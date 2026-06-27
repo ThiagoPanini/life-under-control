@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 // next/navigation e next/link não têm router montado nos testes — mockamos o mínimo.
 vi.mock("next/navigation", () => ({ usePathname: () => "/painel" }))
+// Evita puxar @/auth (next-auth) pelo server action de logout no ambiente de teste.
+vi.mock("@/app/actions", () => ({ logout: async () => {} }))
 vi.mock("next/link", () => ({
   default: ({
     href,
