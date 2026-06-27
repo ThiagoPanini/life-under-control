@@ -4,16 +4,22 @@ import { describe, expect, it } from "vitest"
 
 /**
  * Fronteira do núcleo, mecanizada (ADR-0003): core/ só importa pra dentro —
- * nunca de adapters/, app/, components/, lib/, Next, Drizzle ou React. Este
- * teste é o gate; a regra de lint do Biome reforça no editor. A borda fala com
- * use-case; o núcleo nunca fala com o store nem com o framework.
+ * nunca de Next, next-auth, Drizzle, React nem de qualquer alias `@/` fora de
+ * `@/core`. Este teste é o gate; a regra de lint do Biome reforça no editor. A
+ * borda fala com use-case; o núcleo nunca fala com o store nem com o framework.
  */
 
 const CORE_DIR = resolve(process.cwd(), "src", "core")
 
-const FORBIDDEN_PACKAGES = ["next", "react", "react-dom", "drizzle-orm", "pg"]
-
-const FORBIDDEN_ALIAS = /^@\/(adapters|app|components|lib)(\/|$)/
+const FORBIDDEN_PACKAGES = [
+  "next",
+  "next-auth",
+  "@auth/core",
+  "react",
+  "react-dom",
+  "drizzle-orm",
+  "pg",
+]
 
 /** Extrai os especificadores de todo import/export ... from "x" e import("x"). */
 function importSpecifiers(source: string): string[] {
@@ -35,7 +41,9 @@ function isForbidden(spec: string, fileDir: string): boolean {
     const resolved = resolve(fileDir, spec)
     return !resolved.startsWith(CORE_DIR)
   }
-  if (spec.startsWith("@/")) return FORBIDDEN_ALIAS.test(spec)
+  // Alias: o núcleo só pode importar de dentro de @/core. Qualquer outro alias
+  // (@/auth, @/middleware, @/adapters, @/app, @/components, @/lib) fura.
+  if (spec.startsWith("@/")) return !spec.startsWith("@/core/")
   if (spec.startsWith("node:")) return false
   const pkg = spec.startsWith("@") ? spec.split("/").slice(0, 2).join("/") : spec.split("/")[0]
   return FORBIDDEN_PACKAGES.includes(pkg)
@@ -66,9 +74,12 @@ describe("fronteira do núcleo (ADR-0003)", () => {
   it("test_detector_reconhece_import_proibido", () => {
     const domain = join(CORE_DIR, "domain")
     expect(isForbidden("next/server", domain)).toBe(true)
+    expect(isForbidden("next-auth/providers/google", domain)).toBe(true)
     expect(isForbidden("react", domain)).toBe(true)
     expect(isForbidden("drizzle-orm", domain)).toBe(true)
     expect(isForbidden("@/adapters/db", domain)).toBe(true)
+    expect(isForbidden("@/auth", domain)).toBe(true)
+    expect(isForbidden("@/middleware", domain)).toBe(true)
     expect(isForbidden("../../adapters/db", domain)).toBe(true)
     // permitido: interno, node, libs puras
     expect(isForbidden("./money", domain)).toBe(false)

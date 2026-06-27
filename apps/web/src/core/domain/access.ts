@@ -4,12 +4,17 @@
  * pura: parse da allowlist e checagem de e-mail. Nada de Auth.js nem rede.
  */
 
-/** Quebra a config `LUC_ALLOWLIST` ("a@x, b@y") em e-mails normalizados. */
+/**
+ * Quebra a config `LUC_ALLOWLIST` ("a@x, b@y") em e-mails normalizados e únicos.
+ * Deduplica (após trim/lowercase) pra que `a@x, A@x` conte como 1 Pessoa, não 2
+ * — senão o check de "exatamente 2" (invariante #2) passaria com 1 identidade.
+ */
 export function parseAllowlist(raw: string | null | undefined): string[] {
-  return (raw ?? "")
+  const emails = (raw ?? "")
     .split(",")
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean)
+  return [...new Set(emails)]
 }
 
 /** O e-mail está na allowlist? Comparação case-insensitive, ignorando espaços. */

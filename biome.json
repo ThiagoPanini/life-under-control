@@ -48,6 +48,8 @@
                   "next/server": "core/ é puro: a borda Next nunca entra no núcleo (ADR-0003).",
                   "next/navigation": "core/ é puro: a borda Next nunca entra no núcleo (ADR-0003).",
                   "next/headers": "core/ é puro: a borda Next nunca entra no núcleo (ADR-0003).",
+                  "next-auth": "core/ é puro: a borda de auth (next-auth) nunca entra no núcleo (ADR-0003).",
+                  "@auth/core": "core/ é puro: a borda de auth nunca entra no núcleo (ADR-0003).",
                   "react": "core/ é puro: sem React (ADR-0003).",
                   "react-dom": "core/ é puro: sem React (ADR-0003).",
                   "drizzle-orm": "core/ não fala com o store: use um port, não Drizzle (ADR-0003).",
