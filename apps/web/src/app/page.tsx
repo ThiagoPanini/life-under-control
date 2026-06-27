@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { Logo } from "@/components/brand/Logo"
 
 export default function Home() {
@@ -22,10 +23,18 @@ export default function Home() {
             A vida adulta do Lar num só lugar. Em construção, fatia por fatia.
           </p>
         </div>
-        <span className="inline-flex items-center gap-2 rounded-luc-md border border-luc-border bg-luc-surface-2 px-3 py-1.5 font-mono text-[11.5px] text-luc-text-3">
-          <span className="h-2 w-2 rounded-full bg-luc-success" />
-          carcaça viva · S0
-        </span>
+        <div className="flex flex-col items-center gap-4">
+          <Link
+            href="/painel"
+            className="inline-flex items-center gap-2 rounded-luc-md border border-luc-border bg-luc-surface-2 px-4 py-2 text-sm font-medium text-luc-text transition-colors hover:border-luc-accent hover:text-luc-accent"
+          >
+            Abrir o Painel →
+          </Link>
+          <span className="inline-flex items-center gap-2 rounded-luc-md border border-luc-border bg-luc-surface-2 px-3 py-1.5 font-mono text-[11.5px] text-luc-text-3">
+            <span className="h-2 w-2 rounded-full bg-luc-success" />
+            carcaça viva · S1
+          </span>
+        </div>
       </div>
     </main>
   )

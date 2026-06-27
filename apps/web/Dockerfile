@@ -29,6 +29,9 @@ RUN addgroup -S nodejs -g 1001 && adduser -S nextjs -u 1001
 COPY --from=build --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
+# Migração + seed rodam no boot (usam o `pg` traçado no standalone).
+COPY --from=build --chown=nextjs:nodejs /app/apps/web/drizzle ./apps/web/drizzle
+COPY --from=build --chown=nextjs:nodejs /app/apps/web/migrate.mjs ./apps/web/migrate.mjs
 USER nextjs
 EXPOSE 3000
-CMD ["node", "apps/web/server.js"]
+CMD ["sh", "-c", "node apps/web/migrate.mjs && node apps/web/server.js"]

@@ -29,6 +29,22 @@ jobs:
   web:
     name: web
     runs-on: ubuntu-latest
+    # Postgres real para o teste de Seam 2 (adapter Drizzle). Os demais passos
+    # ignoram o serviço; só o passo de teste recebe DATABASE_URL.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: luc
+          POSTGRES_PASSWORD: luc
+          POSTGRES_DB: luc
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U luc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v7
       - id: appcheck
@@ -56,6 +72,8 @@ jobs:
         run: pnpm --filter @luc/web typecheck
       - name: test (vitest)
         if: steps.appcheck.outputs.exists == 'true'
+        env:
+          DATABASE_URL: postgres://luc:luc@localhost:5432/luc
         run: pnpm --filter @luc/web test
 
   security:
