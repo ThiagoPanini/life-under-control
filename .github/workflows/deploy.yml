@@ -92,19 +92,20 @@ jobs:
         if: steps.guard.outputs.enabled == 'true'
         run: |
           set -euo pipefail
-          public_url="https://luc.panlabs.tech"
+          # /login e a superficie publica (200); / e o resto sao gateados (S3).
+          smoke_url="https://luc.panlabs.tech/login"
 
           echo "Aguardando deploy estabilizar..."
           sleep 20
           for i in $(seq 1 15); do
-            code="$(curl -fsS -o /dev/null -w "%{http_code}" "${public_url}/" || true)"
+            code="$(curl -fsS -o /dev/null -w "%{http_code}" "${smoke_url}" || true)"
             if [ "$code" = "200" ]; then
               echo "Smoke OK (tentativa $i)"; exit 0
             fi
             echo "tentativa $i: HTTP ${code} - aguardando..."
             sleep 10
           done
-          echo "::error::Smoke test falhou - ${public_url} nao respondeu 200."; exit 1
+          echo "::error::Smoke test falhou - ${smoke_url} nao respondeu 200."; exit 1
 
       - name: Deploy pulado (sem secrets do Coolify)
         if: steps.guard.outputs.enabled != 'true'
