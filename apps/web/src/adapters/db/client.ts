@@ -14,7 +14,12 @@ export function getDb(): Db {
   if (!globalForDb.__lucPool) {
     const connectionString = process.env.DATABASE_URL
     if (!connectionString) throw new Error("DATABASE_URL não definido")
-    globalForDb.__lucPool = new Pool({ connectionString })
+    const pool = new Pool({ connectionString })
+    // node-postgres emite 'error' em clients ociosos (ex.: o Postgres reciclando
+    // a conexão num redeploy). Sem um listener, o Node derruba o processo; aqui
+    // logamos e seguimos — o pg descarta o client quebrado e reabre sob demanda.
+    pool.on("error", (err) => console.error("[db] erro em client ocioso do pool:", err))
+    globalForDb.__lucPool = pool
   }
   return drizzle(globalForDb.__lucPool, { schema })
 }

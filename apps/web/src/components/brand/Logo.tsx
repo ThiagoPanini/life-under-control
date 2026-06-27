@@ -1,7 +1,18 @@
-/** A marca do LUC — quadrado arredondado com mira ciano (sistema de design Mirante). */
-export function Logo({ size = 30 }: { size?: number }) {
+/**
+ * A marca do LUC — quadrado arredondado com mira ciano (sistema de design Mirante).
+ * Use `decorative` quando o nome já estiver escrito ao lado, pro leitor de tela
+ * não anunciar "Life Under Control" duas vezes.
+ */
+export function Logo({ size = 30, decorative = false }: { size?: number; decorative?: boolean }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 30 30" role="img" aria-label="Life Under Control">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 30 30"
+      role="img"
+      aria-label="Life Under Control"
+      aria-hidden={decorative || undefined}
+    >
       <rect
         x="1"
         y="1"

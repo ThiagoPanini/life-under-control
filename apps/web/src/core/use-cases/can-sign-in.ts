@@ -1,9 +1,9 @@
 import { emailNaAllowlist, parseAllowlist } from "../domain/access"
 
-/** A allowlist do Lar precisa ter exatamente 2 e-mails (invariante: 2 Pessoas). */
+/** A allowlist do Lar precisa ter exatamente 2 e-mails únicos (invariante: 2 Pessoas). */
 export class AllowlistInvalidaError extends Error {
   constructor(quantidade: number) {
-    super(`A allowlist precisa de exatamente 2 e-mails; encontrei ${quantidade}`)
+    super(`A allowlist precisa de exatamente 2 e-mails únicos; encontrei ${quantidade}`)
     this.name = "AllowlistInvalidaError"
   }
 }

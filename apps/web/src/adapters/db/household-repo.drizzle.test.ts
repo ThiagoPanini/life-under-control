@@ -13,6 +13,14 @@ import * as schema from "./schema"
 const DATABASE_URL = process.env.DATABASE_URL
 const suite = DATABASE_URL ? describe : describe.skip
 
+// Guarda: no CI o Seam 2 NÃO pode ser pulado em silêncio (falso-verde). Se o
+// Postgres do workflow sumir, isto falha-vermelho em vez de mergear sem cobertura.
+describe("Seam 2 — guarda de cobertura", () => {
+  it("test_database_url_presente_no_ci", () => {
+    if (process.env.CI) expect(DATABASE_URL).toBeTruthy()
+  })
+})
+
 suite("drizzleHouseholdRepo (Seam 2 — Postgres real)", () => {
   let pool: Pool
 

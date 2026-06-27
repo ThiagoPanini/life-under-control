@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest"
-import { cleanup, render, screen, waitFor } from "@testing-library/react"
+import { cleanup, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { ComponentProps, ReactNode } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -26,7 +26,8 @@ import { AppShell } from "./AppShell"
 
 afterEach(() => {
   cleanup()
-  localStorage.clear()
+  // biome-ignore lint/suspicious/noDocumentCookie: limpeza do cookie entre testes.
+  document.cookie = "luc:sidebar-collapsed=; path=/; max-age=0"
 })
 
 describe("AreaCard (Seam 3)", () => {
@@ -42,10 +43,19 @@ describe("AreaCard (Seam 3)", () => {
     expect(selo).toHaveAttribute("data-tone", "muted")
     expect(screen.getByText("Finanças").closest("a")).toHaveAttribute("href", "/areas/financas")
   })
+
+  it("test_area_ativa_nao_mostra_selo_em_breve", () => {
+    render(
+      <AreaCard area={{ slug: "financas", nome: "Finanças", icon: "wallet", estado: "ativa" }} />,
+    )
+
+    expect(screen.queryByText("em breve")).toBeNull()
+    expect(screen.getByText("Finanças").closest("a")).toHaveAttribute("href", "/areas/financas")
+  })
 })
 
 describe("AppShell sidebar (Seam 3)", () => {
-  it("test_colapso_persiste_no_localStorage", async () => {
+  it("test_colapso_grava_cookie", async () => {
     const user = userEvent.setup()
     const { container } = render(
       <AppShell>
@@ -57,21 +67,17 @@ describe("AppShell sidebar (Seam 3)", () => {
 
     await user.click(screen.getByRole("button", { name: "Recolher menu" }))
 
-    expect(localStorage.getItem("luc:sidebar-collapsed")).toBe("true")
+    expect(document.cookie).toContain("luc:sidebar-collapsed=true")
     expect(aside).toHaveAttribute("data-collapsed", "true")
   })
 
-  it("test_estado_colapsado_sobrevive_a_remontagem", async () => {
-    localStorage.setItem("luc:sidebar-collapsed", "true")
-
+  it("test_inicia_colapsado_pela_preferencia_do_servidor", () => {
     const { container } = render(
-      <AppShell>
+      <AppShell initialCollapsed>
         <div>conteúdo</div>
       </AppShell>,
     )
 
-    await waitFor(() => {
-      expect(container.querySelector("aside")).toHaveAttribute("data-collapsed", "true")
-    })
+    expect(container.querySelector("aside")).toHaveAttribute("data-collapsed", "true")
   })
 })
