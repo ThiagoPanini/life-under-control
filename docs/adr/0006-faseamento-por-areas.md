@@ -27,7 +27,7 @@ Sem essa distinção fixada, o projeto se obriga a construir seis Áreas para "l
 
 - **Positivas:** lançável com uma Área; o Painel comunica visão completa desde o dia 1; cada Área nova é um incremento isolado.
 - **Negativas / aceito:** Áreas `em breve` por muito tempo podem parecer abandono. Aceito: a honestidade visual ("em breve") é melhor que esconder a ambição ou que prometer datas. O estado é honesto justamente por não carregar prazo.
-- O estado de Área (`em breve`/`ativa`) é um dado de primeira classe do Painel — e provavelmente a primeira coisa que o sistema visual (Noturno, no design) precisa representar.
+- O estado de Área (`em breve`/`ativa`) é um dado de primeira classe do Painel — e provavelmente a primeira coisa que o sistema visual precisa representar.
 
 ## Opções rejeitadas
 

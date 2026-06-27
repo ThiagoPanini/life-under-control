@@ -1,0 +1,113 @@
+name: deploy
+
+# Portao 3 — deploy em producao no merge para main.
+# Fluxo: build do app -> push GHCR -> redeploy Coolify via webhook -> smoke test.
+# Guardas: build pula se apps/web/Dockerfile nao existe (pre-protótipo);
+# deploy pula se COOLIFY_TOKEN nao esta configurado. Nenhuma das duas falha.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  build-push:
+    name: build-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: appcheck
+        run: |
+          if [ -f apps/web/Dockerfile ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::apps/web/Dockerfile ainda nao existe — build/push pulado."
+          fi
+      - uses: docker/setup-buildx-action@v3
+        if: steps.appcheck.outputs.exists == 'true'
+      - uses: docker/login-action@v3
+        if: steps.appcheck.outputs.exists == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        if: steps.appcheck.outputs.exists == 'true'
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/thiagopanini/life-under-control
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+      - uses: docker/build-push-action@v6
+        if: steps.appcheck.outputs.exists == 'true'
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: deploy (coolify)
+    needs: build-push
+    runs-on: ubuntu-latest
+    steps:
+      - id: guard
+        run: echo "enabled=${{ secrets.COOLIFY_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger Coolify redeploy
+        if: steps.guard.outputs.enabled == 'true'
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -z "$COOLIFY_URL" ] && missing="$missing COOLIFY_URL"
+          [ -z "$APP_UUID" ] && missing="$missing COOLIFY_APP_UUID"
+          if [ -n "$missing" ]; then
+            echo "::error::Deploy abortado - secret(s) ausente(s):${missing}."
+            exit 1
+          fi
+
+          echo "Disparando deploy do app $APP_UUID..."
+          curl -fsSL -X POST \
+            -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+            "${COOLIFY_URL}/api/v1/deploy?uuid=${APP_UUID}&force=true"
+
+      - name: Smoke test (luc.panlabs.tech)
+        if: steps.guard.outputs.enabled == 'true'
+        run: |
+          set -euo pipefail
+          public_url="https://luc.panlabs.tech"
+
+          echo "Aguardando deploy estabilizar..."
+          sleep 20
+          for i in $(seq 1 15); do
+            code="$(curl -fsS -o /dev/null -w "%{http_code}" "${public_url}/" || true)"
+            if [ "$code" = "200" ]; then
+              echo "Smoke OK (tentativa $i)"; exit 0
+            fi
+            echo "tentativa $i: HTTP ${code} - aguardando..."
+            sleep 10
+          done
+          echo "::error::Smoke test falhou - ${public_url} nao respondeu 200."; exit 1
+
+      - name: Deploy pulado (sem secrets do Coolify)
+        if: steps.guard.outputs.enabled != 'true'
+        run: |
+          echo "::notice::COOLIFY_TOKEN ausente — build/push para GHCR feito (se app existe), deploy pulado."
+          echo "::notice::Configure os secrets COOLIFY_TOKEN, COOLIFY_URL, COOLIFY_APP_UUID."
