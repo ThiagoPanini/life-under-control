@@ -1,0 +1,17 @@
+# Build context = raiz do repo (deploy.yml usa context: .)
+**/node_modules
+**/.next
+**/dist
+**/build
+**/.turbo
+.git
+.github
+docs
+prompts
+.agents
+.claude
+.codex
+.env
+.env.*
+**/*.log
+luc-login-backgroudn.png

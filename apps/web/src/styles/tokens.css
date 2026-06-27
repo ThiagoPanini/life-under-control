@@ -1,0 +1,52 @@
+/* Life Under Control — Mirante · tokens (handoff do sistema de design).
+   "Mirante" é codinome interno; nunca aparece na UI. */
+:root {
+  /* Fundo & superfície */
+  --luc-bg: #0a0c0f;
+  --luc-surface-1: #0c0f13;
+  --luc-surface-2: #111419;
+  --luc-surface-3: #13161b;
+  --luc-border: rgba(255, 255, 255, 0.07);
+  --luc-border-strong: rgba(255, 255, 255, 0.1);
+  --luc-row-line: rgba(255, 255, 255, 0.04);
+
+  /* Texto */
+  --luc-text: #e7e9ec;
+  --luc-text-strong: #c9ccd1;
+  --luc-text-2: #9aa0a8;
+  --luc-text-3: #8b9099;
+  --luc-muted: #6b7178;
+  --luc-faint: #5f656d;
+  --luc-disabled: #4f555c;
+
+  /* Acento · ciano */
+  --luc-accent: #4cc4e6;
+  --luc-accent-bright: #8fdcf0;
+  --luc-accent-16: rgba(76, 196, 230, 0.16);
+  --luc-accent-12: rgba(76, 196, 230, 0.12);
+  --luc-accent-06: rgba(76, 196, 230, 0.06);
+
+  /* Semânticos — estado, nunca decoração */
+  --luc-success: #5fd0a0;
+  --luc-warn: #e0a05f;
+
+  /* Pessoas · autoria (nunca permissão) */
+  --luc-thiago-fg: hsl(211 76% 74%);
+  --luc-thiago-bg: hsl(211 44% 23%);
+  --luc-jakeline-fg: hsl(14 76% 74%);
+  --luc-jakeline-bg: hsl(14 44% 23%);
+
+  /* Tipografia — Manrope (texto) + JetBrains Mono (números/datas/%) */
+  --luc-font-sans: var(--font-manrope), "Manrope", system-ui, sans-serif;
+  --luc-font-mono: var(--font-jetbrains), "JetBrains Mono", monospace;
+
+  /* Raio */
+  --luc-r-sm: 7px;
+  --luc-r-md: 9px;
+  --luc-r-lg: 13px;
+  --luc-r-xl: 16px;
+
+  /* Painel lateral colapsável */
+  --luc-sidebar-w: 244px;
+  --luc-sidebar-w-collapsed: 74px;
+}

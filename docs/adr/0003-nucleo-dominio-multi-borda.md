@@ -29,7 +29,24 @@ As **bordas são finas e plugam no mesmo núcleo**: a UI (Server Actions/Compone
 
 - **Positivas:** regra de domínio num lugar, falável pelo vocabulário do CONTEXT.md; bordas novas são adapters, não reescritas; testes de domínio rápidos.
 - **Negativas:** disciplina exigida — num app Next é tentador chamar o banco direto de uma Server Action. Sem revisão, o núcleo vaza. Mitiga-se com a convenção "borda nunca fala com o store; fala com use-case".
-- O *layout de pastas* concreto (onde moram use-cases, ports, adapters) é detalhe de implementação a firmar no primeiro código — este ADR fixa o princípio (núcleo isolado, bordas finas), não a estrutura de diretórios.
+- O *layout de pastas* concreto (onde moram use-cases, ports, adapters) é detalhe de implementação — **firmado em 2026-06-27** (ver abaixo); este ADR fixa o princípio (núcleo isolado, bordas finas) e agora também registra a estrutura escolhida.
+
+### Layout firmado (2026-06-27)
+
+O primeiro código firmou o layout. **Escolha: um pacote (`@luc/web`), com a fronteira por pasta + uma regra de lint** — não um pacote `core` separado (a cerimônia que este ADR quis evitar). Quando a 2ª borda existir, extrai-se `packages/core` por refactor.
+
+```
+apps/web/src/
+  core/        # núcleo puro — domain/ use-cases/ ports/ · zero Next, Drizzle, HTTP, React
+  adapters/    # implementam os ports — db/ (Drizzle: schema, client, repositories), clock/
+  app/         # borda: Next App Router (Server Components / Actions / Route Handlers)
+  components/  # design system (Tailwind)
+  lib/         # cola: auth (Auth.js), env, allowlist, composition root
+```
+
+- **Regra de ouro mecanizada:** `core/**` só importa pra dentro — nunca de `adapters/`, `app/`, Drizzle ou Next. Uma regra de import no lint reprova o vazamento, dando quase a proteção do pacote-separado sem a cerimônia.
+- **Composition root** em `lib/` injeta os adapters concretos nos use-cases (funções-fábrica, sem framework de DI).
+- **Gatilho de extração:** quando uma 2ª borda (worker de WhatsApp, OCR) precisar do núcleo de fato, extrai-se `packages/core` por refactor — generalização extraída quando a repetição aparece, não presumida ([ADR-0005](0005-primitivos-descritivos-spine-especializacao.md)).
 
 ## Opções rejeitadas
 

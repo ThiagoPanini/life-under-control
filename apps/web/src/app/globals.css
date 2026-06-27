@@ -1,0 +1,43 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+
+/* Mapeia os tokens --luc-* para utilitários Tailwind (bg-luc-*, text-luc-*,
+   font-mono, rounded-luc-*). @theme inline preserva a referência à variável. */
+@theme inline {
+  --color-luc-bg: var(--luc-bg);
+  --color-luc-surface-1: var(--luc-surface-1);
+  --color-luc-surface-2: var(--luc-surface-2);
+  --color-luc-surface-3: var(--luc-surface-3);
+  --color-luc-border: var(--luc-border);
+  --color-luc-border-strong: var(--luc-border-strong);
+  --color-luc-text: var(--luc-text);
+  --color-luc-text-strong: var(--luc-text-strong);
+  --color-luc-text-2: var(--luc-text-2);
+  --color-luc-text-3: var(--luc-text-3);
+  --color-luc-muted: var(--luc-muted);
+  --color-luc-faint: var(--luc-faint);
+  --color-luc-disabled: var(--luc-disabled);
+  --color-luc-accent: var(--luc-accent);
+  --color-luc-accent-bright: var(--luc-accent-bright);
+  --color-luc-success: var(--luc-success);
+  --color-luc-warn: var(--luc-warn);
+
+  --font-sans: var(--luc-font-sans);
+  --font-mono: var(--luc-font-mono);
+
+  --radius-luc-sm: var(--luc-r-sm);
+  --radius-luc-md: var(--luc-r-md);
+  --radius-luc-lg: var(--luc-r-lg);
+  --radius-luc-xl: var(--luc-r-xl);
+}
+
+html,
+body {
+  background: var(--luc-bg);
+  color: var(--luc-text);
+}
+
+body {
+  font-family: var(--luc-font-sans);
+  -webkit-font-smoothing: antialiased;
+}
