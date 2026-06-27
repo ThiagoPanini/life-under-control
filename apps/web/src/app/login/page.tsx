@@ -10,7 +10,12 @@ export default async function LoginPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const { error } = await searchParams
-  const semAcesso = Boolean(error)
+  const codigo = Array.isArray(error) ? error[0] : error
+  // Auth.js emite `AccessDenied` quando o callback signIn nega (allowlist). Os
+  // demais códigos (Configuration, OAuthCallback…) são falha técnica, não "fora
+  // do Lar" — não acusar uma conta legítima de não pertencer.
+  const negado = codigo === "AccessDenied"
+  const falhou = Boolean(codigo) && !negado
 
   return (
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden px-6">
@@ -29,7 +34,7 @@ export default async function LoginPage({
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(90% 60% at 82% -10%, rgba(76,196,230,.16), transparent 60%), linear-gradient(180deg, rgba(10,12,15,.55), rgba(10,12,15,.88))",
+            "radial-gradient(90% 60% at 82% -10%, var(--luc-accent-16), transparent 60%), linear-gradient(180deg, color-mix(in srgb, var(--luc-bg) 55%, transparent), color-mix(in srgb, var(--luc-bg) 88%, transparent))",
         }}
       />
 
@@ -47,9 +52,14 @@ export default async function LoginPage({
           </p>
         </div>
 
-        {semAcesso && (
+        {negado && (
           <p className="w-full rounded-luc-md border border-luc-border bg-luc-surface-2 px-3 py-2 text-luc-warn text-sm">
             Sem acesso — esta conta não faz parte do Lar.
+          </p>
+        )}
+        {falhou && (
+          <p className="w-full rounded-luc-md border border-luc-border bg-luc-surface-2 px-3 py-2 text-luc-warn text-sm">
+            Não foi possível entrar. Tente novamente.
           </p>
         )}
 
@@ -62,7 +72,7 @@ export default async function LoginPage({
         >
           <button
             type="submit"
-            className="inline-flex w-full items-center justify-center gap-3 rounded-luc-md bg-luc-text px-4 py-2.5 font-medium text-luc-bg text-sm transition-opacity hover:opacity-90"
+            className="inline-flex w-full items-center justify-center gap-3 rounded-luc-md bg-luc-text px-4 py-2.5 font-medium text-luc-bg text-sm transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-luc-bg"
           >
             <GoogleMark />
             Entrar com Google
