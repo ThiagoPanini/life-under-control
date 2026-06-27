@@ -10,7 +10,7 @@ export function AreaCard({ area }: { area: Area }) {
     <Link
       href={`/areas/${area.slug}`}
       data-estado={area.estado}
-      className="group flex flex-col gap-5 rounded-luc-lg border border-luc-border bg-luc-surface-1 p-5 transition-colors hover:border-luc-border-strong"
+      className="group flex min-h-28 touch-manipulation flex-col gap-5 rounded-luc-lg border border-luc-border bg-luc-surface-1 p-5 transition-[border-color,background-color,transform] active:scale-[0.99] active:bg-luc-surface-2 hover:border-luc-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-luc-bg"
     >
       <div className="flex items-start justify-between">
         <span className="flex h-10 w-10 items-center justify-center rounded-luc-md border border-luc-border bg-luc-surface-2 text-luc-text-2 transition-colors group-hover:text-luc-accent">

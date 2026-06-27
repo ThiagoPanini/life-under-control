@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest"
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { ComponentProps, ReactNode } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -79,5 +79,55 @@ describe("AppShell sidebar (Seam 3)", () => {
     )
 
     expect(container.querySelector("aside")).toHaveAttribute("data-collapsed", "true")
+  })
+})
+
+describe("AppShell mobile", () => {
+  it("test_dock_movel_mantem_rotas_principais_ao_alcance", () => {
+    render(
+      <AppShell>
+        <div>conteúdo</div>
+      </AppShell>,
+    )
+
+    const dock = screen.getByRole("navigation", { name: "Navegação móvel" })
+    expect(within(dock).getByRole("link", { name: "Painel" })).toHaveAttribute("href", "/painel")
+    expect(within(dock).getByRole("link", { name: "Painel" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    )
+    expect(within(dock).getByRole("link", { name: "Agenda" })).toHaveAttribute("href", "/agenda")
+    expect(within(dock).getByRole("button", { name: "Abrir Áreas" })).toHaveAttribute(
+      "aria-controls",
+      "mobile-navigation-drawer",
+    )
+  })
+
+  it("test_menu_movel_da_acesso_a_todas_as_areas_e_retem_o_foco", async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <AppShell>
+        <div>conteúdo</div>
+      </AppShell>,
+    )
+    const openButton = screen.getByRole("button", { name: "Abrir menu" })
+
+    await user.click(openButton)
+
+    const dialog = screen.getByRole("dialog", { name: "Life Under Control" })
+    const areaNavigation = within(dialog).getByRole("navigation", { name: "Áreas móvel" })
+    expect(within(areaNavigation).getAllByRole("link")).toHaveLength(6)
+    expect(within(areaNavigation).getByRole("link", { name: "Finanças" })).toHaveAttribute(
+      "href",
+      "/areas/financas",
+    )
+    expect(within(dialog).getByRole("button", { name: "Fechar menu" })).toHaveFocus()
+    expect(document.body).toHaveStyle({ overflow: "hidden" })
+
+    await user.keyboard("{Escape}")
+
+    expect(container.querySelector("div[data-open]")).toHaveAttribute("data-open", "false")
+    expect(openButton).toHaveFocus()
+    expect(document.body).not.toHaveStyle({ overflow: "hidden" })
   })
 })

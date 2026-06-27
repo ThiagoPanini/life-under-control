@@ -21,7 +21,7 @@ export function Pill({
   return (
     <span
       data-tone={tone}
-      className={`inline-flex items-center gap-1.5 rounded-luc-sm border px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.12em] ${TONES[tone]} ${className}`}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-luc-sm border px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.12em] ${TONES[tone]} ${className}`}
     >
       {children}
     </span>

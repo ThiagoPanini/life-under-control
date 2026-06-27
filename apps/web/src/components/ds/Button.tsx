@@ -5,7 +5,7 @@ import type { ComponentProps, ReactNode } from "react"
 export type ButtonVariant = "primary" | "ghost"
 
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-luc-md px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-luc-bg"
+  "inline-flex min-h-11 touch-manipulation items-center justify-center gap-2 rounded-luc-md px-4 py-2 text-sm font-medium transition-colors active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-luc-bg"
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary: "bg-luc-accent text-luc-bg hover:bg-luc-accent-bright",

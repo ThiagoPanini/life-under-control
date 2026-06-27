@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { JetBrains_Mono, Manrope } from "next/font/google"
 import type { ReactNode } from "react"
 import "./globals.css"
@@ -18,6 +18,14 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Life Under Control",
   description: "O cockpit da vida do Lar.",
+}
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  colorScheme: "dark",
+  themeColor: "#0a0c0f",
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {
