@@ -27,6 +27,25 @@ Disparado por **"implementa as issues"** (ou equivalente). O agente está livre 
 
 A cadência de *Áreas* permanece de planejamento ([ADR-0006](../adr/0006-faseamento-por-areas.md)): *qual* Área ativar a seguir é decisão do operador; *dentro* das issues fatiadas, a execução é autônoma.
 
+## Economia de contexto (enforçada por hooks)
+
+Medições de `/implement` reais mostraram a janela chegando a 92-160k de tokens já no primeiro código — até 15-28k disso em Reads de arquivo inteiro evitáveis, uma vez **mesmo com um digest de 191 tokens já disponível**. O `gh issue view` de issues irmãs (3.5-4.6k) e a releitura de output cru de subagente (12.5k) se repetem sessão a sessão. O conserto é estrutural, não exortação.
+
+**Disciplina (o protocolo injetado — `.claude/context-economy-protocol.md`):**
+
+- **Delegue o reconhecimento.** Ao implementar, primeiro spawne um subagente `Explore` (escopo na Área) e peça um digest ≤2-3k: arquivos relevantes (path+porquê), padrão a espelhar, invariantes/ADR, seams p/ TDD. O digest é o **orçamento de leitura** — leia só o que ele nomeia, em fatias estreitas, e parta pro RED.
+- **Issue enxuta.** Só a issue-alvo (`gh issue view N`, title/body/labels); sem irmãs, sem `--comments` salvo necessidade.
+- **Não releia output cru.** `.output` de subagente e dumps de `tool-results/` de MCP já viraram digest — re-consulte a fonte com pergunta dirigida, não releia o dump.
+
+**Enforcement (dois hooks do projeto, em `.claude/hooks/`):**
+
+- **Injetor** (`UserPromptSubmit`): ao ver `/implement` ou "implementa as issues", injeta o protocolo no contexto do turno.
+- **Trava** (`PreToolUse`/Read): bloqueia leitura inteira de paths que nunca valem a pena no implement — `.output`, `tool-results/`, lockfiles, `drizzle/meta/`, artefatos (`node_modules`/`dist`/`.next`/`*.min.*`). Leitura de código-fonte fica livre.
+
+Ambos são **marker-gated** pelo arquivo `.claude/context-economy-protocol.md`: sem ele, são inertes. Isso permite **promover os scripts pro `~/.claude` global** (fonte única, sem drift) e cada repo opta-in só dropando o protocolo — sem duplicar o wiring (hooks de user e project mergeiam e disparariam 2×).
+
+**Promoção pro global (quando validado no LUC):** (1) `cp .claude/hooks/*.py ~/.claude/hooks/`; (2) mova o bloco `hooks` de `.claude/settings.json` → `~/.claude/settings.json`; (3) **apague** o bloco `hooks` do `.claude/settings.json` do projeto (senão dispara 2×); (4) o LUC mantém o `context-economy-protocol.md` como override/marker; (5) cada outro repo opta-in dropando seu próprio `context-economy-protocol.md`. Scripts não mudam (já `${CLAUDE_PROJECT_DIR}`-relativos e marker-gated).
+
 ## Onde as coisas vivem
 
 - Issues e PRDs: GitHub Issues — [`issue-tracker.md`](issue-tracker.md).

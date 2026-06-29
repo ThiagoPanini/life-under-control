@@ -11,14 +11,15 @@ import {
 /**
  * Card de uma Conta na lista de Finanças. Mostra a *regra* — Recorrência e
  * vencimento esperado — nunca um valor (invariante #5). O card todo é o caminho
- * para a edição (#18); farol, grid, média e histórico chegam com o card cheio (#21).
- * Contas encerradas aparecem esmaecidas, com a data de encerramento.
+ * para o detalhe da Conta (baixa + Lançamentos, #19; daí se chega à edição, #18);
+ * farol, grid, média e histórico chegam com o card cheio (#21). Contas encerradas
+ * aparecem esmaecidas, com a data de encerramento.
  */
 export function BillCard({ bill }: { bill: Bill }) {
   const encerrada = bill.estado === "encerrada"
   return (
     <Link
-      href={`/areas/financas/${bill.id}/editar`}
+      href={`/areas/financas/${bill.id}`}
       className={`flex items-start gap-4 rounded-luc-lg border border-luc-border bg-luc-surface-1 p-5 transition-colors hover:border-luc-border-strong focus-visible:border-luc-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent/40 ${
         encerrada ? "opacity-60" : ""
       }`}

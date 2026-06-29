@@ -11,6 +11,9 @@ const here = dirname(fileURLToPath(import.meta.url))
 const migrationsDir = join(here, "drizzle")
 const seedFile = join(migrationsDir, "seed.sql")
 
+// Chave fixa do advisory lock que serializa execuções concorrentes (ver runMigrations).
+const LOCK_KEY = 8150019
+
 /** Conecta com retry — o Postgres pode não estar pronto no boot do deploy. */
 async function connectWithRetry(connectionString, attempts = 10, delayMs = 1500) {
   let lastErr
@@ -38,34 +41,46 @@ export async function runMigrations(connectionString, opts = {}) {
   const { seed = true } = opts
   const client = await connectWithRetry(connectionString)
   try {
-    await client.query(
-      "CREATE TABLE IF NOT EXISTS _luc_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())",
-    )
-    const { rows } = await client.query("SELECT name FROM _luc_migrations")
-    const applied = new Set(rows.map((r) => r.name))
+    // Serializa execuções concorrentes (os 3 arquivos de Seam 2 migram em
+    // workers paralelos do Vitest; e um deploy rolando pode subir dois
+    // containers). `CREATE TABLE IF NOT EXISTS` NÃO é atômico contra criação
+    // concorrente — dois processos passam pelo "não existe" e colidem no
+    // catálogo (duplicate key em pg_type para _luc_migrations, code 23505). O
+    // advisory lock é de sessão e cai sozinho no client.end(), mas liberamos
+    // explicitamente no finally por higiene.
+    await client.query("SELECT pg_advisory_lock($1)", [LOCK_KEY])
+    try {
+      await client.query(
+        "CREATE TABLE IF NOT EXISTS _luc_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())",
+      )
+      const { rows } = await client.query("SELECT name FROM _luc_migrations")
+      const applied = new Set(rows.map((r) => r.name))
 
-    const pendentes = readdirSync(migrationsDir)
-      .filter((f) => f.endsWith(".sql") && f !== "seed.sql")
-      .sort()
+      const pendentes = readdirSync(migrationsDir)
+        .filter((f) => f.endsWith(".sql") && f !== "seed.sql")
+        .sort()
 
-    for (const file of pendentes) {
-      if (applied.has(file)) continue
-      const sql = readFileSync(join(migrationsDir, file), "utf8")
-      await client.query("BEGIN")
-      try {
-        await client.query(sql)
-        await client.query("INSERT INTO _luc_migrations (name) VALUES ($1)", [file])
-        await client.query("COMMIT")
-        console.log(`[migrate] aplicada: ${file}`)
-      } catch (err) {
-        await client.query("ROLLBACK")
-        throw err
+      for (const file of pendentes) {
+        if (applied.has(file)) continue
+        const sql = readFileSync(join(migrationsDir, file), "utf8")
+        await client.query("BEGIN")
+        try {
+          await client.query(sql)
+          await client.query("INSERT INTO _luc_migrations (name) VALUES ($1)", [file])
+          await client.query("COMMIT")
+          console.log(`[migrate] aplicada: ${file}`)
+        } catch (err) {
+          await client.query("ROLLBACK")
+          throw err
+        }
       }
-    }
 
-    if (seed && existsSync(seedFile)) {
-      await client.query(readFileSync(seedFile, "utf8"))
-      console.log("[migrate] seed aplicado (idempotente)")
+      if (seed && existsSync(seedFile)) {
+        await client.query(readFileSync(seedFile, "utf8"))
+        console.log("[migrate] seed aplicado (idempotente)")
+      }
+    } finally {
+      await client.query("SELECT pg_advisory_unlock($1)", [LOCK_KEY])
     }
   } finally {
     await client.end()

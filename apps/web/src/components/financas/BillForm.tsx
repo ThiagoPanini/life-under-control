@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from "react"
 import { Button } from "@/components/ds/Button"
 import { BillIcon } from "@/components/financas/BillIcon"
 import { type BillFormInicial, INICIAL_PADRAO } from "@/components/financas/bill-form-inicial"
+import { Campo, erroDoCampo, inputCls, MensagemErro } from "@/components/financas/form-field"
 import {
   BILL_ICONS,
   type ErroCampo,
@@ -57,9 +58,6 @@ const PASSO_DO_CAMPO: Record<string, number> = {
   dueMonthOffset: 2,
 }
 
-const inputCls =
-  "min-h-11 w-full rounded-luc-md border border-luc-border bg-luc-surface-2 px-3 py-2 text-luc-text outline-none transition-colors focus-visible:border-luc-accent focus-visible:ring-2 focus-visible:ring-luc-accent/40"
-
 export function BillForm({
   formAction,
   erros = [],
@@ -96,9 +94,7 @@ export function BillForm({
     setPasso(Math.min(...passos))
   }, [erros])
 
-  function erroDe(campo: string): string | undefined {
-    return erros.find((e) => e.campo === campo)?.mensagem
-  }
+  const erroDe = (campo: string) => erroDoCampo(erros, campo)
 
   return (
     <form action={formAction} className="flex flex-col gap-8">
@@ -332,35 +328,5 @@ export function BillForm({
         )}
       </div>
     </form>
-  )
-}
-
-function Campo({
-  label,
-  htmlFor,
-  erro,
-  children,
-}: {
-  label: string
-  htmlFor: string
-  erro?: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={htmlFor} className="font-medium text-luc-text-2 text-sm">
-        {label}
-      </label>
-      {children}
-      {erro && <MensagemErro>{erro}</MensagemErro>}
-    </div>
-  )
-}
-
-function MensagemErro({ children }: { children: React.ReactNode }) {
-  return (
-    <p role="alert" className="text-luc-warn text-sm">
-      {children}
-    </p>
   )
 }
