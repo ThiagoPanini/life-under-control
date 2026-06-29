@@ -53,9 +53,9 @@ As formas recorrentes descobertas até aqui. Dois grupos: **itens** (o que você
 
 Única Área trabalhada a fundo por enquanto; as demais ganham vocabulário aqui quando forem trabalhadas.
 
-**Conta** (`Bill`) — A instância do Gerador em Finanças: a regra de um pagamento que se repete (condomínio, luz, fatura); guarda periodicidade e janela esperada de chegada, nunca um valor fixo. _Evite_: despesa, boleto, assinatura, conta bancária.
+**Conta** (`Bill`) — A instância do Gerador em Finanças: a regra de um pagamento que se repete (condomínio, luz, fatura); guarda a periodicidade e a regra do vencimento esperado, nunca um valor fixo. Está `ativa` ou `encerrada` — encerrar (com data) para de projetar dali pra frente e guarda o histórico, sem apagar nada. _Evite_: despesa, boleto, assinatura, conta bancária.
 
-**Lançamento** (`Payment`) — A especialização de Registro em Finanças: o registro de um pagamento efetuado; nasce na quitação, com o valor real do momento, e ganha Competência e origem (uma Conta ou avulso). _Evite_: pagamento previsto, fatura, parcela.
+**Lançamento** (`Payment`) — A especialização de Registro em Finanças: o registro de um pagamento efetuado; nasce na quitação, com o valor real do momento e a data de pagamento, e ganha Competência e origem (uma Conta ou avulso). _Evite_: pagamento previsto, fatura, parcela.
 
 **Competência** (`ReferencePeriod`) — O período a que um Lançamento se refere (o condomínio "de julho"), independente da data em que foi pago. _Evite_: mês de pagamento, vencimento.
 
@@ -83,6 +83,8 @@ O LUC é um cockpit para a vida-administrativa recorrente de um casal. Dizer o q
 **Tarefa (item) × Agenda/Tarefas (vistas).** "Tarefa" é um tipo de item; "Agenda" e "Tarefas" são duas lentes sobre o mesmo conjunto — a Agenda ordena por tempo, a vista de Tarefas agrupa por Área. As vistas nunca têm dados próprios.
 
 **Conta × Lançamento.** A Conta é a regra que se repete e só conhece o "quando"; o Lançamento é o fato de um pagamento e só nasce com o "quanto", na quitação. Reajustar a Conta nunca altera Lançamentos passados.
+
+**Imutável (sistema) × corrigível (pessoa).** A invariante #4 trava o *sistema*, não as Pessoas: reajustar a Conta nunca reescreve um Lançamento, e um fato nasce com o valor do momento (não espelha a Conta). Ela não proíbe as Pessoas de corrigir o que registraram — Lançamentos e Contas são editáveis pelas duas (acesso simétrico, #1); o controle do dado é humano. "Quem pagou" é autoria, nunca trava de edição.
 
 **Ocorrência projetada × exceção.** Um Gerador projeta ocorrências; mexer numa ocorrência específica (adiar "esse mês pago dia 20", pular "esse mês não tem") é registrar uma **exceção** — um fato guardado contra o Gerador. Não é reajustar a regra (não reescreve passado nem futuro inteiro) nem é um Lançamento (não aconteceu). Exceção é fato, não mudança de regra.
 

@@ -31,6 +31,10 @@ O **mecanismo de persistência** dessa especialização (tabela única com discr
 - **Negativas / aceito:** sem um schema genérico imposto, há risco de *inconsistência* entre Áreas (cada uma especializar de um jeito). Mitigam a disciplina do spine compartilhado e a revisão. É a troca consciente: tolera-se alguma divergência para não pagar abstração prematura.
 - O nome e o identificador de código do **Gerador** são provisórios (CONTEXT.md) — firmam com a 2ª Área. Aceitar isto é aceitar um termo "em aberto" no glossário, de propósito.
 
+### 1ª instanciação — Finanças (2026-06-28)
+
+A 1ª Área ativa firmou o padrão na prática: Finanças persiste em **tabelas próprias** (`bills`, `payments`, `attachments`), com os tipos no vocabulário especializado (`Bill`/`Payment`/`Attachment`) — **não** num spine genérico (`generators`/`entries`). O spine só será **extraído por refactor** se a 2ª Área mostrar a mesma forma (gatilho de extração do [ADR-0003](0003-nucleo-dominio-multi-borda.md)). É a filosofia deste ADR em ato: descritivo agora, generalização quando a repetição aparecer — não presumida de uma Área só.
+
 ## Opções rejeitadas
 
 - **Schema prescritivo (N tipos genéricos, Áreas configuram).** Consistência por construção, mas exige que a ontologia derivada de Finanças valha para Saúde/Carro/Imóvel — não verificável hoje. É a aposta cara que o projeto declarou querer evitar.
