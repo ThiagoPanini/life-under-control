@@ -1,12 +1,18 @@
 "use server"
 
+import { randomUUID } from "node:crypto"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { systemClock } from "@/adapters/clock/system-clock"
+import { drizzleAttachmentRepo } from "@/adapters/db/attachment-repo.drizzle"
 import { drizzleBillRepo } from "@/adapters/db/bill-repo.drizzle"
 import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
 import { drizzlePaymentRepo } from "@/adapters/db/payment-repo.drizzle"
+import { r2AttachmentStore } from "@/adapters/r2/r2-attachment-store"
+import { auth } from "@/auth"
+import type { AttachmentBruto } from "@/core/domain/attachment"
 import type { BillBruto, ErroCampo } from "@/core/domain/bill"
+import type { Pessoa } from "@/core/domain/household"
 import { parseCentavos } from "@/core/domain/money"
 import type { PaymentBruto } from "@/core/domain/payment"
 import { BillInvalidaError, createBill } from "@/core/use-cases/create-bill"
@@ -16,7 +22,14 @@ import { BillNaoEncontradaError, editBill } from "@/core/use-cases/edit-bill"
 import { editPayment, PaymentNaoEncontradoError } from "@/core/use-cases/edit-payment"
 import { EncerramentoInvalidoError, encerrarBill } from "@/core/use-cases/encerrar-bill"
 import { getPainel } from "@/core/use-cases/get-painel"
+import { openAttachment } from "@/core/use-cases/open-attachment"
+import {
+  AttachmentInvalidoError,
+  prepareAttachmentUpload,
+} from "@/core/use-cases/prepare-attachment-upload"
 import { PaymentInvalidoError, recordPayment } from "@/core/use-cases/record-payment"
+import { registerAttachment } from "@/core/use-cases/register-attachment"
+import { removeAttachment } from "@/core/use-cases/remove-attachment"
 
 /** Estado do formulário de Conta entre submissões — só os erros por campo (vazio = ok). */
 export type ContaFormState = { erros: ErroCampo[] }
@@ -240,4 +253,116 @@ export async function deletarLancamento(billId: string, paymentId: string): Prom
   }
 
   voltarParaConta(billId)
+}
+
+// ── Comprovantes (Anexos de um Lançamento — ADR-0008) ─────────────────────────
+
+/** Resultado de preparar o upload — a URL assinada e o id a confirmar, ou um erro. */
+export type PrepararComprovanteResult =
+  | { ok: true; attachmentId: string; uploadUrl: string }
+  | { ok: false; erro: string }
+
+/** Resultado de confirmar/remover um comprovante — sucesso ou uma mensagem de erro. */
+export type ComprovanteResult = { ok: true } | { ok: false; erro: string }
+
+/** A Pessoa logada (autoria do upload), casada por e-mail; sem casar, a 1ª do Lar. */
+async function idDaPessoaLogada(pessoas: Pessoa[]): Promise<string> {
+  const session = await auth()
+  const email = session?.user?.email?.toLowerCase()
+  const pessoa = (email && pessoas.find((p) => p.email.toLowerCase() === email)) || pessoas[0]
+  return pessoa?.id ?? ""
+}
+
+/** Primeira mensagem de um erro de validação de anexo (para a borda exibir). */
+function mensagemDeAnexoInvalido(e: AttachmentInvalidoError): string {
+  return e.erros[0]?.mensagem ?? "Arquivo inválido."
+}
+
+/**
+ * Server action (1ª etapa do upload por URL assinada — ADR-0008): valida os
+ * metadados do arquivo e devolve a URL assinada de PUT para o navegador subir os
+ * bytes direto pro R2, mais o `attachmentId` que a confirmação usará. O Lar vem
+ * do use-case; o id é gerado aqui (é o mesmo da chave). **Nada é persistido** —
+ * os metadados só entram no banco quando o upload é confirmado.
+ */
+export async function prepararComprovante(
+  paymentId: string,
+  bruto: AttachmentBruto,
+): Promise<PrepararComprovanteResult> {
+  const { lar } = await getPainel(drizzleHouseholdRepo())
+  const attachmentId = randomUUID()
+
+  try {
+    const prep = await prepareAttachmentUpload(
+      r2AttachmentStore(),
+      lar.id,
+      paymentId,
+      attachmentId,
+      bruto,
+    )
+    return { ok: true, attachmentId: prep.attachmentId, uploadUrl: prep.uploadUrl }
+  } catch (e) {
+    if (e instanceof AttachmentInvalidoError) return { ok: false, erro: mensagemDeAnexoInvalido(e) }
+    throw e
+  }
+}
+
+/**
+ * Server action (2ª etapa): depois que o navegador subiu os bytes pro R2,
+ * persiste os metadados do comprovante e revalida o detalhe da Conta. O tamanho e
+ * o tipo são lidos do **objeto real no R2** dentro do use-case (não se confia no
+ * cliente); aqui só passa o `nomeOriginal` (rótulo). `billId`/`paymentId`/
+ * `attachmentId` chegam ligados pela borda; quem subiu é a Pessoa logada (#1).
+ */
+export async function confirmarComprovante(
+  billId: string,
+  paymentId: string,
+  attachmentId: string,
+  nomeOriginal: string,
+): Promise<ComprovanteResult> {
+  const { lar } = await getPainel(drizzleHouseholdRepo())
+  const uploadedBy = await idDaPessoaLogada(lar.pessoas)
+
+  try {
+    await registerAttachment(
+      drizzleAttachmentRepo(),
+      r2AttachmentStore(),
+      lar.id,
+      paymentId,
+      attachmentId,
+      uploadedBy,
+      nomeOriginal,
+    )
+  } catch (e) {
+    if (e instanceof AttachmentInvalidoError) return { ok: false, erro: mensagemDeAnexoInvalido(e) }
+    throw e
+  }
+
+  revalidatePath(rotaDaConta(billId))
+  return { ok: true }
+}
+
+/**
+ * Server action: resgata um comprovante — devolve uma URL assinada de leitura
+ * (escopada pelo Lar) para a borda abri-lo numa aba. `null` se não achou (anexo
+ * de outro Lar ou inexistente). Os bytes nunca passam pelo app.
+ */
+export async function abrirComprovante(attachmentId: string): Promise<string | null> {
+  const { lar } = await getPainel(drizzleHouseholdRepo())
+  return openAttachment(r2AttachmentStore(), drizzleAttachmentRepo(), lar.id, attachmentId)
+}
+
+/**
+ * Server action: remove um comprovante — apaga metadado e objeto no R2 (escopado
+ * pelo Lar) e revalida o detalhe da Conta. Substituir é remover e anexar de novo.
+ * As duas Pessoas removem (acesso simétrico, #1).
+ */
+export async function removerComprovante(
+  billId: string,
+  attachmentId: string,
+): Promise<ComprovanteResult> {
+  const { lar } = await getPainel(drizzleHouseholdRepo())
+  await removeAttachment(r2AttachmentStore(), drizzleAttachmentRepo(), lar.id, attachmentId)
+  revalidatePath(rotaDaConta(billId))
+  return { ok: true }
 }

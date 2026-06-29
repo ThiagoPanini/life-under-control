@@ -2,7 +2,7 @@ import { and, asc, count, eq } from "drizzle-orm"
 import type { Bill, BillEstado, DadosBill, DueRule } from "@/core/domain/bill"
 import type { BillRepo, DependentesBill, NovaBill } from "@/core/ports/bill-repo"
 import { type Db, getDb } from "./client"
-import { bills, payments } from "./schema"
+import { attachments, bills, payments } from "./schema"
 
 /** Linha bruta da tabela `bills` (a forma do Drizzle, não a de domínio). */
 type BillRow = typeof bills.$inferSelect
@@ -14,6 +14,29 @@ async function contarLancamentos(db: Db, householdId: string, billId: string): P
     .from(payments)
     .where(and(eq(payments.householdId, householdId), eq(payments.billId, billId)))
   return Number(linha?.n ?? 0)
+}
+
+/** Conta os Anexos de uma Conta do Lar (via os Lançamentos) — o cascade os leva junto. */
+async function contarAttachments(db: Db, householdId: string, billId: string): Promise<number> {
+  const [linha] = await db
+    .select({ n: count() })
+    .from(attachments)
+    .innerJoin(payments, eq(attachments.paymentId, payments.id))
+    .where(and(eq(payments.householdId, householdId), eq(payments.billId, billId)))
+  return Number(linha?.n ?? 0)
+}
+
+/** Conta Lançamentos e Anexos de uma Conta em paralelo (o que a exclusão leva junto). */
+async function contarDependentesDe(
+  db: Db,
+  householdId: string,
+  billId: string,
+): Promise<DependentesBill> {
+  const [lancamentos, anexos] = await Promise.all([
+    contarLancamentos(db, householdId, billId),
+    contarAttachments(db, householdId, billId),
+  ])
+  return { lancamentos, anexos }
 }
 
 /** Reconstrói a união `DueRule` a partir das colunas desnormalizadas. */
@@ -130,20 +153,19 @@ export function drizzleBillRepo(db: Db = getDb()): BillRepo {
     },
 
     async contarDependentes(householdId: string, billId: string): Promise<DependentesBill> {
-      // Anexos chegam com #20; até lá, honestamente zero. Lançamentos já contam.
-      return { lancamentos: await contarLancamentos(db, householdId, billId), anexos: 0 }
+      return contarDependentesDe(db, householdId, billId)
     },
 
     async deletarBill(householdId: string, billId: string): Promise<DependentesBill | null> {
-      // Conta os dependentes antes — apagar a Conta cascateia os `payments`
-      // (`on delete cascade`), então a contagem precisa ser feita primeiro.
-      const lancamentos = await contarLancamentos(db, householdId, billId)
+      // Conta os dependentes antes — apagar a Conta cascateia `payments` e, por
+      // eles, os `attachments` (`on delete cascade`); a contagem vem primeiro.
+      const dependentes = await contarDependentesDe(db, householdId, billId)
       const removidas = await db
         .delete(bills)
         .where(and(eq(bills.householdId, householdId), eq(bills.id, billId)))
         .returning({ id: bills.id })
       if (removidas.length === 0) return null
-      return { lancamentos, anexos: 0 }
+      return dependentes
     },
   }
 }

@@ -3,8 +3,10 @@
 import { useState } from "react"
 import { deletarLancamento, editarLancamento } from "@/app/(app)/areas/financas/actions"
 import { Button } from "@/components/ds/Button"
+import { ComprovantesLancamento } from "@/components/financas/ComprovantesLancamento"
 import { ConnectedPaymentForm } from "@/components/financas/ConnectedPaymentForm"
 import { paymentParaInicial } from "@/components/financas/payment-form-inicial"
+import type { Attachment } from "@/core/domain/attachment"
 import { formatarDataBr, type Recurrence } from "@/core/domain/bill"
 import type { Pessoa } from "@/core/domain/household"
 import { formatBRL } from "@/core/domain/money"
@@ -23,11 +25,14 @@ export function LancamentosLista({
   lancamentos,
   pessoas,
   recurrence,
+  comprovantesPorLancamento,
 }: {
   billId: string
   lancamentos: Payment[]
   pessoas: Pessoa[]
   recurrence: Recurrence
+  /** Comprovantes de cada Lançamento, por id (vazio quando não há). */
+  comprovantesPorLancamento: Record<string, Attachment[]>
 }) {
   if (lancamentos.length === 0) {
     return (
@@ -46,6 +51,7 @@ export function LancamentosLista({
           lancamento={p}
           pessoas={pessoas}
           recurrence={recurrence}
+          comprovantes={comprovantesPorLancamento[p.id] ?? []}
           // Aviso de duplicidade na edição: as competências dos OUTROS Lançamentos
           // (exclui só este, por id — não some todo mês igual ao dele).
           competenciasDeOutros={lancamentos.filter((x) => x.id !== p.id).map((x) => x.competencia)}
@@ -73,12 +79,14 @@ function LancamentoRow({
   lancamento,
   pessoas,
   recurrence,
+  comprovantes,
   competenciasDeOutros,
 }: {
   billId: string
   lancamento: Payment
   pessoas: Pessoa[]
   recurrence: Recurrence
+  comprovantes: Attachment[]
   competenciasDeOutros: string[]
 }) {
   const [editando, setEditando] = useState(false)
@@ -100,29 +108,37 @@ function LancamentoRow({
   }
 
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 rounded-luc-lg border border-luc-border bg-luc-surface-1 p-5">
-      <div className="flex min-w-0 flex-col gap-1">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="font-medium text-luc-text">{formatBRL(lancamento.valor)}</span>
-          <span className="font-mono text-[11.5px] text-luc-text-2 uppercase tracking-[0.12em]">
-            {descreverCompetencia(lancamento.competencia, recurrence)}
-          </span>
+    <li className="flex flex-col gap-3 rounded-luc-lg border border-luc-border bg-luc-surface-1 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="font-medium text-luc-text">{formatBRL(lancamento.valor)}</span>
+            <span className="font-mono text-[11.5px] text-luc-text-2 uppercase tracking-[0.12em]">
+              {descreverCompetencia(lancamento.competencia, recurrence)}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-luc-text-3 text-sm">
+            <span>
+              {lancamento.dataPagamento ? formatarDataBr(lancamento.dataPagamento) : "Sem data"}
+            </span>
+            <span className="text-luc-faint">·</span>
+            <span>Pago por {nomeDe(pessoas, lancamento.paidBy)}</span>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-luc-text-3 text-sm">
-          <span>
-            {lancamento.dataPagamento ? formatarDataBr(lancamento.dataPagamento) : "Sem data"}
-          </span>
-          <span className="text-luc-faint">·</span>
-          <span>Pago por {nomeDe(pessoas, lancamento.paidBy)}</span>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="ghost" type="button" onClick={() => setEditando(true)}>
+            Editar
+          </Button>
+          <DeletarLancamento billId={billId} paymentId={lancamento.id} />
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2">
-        <Button variant="ghost" type="button" onClick={() => setEditando(true)}>
-          Editar
-        </Button>
-        <DeletarLancamento billId={billId} paymentId={lancamento.id} />
-      </div>
+      <ComprovantesLancamento
+        billId={billId}
+        paymentId={lancamento.id}
+        comprovantes={comprovantes}
+      />
     </li>
   )
 }

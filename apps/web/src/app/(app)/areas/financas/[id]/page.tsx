@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 import { systemClock } from "@/adapters/clock/system-clock"
+import { drizzleAttachmentRepo } from "@/adapters/db/attachment-repo.drizzle"
 import { drizzleBillRepo } from "@/adapters/db/bill-repo.drizzle"
 import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
 import { drizzlePaymentRepo } from "@/adapters/db/payment-repo.drizzle"
@@ -11,11 +12,13 @@ import { BillIcon } from "@/components/financas/BillIcon"
 import { ConnectedPaymentForm } from "@/components/financas/ConnectedPaymentForm"
 import { LancamentosLista } from "@/components/financas/LancamentosLista"
 import type { PaymentFormInicial } from "@/components/financas/payment-form-inicial"
+import type { Attachment } from "@/core/domain/attachment"
 import { descreverRecorrencia, descreverVencimento, formatarDataBr } from "@/core/domain/bill"
 import { centavosParaCampo } from "@/core/domain/money"
 import { ehCompetenciaValida } from "@/core/domain/payment"
 import { getBill } from "@/core/use-cases/get-bill"
 import { getPainel } from "@/core/use-cases/get-painel"
+import { listAttachmentsDeLancamentos } from "@/core/use-cases/list-attachments"
 import { listPayments } from "@/core/use-cases/list-payments"
 
 // Lê o banco a cada request: os Lançamentos mudam; nada de prerender (sem DB no build).
@@ -67,6 +70,15 @@ export default async function ContaDetailPage({
     paidBy: pessoaLogada?.id ?? "",
   }
   const competenciasComLancamento = lancamentos.map((p) => p.competencia)
+
+  // Comprovantes de todos os Lançamentos (ADR-0008) numa só consulta, já agrupados
+  // por id — a lista pendura cada conjunto na sua linha (sem N+1).
+  const comprovantesPorLancamento: Record<string, Attachment[]> =
+    await listAttachmentsDeLancamentos(
+      drizzleAttachmentRepo(),
+      lar.id,
+      lancamentos.map((p) => p.id),
+    )
 
   return (
     <div className="luc-page-gutter py-7 sm:py-9 lg:py-10">
@@ -128,6 +140,7 @@ export default async function ContaDetailPage({
             lancamentos={lancamentos}
             pessoas={lar.pessoas}
             recurrence={bill.recurrence}
+            comprovantesPorLancamento={comprovantesPorLancamento}
           />
         </section>
       </div>

@@ -5,8 +5,8 @@ export type NovaBill = DadosBill & { householdId: string }
 
 /**
  * Quanto a exclusão de uma Conta leva junto (invariante: deletar é destrutivo).
- * Lançamentos e Anexos chegam nas próximas fatias de Pagamentos (#19+); até lá a
- * contagem é honestamente zero — não há dependentes a apagar.
+ * Lançamentos (#19) e Anexos (#20) cascateiam na exclusão — a contagem reflete o
+ * que o `on delete cascade` apaga, para o aviso destrutivo da borda ser honesto.
  */
 export type DependentesBill = { lancamentos: number; anexos: number }
 

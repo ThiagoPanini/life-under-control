@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm"
-import { bigint, check, date, integer, pgTable, text, uuid } from "drizzle-orm/pg-core"
+import { bigint, check, date, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core"
 
 /**
  * Schema Drizzle do LUC. `households` e `users` são identidade/autoria
@@ -118,5 +118,48 @@ export const payments = pgTable(
     check("payments_valor_check", sql`${t.valor} > 0`),
     // Competência é `ano-mês` (YYYY-MM), mês 01–12 — o banco guarda fato íntegro.
     check("payments_competencia_check", sql`${t.competencia} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
+  ],
+)
+
+/**
+ * Anexos de Finanças (`attachments`) — o comprovante de um Lançamento (ADR-0008).
+ * Tabela própria da Área (ADR-0005), não um spine genérico: se Saúde precisar
+ * anexar um Exame depois, replica o padrão, não reabre esta. Guarda só os
+ * **metadados** (os bytes vivem no R2): nome original, tipo MIME, tamanho, a
+ * `chave_r2` (o endereço no bucket, `{lar}/{lançamento}/{anexo}`), quem subiu
+ * (autoria, não permissão — #1) e quando. Apagar o Lançamento cascateia os Anexos
+ * (`on delete cascade`); o objeto no R2 vira lixo a coletar (consequência do ADR).
+ */
+export const attachments = pgTable(
+  "attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id),
+    paymentId: uuid("payment_id")
+      .notNull()
+      .references(() => payments.id, { onDelete: "cascade" }),
+    nomeOriginal: text("nome_original").notNull(),
+    tipoMime: text("tipo_mime").notNull(),
+    // Tamanho em bytes (inteiro positivo). `bigint` mode "number": o domínio fala
+    // number e um comprovante cabe folgado no seguro.
+    tamanhoBytes: bigint("tamanho_bytes", { mode: "number" }).notNull(),
+    // Endereço dos bytes no bucket R2 — único (a chave embute o uuid do Anexo).
+    chaveR2: text("chave_r2").notNull().unique(),
+    uploadedBy: uuid("uploaded_by")
+      .notNull()
+      .references(() => users.id),
+    // Instante do upload — fato persistido (CONTEXT.md #3); o adapter o serializa em ISO.
+    criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Tamanho positivo e tipo aceito (imagem — menos SVG, que carrega script — ou
+    // PDF) garantidos no banco, não só no use-case — persistir fato íntegro (CONTEXT.md).
+    check("attachments_tamanho_check", sql`${t.tamanhoBytes} > 0`),
+    check(
+      "attachments_tipo_check",
+      sql`${t.tipoMime} = 'application/pdf' or (${t.tipoMime} like 'image/%' and ${t.tipoMime} <> 'image/svg+xml')`,
+    ),
   ],
 )
