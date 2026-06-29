@@ -22,6 +22,11 @@ import { AREAS } from "@/core/domain/areas"
  * certa já no primeiro frame (sem flash de hidratação). */
 export const SIDEBAR_COOKIE = "luc:sidebar-collapsed"
 
+/** A rota está dentro de uma Área (a própria ou uma sub-rota como /nova)? */
+function naArea(pathname: string, slug: string): boolean {
+  return pathname === `/areas/${slug}` || pathname.startsWith(`/areas/${slug}/`)
+}
+
 const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-luc-bg"
 
@@ -45,7 +50,7 @@ export function AppShell({
       ? "Painel"
       : pathname === "/agenda"
         ? "Agenda"
-        : (AREAS.find((area) => pathname === `/areas/${area.slug}`)?.nome ?? "Life Under Control")
+        : (AREAS.find((area) => naArea(pathname, area.slug))?.nome ?? "Life Under Control")
 
   useEffect(() => {
     if (pathname) setMobileMenuOpen(false)
@@ -234,7 +239,7 @@ function DesktopSidebar({
               key={area.slug}
               href={`/areas/${area.slug}`}
               label={area.nome}
-              active={pathname === `/areas/${area.slug}`}
+              active={naArea(pathname, area.slug)}
               collapsed={collapsed}
             >
               <AreaIcon name={area.icon} size={18} />
@@ -360,7 +365,7 @@ function MobileMenu({
                 key={area.slug}
                 href={`/areas/${area.slug}`}
                 label={area.nome}
-                active={pathname === `/areas/${area.slug}`}
+                active={naArea(pathname, area.slug)}
                 onNavigate={onClose}
               >
                 <AreaIcon name={area.icon} size={19} />

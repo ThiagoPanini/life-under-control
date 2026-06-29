@@ -4,15 +4,18 @@ import { Button } from "@/components/ds/Button"
 import { Pill } from "@/components/ds/Pill"
 import { AREAS } from "@/core/domain/areas"
 
+// Só as Áreas `em-breve` usam esta view genérica; as `ativa` têm rota própria
+// (ex.: /areas/financas), que sombreia este segmento dinâmico.
 export function generateStaticParams() {
-  return AREAS.map((area) => ({ slug: area.slug }))
+  return AREAS.filter((area) => area.estado === "em-breve").map((area) => ({ slug: area.slug }))
 }
 
 /** View genérica e honesta de "em breve" para qualquer Área ainda não construída. */
 export default async function AreaPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const area = AREAS.find((a) => a.slug === slug)
-  if (!area) notFound()
+  // Área inexistente ou já `ativa` (que tem rota dedicada) não cai no genérico.
+  if (!area || area.estado === "ativa") notFound()
 
   return (
     <div className="luc-page-gutter py-7 sm:py-9 lg:py-10">
