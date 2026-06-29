@@ -19,9 +19,10 @@ describe("prepareAttachmentUpload (Seam 1)", () => {
     const out = await prepareAttachmentUpload(store, "h-1", "pay-1", "att-1", brutoValido())
 
     expect(out.attachmentId).toBe("att-1")
-    // chave = {lar}/{lançamento}/{anexo} — o escopo do Lar prefixa tudo (#1).
-    expect(out.chaveR2).toBe("h-1/pay-1/att-1")
-    expect(out.uploadUrl).toContain(encodeURIComponent("h-1/pay-1/att-1"))
+    // chave = finance/payments/{lar}/{lançamento}/{anexo} — Área prefixa o bucket,
+    // o escopo do Lar prefixa o resto (#1).
+    expect(out.chaveR2).toBe("finance/payments/h-1/pay-1/att-1")
+    expect(out.uploadUrl).toContain(encodeURIComponent("finance/payments/h-1/pay-1/att-1"))
   })
 
   it("test_prepara_nao_persiste_nada", async () => {

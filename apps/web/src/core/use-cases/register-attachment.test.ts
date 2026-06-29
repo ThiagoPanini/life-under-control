@@ -7,7 +7,7 @@ import { registerAttachment } from "./register-attachment"
 /** Um objeto "já subido" no R2 fake, na chave que o registro vai derivar. */
 function objeto(over: Partial<ObjetoFake> = {}): ObjetoFake {
   return {
-    chave: "h-1/pay-1/att-1",
+    chave: "finance/payments/h-1/pay-1/att-1",
     tamanhoBytes: 48_000,
     tipoMime: "application/pdf",
     ...over,
@@ -42,7 +42,7 @@ describe("registerAttachment (Seam 1)", () => {
 
   it("test_chave_e_derivada_no_nucleo_nao_vem_da_borda", async () => {
     const repo = fakeAttachmentRepo()
-    const store = fakeAttachmentStore([objeto({ chave: "h-9/pay-7/att-3" })])
+    const store = fakeAttachmentStore([objeto({ chave: "finance/payments/h-9/pay-7/att-3" })])
     const att = await registerAttachment(
       repo,
       store,
@@ -52,7 +52,7 @@ describe("registerAttachment (Seam 1)", () => {
       "p-2",
       "comprovante.pdf",
     )
-    expect(att.chaveR2).toBe("h-9/pay-7/att-3")
+    expect(att.chaveR2).toBe("finance/payments/h-9/pay-7/att-3")
   })
 
   it("test_upload_ausente_lanca_e_nao_persiste", async () => {

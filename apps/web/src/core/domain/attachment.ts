@@ -89,15 +89,24 @@ export function validarDadosAttachment(bruto: AttachmentBruto): ValidacaoAttachm
 }
 
 /**
- * Deriva a chave de um comprovante no bucket R2: `{lar}/{lançamento}/{anexo}`. O
- * Lar prefixa tudo (invariante de escopo, #1) e o Lançamento agrupa seus anexos.
- * É a única fonte da chave — prepare (assina o upload) e confirm (persiste) a
- * derivam igual a partir dos mesmos ids, então a borda nunca a inventa.
+ * Prefixo dos comprovantes no bucket compartilhado: a Área (`finance`) e o
+ * primitivo (`payments`, o Lançamento). Namespeia a raiz do bucket por Área para
+ * as próximas fases não colidirem (ADR-0006) e espelha a pasta provisionada no R2.
+ */
+const PREFIXO_COMPROVANTE = "finance/payments"
+
+/**
+ * Deriva a chave de um comprovante no bucket R2:
+ * `finance/payments/{lar}/{lançamento}/{anexo}`. O prefixo da Área isola o bucket
+ * compartilhado; dentro dele o Lar prefixa tudo (invariante de escopo, #1) e o
+ * Lançamento agrupa seus anexos. É a única fonte da chave — prepare (assina o
+ * upload) e confirm (persiste) a derivam igual a partir dos mesmos ids, então a
+ * borda nunca a inventa.
  */
 export function chaveComprovante(
   householdId: string,
   paymentId: string,
   attachmentId: string,
 ): string {
-  return `${householdId}/${paymentId}/${attachmentId}`
+  return `${PREFIXO_COMPROVANTE}/${householdId}/${paymentId}/${attachmentId}`
 }
