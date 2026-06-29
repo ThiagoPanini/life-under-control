@@ -1,0 +1,234 @@
+{
+  "id": "5bb15696-174f-4e77-b275-621927c2059a",
+  "prevId": "8e1885fe-ceef-4ae5-9992-0285c2860cf6",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.bills": {
+      "name": "bills",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "household_id": {
+          "name": "household_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "descricao": {
+          "name": "descricao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "icon": {
+          "name": "icon",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "interval_months": {
+          "name": "interval_months",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "anchor_month": {
+          "name": "anchor_month",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "due_rule_kind": {
+          "name": "due_rule_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "due_rule_day": {
+          "name": "due_rule_day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "due_rule_nth": {
+          "name": "due_rule_nth",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "due_month_offset": {
+          "name": "due_month_offset",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "estado": {
+          "name": "estado",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ativa'"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "bills_household_id_households_id_fk": {
+          "name": "bills_household_id_households_id_fk",
+          "tableFrom": "bills",
+          "tableTo": "households",
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "bills_estado_check": {
+          "name": "bills_estado_check",
+          "value": "\"bills\".\"estado\" in ('ativa', 'encerrada')"
+        },
+        "bills_due_rule_kind_check": {
+          "name": "bills_due_rule_kind_check",
+          "value": "\"bills\".\"due_rule_kind\" in ('dia-fixo', 'n-esimo-dia-util', 'ultimo-dia-util')"
+        },
+        "bills_interval_months_check": {
+          "name": "bills_interval_months_check",
+          "value": "\"bills\".\"interval_months\" >= 1"
+        },
+        "bills_due_month_offset_check": {
+          "name": "bills_due_month_offset_check",
+          "value": "\"bills\".\"due_month_offset\" >= 0"
+        },
+        "bills_recurrence_anchor_check": {
+          "name": "bills_recurrence_anchor_check",
+          "value": "(\"bills\".\"interval_months\" = 1 and \"bills\".\"anchor_month\" is null) or (\"bills\".\"interval_months\" > 1 and \"bills\".\"anchor_month\" between 1 and 12)"
+        },
+        "bills_due_rule_shape_check": {
+          "name": "bills_due_rule_shape_check",
+          "value": "(\"bills\".\"due_rule_kind\" = 'dia-fixo') = (\"bills\".\"due_rule_day\" is not null)\n        and (\"bills\".\"due_rule_kind\" = 'n-esimo-dia-util') = (\"bills\".\"due_rule_nth\" is not null)\n        and (\"bills\".\"due_rule_day\" is null or \"bills\".\"due_rule_day\" between 1 and 31)\n        and (\"bills\".\"due_rule_nth\" is null or \"bills\".\"due_rule_nth\" between 1 and 23)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.households": {
+      "name": "households",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "household_id": {
+          "name": "household_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hue": {
+          "name": "hue",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "inicial": {
+          "name": "inicial",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "users_household_id_households_id_fk": {
+          "name": "users_household_id_households_id_fk",
+          "tableFrom": "users",
+          "tableTo": "households",
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": ["email"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
