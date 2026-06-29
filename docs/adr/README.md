@@ -34,3 +34,4 @@ Para um **refinamento** (a decisão segue válida, muda um detalhe), edite o ADR
 - [0005 — Primitivos descritivos (spine + especialização por Área)](0005-primitivos-descritivos-spine-especializacao.md)
 - [0006 — Faseamento por Áreas: cara completa, ativação uma a uma](0006-faseamento-por-areas.md)
 - [0007 — Autonomia total do agente, com o dado do casal protegido](0007-autonomia-total-do-agente.md)
+- [0008 — Comprovantes (Anexos) em object storage S3-compatível (Cloudflare R2), via port](0008-anexos-object-storage-r2.md)
