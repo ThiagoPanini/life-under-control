@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm"
-import { check, date, integer, pgTable, text, uuid } from "drizzle-orm/pg-core"
+import { bigint, check, date, integer, pgTable, text, uuid } from "drizzle-orm/pg-core"
 
 /**
  * Schema Drizzle do LUC. `households` e `users` são identidade/autoria
@@ -81,5 +81,42 @@ export const bills = pgTable(
         and (${t.dueRuleDay} is null or ${t.dueRuleDay} between 1 and 31)
         and (${t.dueRuleNth} is null or ${t.dueRuleNth} between 1 and 23)`,
     ),
+  ],
+)
+
+/**
+ * Lançamentos de Finanças (`payments`) — tabela própria da Área (ADR-0005): o
+ * fato de um pagamento, ligado a uma Conta. Guarda o valor **real** do momento
+ * (inteiro em centavos, BRL — invariante #6; `bigint` por folga, nunca float), a
+ * data civil de pagamento (nula só no backfill sem recibo, CONTEXT.md #3), a
+ * Competência como `ano-mês` e quem pagou (autoria, não permissão — #1). Apagar a
+ * Conta cascateia os Lançamentos (`on delete cascade`). Sem unicidade rígida por
+ * (Conta, competência): a borda avisa no 2º, não trava (abre espaço a split).
+ */
+export const payments = pgTable(
+  "payments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id),
+    billId: uuid("bill_id")
+      .notNull()
+      .references(() => bills.id, { onDelete: "cascade" }),
+    // Centavos (inteiro, BRL). `bigint` com mode "number": o domínio fala number,
+    // sempre dentro do seguro pra dinheiro de um Lar (#6).
+    valor: bigint("valor", { mode: "number" }).notNull(),
+    // Data civil do pagamento (sem hora). Nula só no backfill ("pago sem data").
+    dataPagamento: date("data_pagamento"),
+    competencia: text("competencia").notNull(),
+    paidBy: uuid("paid_by")
+      .notNull()
+      .references(() => users.id),
+  },
+  (t) => [
+    // Uma baixa é positiva — o "quanto" só existe quando a conta é paga (#5/#6).
+    check("payments_valor_check", sql`${t.valor} > 0`),
+    // Competência é `ano-mês` (YYYY-MM), mês 01–12 — o banco guarda fato íntegro.
+    check("payments_competencia_check", sql`${t.competencia} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
   ],
 )

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import { systemClock } from "@/adapters/clock/system-clock"
 import { drizzleBillRepo } from "@/adapters/db/bill-repo.drizzle"
 import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
 import { editarConta } from "@/app/(app)/areas/financas/actions"
@@ -14,11 +15,6 @@ import { getPainel } from "@/core/use-cases/get-painel"
 
 // Lê o banco a cada request: a Conta pode ter mudado; nada de prerender (sem DB no build).
 export const dynamic = "force-dynamic"
-
-/** Data civil de hoje no fuso do domínio (America/Sao_Paulo) — default do encerramento. */
-function hojeSaoPaulo(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date())
-}
 
 /** Edição de uma Conta: a mesma forma do cadastro, preenchida, mais a zona de risco. */
 export default async function EditarContaPage({ params }: { params: Promise<{ id: string }> }) {
@@ -62,7 +58,7 @@ export default async function EditarContaPage({ params }: { params: Promise<{ id
         <DangerZone
           billId={bill.id}
           estado={bill.estado}
-          hoje={hojeSaoPaulo()}
+          hoje={systemClock().hoje()}
           dependentes={dependentes}
         />
       </div>

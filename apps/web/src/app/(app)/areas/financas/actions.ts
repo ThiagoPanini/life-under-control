@@ -2,14 +2,21 @@
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
+import { systemClock } from "@/adapters/clock/system-clock"
 import { drizzleBillRepo } from "@/adapters/db/bill-repo.drizzle"
 import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
+import { drizzlePaymentRepo } from "@/adapters/db/payment-repo.drizzle"
 import type { BillBruto, ErroCampo } from "@/core/domain/bill"
+import { parseCentavos } from "@/core/domain/money"
+import type { PaymentBruto } from "@/core/domain/payment"
 import { BillInvalidaError, createBill } from "@/core/use-cases/create-bill"
 import { deleteBill } from "@/core/use-cases/delete-bill"
+import { deletePayment } from "@/core/use-cases/delete-payment"
 import { BillNaoEncontradaError, editBill } from "@/core/use-cases/edit-bill"
+import { editPayment, PaymentNaoEncontradoError } from "@/core/use-cases/edit-payment"
 import { EncerramentoInvalidoError, encerrarBill } from "@/core/use-cases/encerrar-bill"
 import { getPainel } from "@/core/use-cases/get-painel"
+import { PaymentInvalidoError, recordPayment } from "@/core/use-cases/record-payment"
 
 /** Estado do formulário de Conta entre submissões — só os erros por campo (vazio = ok). */
 export type ContaFormState = { erros: ErroCampo[] }
@@ -140,4 +147,97 @@ export async function deletarConta(billId: string): Promise<void> {
   }
 
   voltarParaFinancas()
+}
+
+// ── Lançamentos (baixa de uma Conta) ──────────────────────────────────────────
+
+/** Estado do formulário de baixa entre submissões — só os erros por campo (vazio = ok). */
+export type PaymentFormState = { erros: ErroCampo[] }
+
+/** A rota do detalhe da Conta — destino e chave de revalidação das ações de baixa. */
+function rotaDaConta(billId: string): string {
+  return `${ROTA_FINANCAS}/${billId}`
+}
+
+/** Cauda comum das mutações de Lançamento: revalida o detalhe da Conta e volta a ele. */
+function voltarParaConta(billId: string): never {
+  revalidatePath(rotaDaConta(billId))
+  redirect(rotaDaConta(billId))
+}
+
+/** Traduz o FormData da baixa num `PaymentBruto` cru — valor já em centavos (parse BR). */
+function lerBrutoLancamento(formData: FormData): PaymentBruto {
+  const data = formData.get("dataPagamento")
+  return {
+    valor: parseCentavos(String(formData.get("valor") ?? "")) ?? Number.NaN,
+    dataPagamento: data ? String(data) : null,
+    competencia: String(formData.get("competencia") ?? ""),
+    paidBy: String(formData.get("paidBy") ?? ""),
+  }
+}
+
+/**
+ * Server action de baixa: registra um Lançamento na Conta (borda fina — ADR-0003).
+ * O `billId` chega ligado (`.bind`) pela borda — nunca do formulário —, o Lar vem
+ * do use-case e a data ausente assume hoje via o `Clock`. Erro de validação volta
+ * por campo para o formulário; sucesso revalida e volta ao detalhe da Conta.
+ */
+export async function criarLancamento(
+  billId: string,
+  _prev: PaymentFormState,
+  formData: FormData,
+): Promise<PaymentFormState> {
+  const bruto = lerBrutoLancamento(formData)
+  const { lar } = await getPainel(drizzleHouseholdRepo())
+
+  try {
+    await recordPayment(drizzlePaymentRepo(), systemClock(), lar.id, billId, bruto)
+  } catch (e) {
+    if (e instanceof PaymentInvalidoError) return { erros: e.erros }
+    throw e
+  }
+
+  voltarParaConta(billId)
+}
+
+/**
+ * Server action de edição de Lançamento. `billId` e `paymentId` chegam ligados.
+ * Corrigir o que se registrou é direito da Pessoa (a imutabilidade #4 é do
+ * sistema, não do autor); valida no núcleo e persiste pelo port.
+ */
+export async function editarLancamento(
+  billId: string,
+  paymentId: string,
+  _prev: PaymentFormState,
+  formData: FormData,
+): Promise<PaymentFormState> {
+  const bruto = lerBrutoLancamento(formData)
+  const { lar } = await getPainel(drizzleHouseholdRepo())
+
+  try {
+    await editPayment(drizzlePaymentRepo(), lar.id, paymentId, bruto)
+  } catch (e) {
+    if (e instanceof PaymentInvalidoError) return { erros: e.erros }
+    if (e instanceof PaymentNaoEncontradoError) redirect(rotaDaConta(billId))
+    throw e
+  }
+
+  voltarParaConta(billId)
+}
+
+/**
+ * Server action de exclusão de Lançamento — desfaz um registro equivocado. As
+ * duas Pessoas deletam (acesso simétrico, #1). Já ausente apenas volta ao detalhe.
+ */
+export async function deletarLancamento(billId: string, paymentId: string): Promise<void> {
+  const { lar } = await getPainel(drizzleHouseholdRepo())
+
+  try {
+    await deletePayment(drizzlePaymentRepo(), lar.id, paymentId)
+  } catch (e) {
+    if (e instanceof PaymentNaoEncontradoError) redirect(rotaDaConta(billId))
+    throw e
+  }
+
+  voltarParaConta(billId)
 }
