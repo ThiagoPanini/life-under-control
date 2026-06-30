@@ -29,11 +29,13 @@ A cadência de *Áreas* permanece de planejamento ([ADR-0006](../adr/0006-faseam
 
 ## Economia de contexto (enforçada por hooks)
 
-Medições de `/implement` reais mostraram a janela chegando a 92-160k de tokens já no primeiro código — até 15-28k disso em Reads de arquivo inteiro evitáveis, uma vez **mesmo com um digest de 191 tokens já disponível**. O `gh issue view` de issues irmãs (3.5-4.6k) e a releitura de output cru de subagente (12.5k) se repetem sessão a sessão. O conserto é estrutural, não exortação.
+Medições de `/implement` reais mostraram a janela chegando a 92-160k de tokens já no primeiro código. Análise forense de uma sessão pós-otimização (`#20`) refinou o diagnóstico: o dump dominante **não** foi leitura de arquivo "à toa" — os Reads de vizinho eram espelhamento necessário pro TDD. Os dois maiores custos evitáveis foram **a prosa do próprio agente** (~33k em dois turnos: um plano longo pré-RED + narração) e a **releitura de vizinhos que o digest já tinha visto** (o digest descrevia, mas não carregava o código a clonar). O conserto é estrutural, não exortação.
 
 **Disciplina (o protocolo injetado — `.claude/context-economy-protocol.md`):**
 
-- **Delegue o reconhecimento.** Ao implementar, primeiro spawne um subagente `Explore` (escopo na Área) e peça um digest ≤2-3k: arquivos relevantes (path+porquê), padrão a espelhar, invariantes/ADR, seams p/ TDD. O digest é o **orçamento de leitura** — leia só o que ele nomeia, em fatias estreitas, e parta pro RED.
+- **Delegue o reconhecimento — e embuta o vizinho.** Ao implementar, primeiro spawne um subagente `Explore` (escopo na Área) e peça um digest de schema fixo: arquivos relevantes (path+porquê), padrão a espelhar, invariantes/ADR, seams p/ TDD. **Peça que ele embuta verbatim o(s) vizinho(s) mais próximo(s) a clonar** (port, use-case, fake, teste irmão) e cite os demais só por path — o código a copiar chega no digest e não custa uma segunda leitura. O digest é o **orçamento de leitura**: o vizinho embutido você não relê; dos demais, leia só o que faltou, em fatias estreitas, e parta pro RED.
+- **Vá direto ao RED.** Não redija o plano completo em prosa antes do primeiro teste — o digest já é o plano. Escreva o RED, deixe falhar, e só então o GREEN.
+- **Narre comprimido (`/caveman` ultra).** Como primeira ação da implementação, acione a skill `/caveman` no modo `ultra` para a narração. As seções *Boundaries* e *Auto-Clarity* da skill mantêm código, commits, PRs e avisos de risco em prosa normal — só a narração encolhe. Ataca o custo dominante: a prosa do agente vira input dos turnos seguintes e infla a janela inteira. Prosa-driven é o único mecanismo possível (hook injeta texto, não invoca skill), e é o que o protocolo injetado pede.
 - **Issue enxuta.** Só a issue-alvo (`gh issue view N`, title/body/labels); sem irmãs, sem `--comments` salvo necessidade.
 - **Não releia output cru.** `.output` de subagente e dumps de `tool-results/` de MCP já viraram digest — re-consulte a fonte com pergunta dirigida, não releia o dump.
 
