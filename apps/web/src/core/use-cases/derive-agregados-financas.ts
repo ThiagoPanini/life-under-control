@@ -2,7 +2,7 @@ import type { Bill } from "@/core/domain/bill"
 import type { Payment } from "@/core/domain/payment"
 import type { Calendar } from "@/core/ports/calendar"
 import type { Clock } from "@/core/ports/clock"
-import { farolDoMes, OCORRENCIAS_NA_JANELA, ocorrenciasRecentes } from "./derive-bill-card"
+import { farolDoMes, mesDe, OCORRENCIAS_NA_JANELA, ocorrenciasRecentes } from "./derive-bill-card"
 
 /**
  * **Cockpit de Finanças** (issue #22): os agregados do mês no topo de
@@ -38,11 +38,6 @@ export type AgregadosMes = {
 
 function contasAtivas(bills: Bill[]): Bill[] {
   return bills.filter((b) => b.estado === "ativa")
-}
-
-/** Mês (competência `YYYY-MM`) de uma data civil `YYYY-MM-DD`. */
-function mesDe(iso: string): string {
-  return iso.slice(0, 7)
 }
 
 /**

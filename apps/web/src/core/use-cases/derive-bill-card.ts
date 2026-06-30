@@ -89,12 +89,13 @@ function competenciaDoIndice(idx: number): string {
   return `${ano}-${pad2(mes)}`
 }
 
-function addMeses(competencia: string, n: number): string {
+/** Soma `n` meses a uma competência `YYYY-MM` (negativo recua), tratando o ano. */
+export function addMeses(competencia: string, n: number): string {
   return competenciaDoIndice(indiceMes(competencia) + n)
 }
 
 /** Mês (competência `YYYY-MM`) de uma data civil `YYYY-MM-DD`. */
-function mesDe(iso: string): string {
+export function mesDe(iso: string): string {
   return iso.slice(0, 7)
 }
 
