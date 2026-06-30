@@ -59,6 +59,20 @@ export function drizzlePaymentRepo(db: Db = getDb()): PaymentRepo {
       return linhas.map(paraDominio)
     },
 
+    async listarTodosPayments(householdId: string): Promise<Payment[]> {
+      const linhas = await db
+        .select()
+        .from(payments)
+        .where(eq(payments.householdId, householdId))
+        // Mesma ordem do listar por Conta: mais recentes primeiro.
+        .orderBy(
+          sql`${payments.dataPagamento} desc nulls last`,
+          desc(payments.competencia),
+          desc(payments.id),
+        )
+      return linhas.map(paraDominio)
+    },
+
     async editarPayment(
       householdId: string,
       paymentId: string,

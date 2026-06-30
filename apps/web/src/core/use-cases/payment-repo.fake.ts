@@ -20,6 +20,9 @@ export function fakePaymentRepo(seed: Payment[] = []): PaymentRepo {
     async listarPayments(householdId, billId) {
       return [...store.values()].filter((p) => p.householdId === householdId && p.billId === billId)
     },
+    async listarTodosPayments(householdId) {
+      return [...store.values()].filter((p) => p.householdId === householdId)
+    },
     async editarPayment(householdId, paymentId, dados) {
       const atual = store.get(paymentId)
       if (!atual || atual.householdId !== householdId) return null

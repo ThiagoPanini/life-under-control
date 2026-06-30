@@ -1,11 +1,17 @@
 import Link from "next/link"
+import { nationalBankCalendar } from "@/adapters/calendar/national-bank-calendar"
+import { systemClock } from "@/adapters/clock/system-clock"
 import { drizzleBillRepo } from "@/adapters/db/bill-repo.drizzle"
 import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
+import { drizzlePaymentRepo } from "@/adapters/db/payment-repo.drizzle"
 import { AreaIcon } from "@/components/areas/AreaIcon"
 import { Button } from "@/components/ds/Button"
 import { BillCard } from "@/components/financas/BillCard"
+import { CockpitFinancas } from "@/components/financas/CockpitFinancas"
 import { AREAS } from "@/core/domain/areas"
+import { derivarAgregadosFinancas } from "@/core/use-cases/derive-agregados-financas"
 import { getPainel } from "@/core/use-cases/get-painel"
+import { listAllPayments } from "@/core/use-cases/list-all-payments"
 import { listBills } from "@/core/use-cases/list-bills"
 
 // Lê o banco a cada request: nada de prerender estático no build (sem DB lá).
@@ -13,7 +19,7 @@ export const dynamic = "force-dynamic"
 
 const financas = AREAS.find((a) => a.slug === "financas")
 
-/** Cockpit de Finanças (tema Pagamentos): lista as Contas do Lar + cadastro. */
+/** Cockpit de Finanças (tema Pagamentos): agregados do mês no topo (#22) + lista de Contas e cadastro. */
 export default async function FinancasPage({
   searchParams,
 }: {
@@ -26,6 +32,16 @@ export default async function FinancasPage({
   const bills = await listBills(drizzleBillRepo(), lar.id)
   const ativas = bills.filter((b) => b.estado === "ativa")
   const encerradas = bills.filter((b) => b.estado === "encerrada")
+
+  // Agregados do mês (cockpit, #22): somam o Lar inteiro — uma só leitura de
+  // todos os Lançamentos das Contas ativas (sem N+1 por Conta).
+  const pagamentos = await listAllPayments(drizzlePaymentRepo(), lar.id)
+  const agregados = derivarAgregadosFinancas(
+    systemClock(),
+    nationalBankCalendar(),
+    ativas,
+    pagamentos,
+  )
 
   return (
     <div className="luc-page-gutter py-7 sm:py-9 lg:py-10">
@@ -41,6 +57,8 @@ export default async function FinancasPage({
             {financas?.nome ?? "Finanças"}
           </h1>
         </header>
+
+        {ativas.length > 0 && <CockpitFinancas agregados={agregados} />}
 
         <section className="flex flex-col gap-5">
           <div className="flex items-center justify-between gap-3">

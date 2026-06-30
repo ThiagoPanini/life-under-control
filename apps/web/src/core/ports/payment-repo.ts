@@ -14,6 +14,8 @@ export type PaymentRepo = {
   criarPayment(novo: NovoPayment): Promise<Payment>
   /** Lista os Lançamentos de uma Conta do Lar, mais recentes primeiro (acesso simétrico, #1). */
   listarPayments(householdId: string, billId: string): Promise<Payment[]>
+  /** Lista os Lançamentos de **todas** as Contas do Lar numa só leitura — base dos agregados do cockpit (#22). */
+  listarTodosPayments(householdId: string): Promise<Payment[]>
   /** Edita um Lançamento do Lar; `null` se não existe ou é de outro Lar. */
   editarPayment(
     householdId: string,
