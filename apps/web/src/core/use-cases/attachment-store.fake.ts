@@ -24,6 +24,11 @@ export function fakeAttachmentStore(seed: ObjetoFake[] = []): FakeAttachmentStor
     async urlDeUpload(chave, tipoMime) {
       return `https://r2.fake/put/${encodeURIComponent(chave)}#${encodeURIComponent(tipoMime)}`
     },
+    async enviar(chave, conteudo, tipoMime) {
+      // O put server-side materializa o objeto: metadados passam a achá-lo, com o
+      // tamanho real dos bytes — espelha o que o R2 devolveria num HEAD depois.
+      bucket.set(chave, { tamanhoBytes: conteudo.byteLength, tipoMime })
+    },
     async urlDeLeitura(chave) {
       return `https://r2.fake/get/${encodeURIComponent(chave)}`
     },

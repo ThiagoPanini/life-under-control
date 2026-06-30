@@ -8,6 +8,12 @@
 export type AttachmentStore = {
   /** URL assinada de **PUT** — o navegador sobe os bytes direto pro R2 (expira). */
   urlDeUpload(chave: string, tipoMime: string): Promise<string>
+  /**
+   * Sobe bytes direto pro bucket, **server-side** (sem navegador). É o caminho da
+   * ingestão histórica (backfill, #24): o app lê o comprovante do disco do operador
+   * e o põe no R2 sem URL assinada. Sobrescreve a mesma chave — idempotente.
+   */
+  enviar(chave: string, conteudo: Uint8Array, tipoMime: string): Promise<void>
   /** URL assinada de **GET** — resgatar (abrir/baixar) o comprovante (expira). */
   urlDeLeitura(chave: string): Promise<string>
   /**
