@@ -85,6 +85,11 @@ export function r2AttachmentStore(
       const cmd = new PutObjectCommand({ Bucket: bucket, Key: chave, ContentType: tipoMime })
       return getSignedUrl(client, cmd, { expiresIn: EXPIRA_SEGUNDOS })
     },
+    async enviar(chave: string, conteudo: Uint8Array, tipoMime: string): Promise<void> {
+      await client.send(
+        new PutObjectCommand({ Bucket: bucket, Key: chave, Body: conteudo, ContentType: tipoMime }),
+      )
+    },
     async urlDeLeitura(chave: string): Promise<string> {
       const cmd = new GetObjectCommand({ Bucket: bucket, Key: chave })
       return getSignedUrl(client, cmd, { expiresIn: EXPIRA_SEGUNDOS })

@@ -5,6 +5,12 @@
 *.claude/design
 .local/
 
+# Dado real do Lar — NUNCA commitar (planilha de controle, comprovantes, manifesto)
+pagamentos-recorrentes.xlsx
+*.comprovante.*
+backfill-manifest*.json
+.backfill/
+
 # Segredos locais — NUNCA commitar (tokens de produção)
 .env
 .env.local
