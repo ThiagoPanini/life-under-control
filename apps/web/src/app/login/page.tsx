@@ -18,68 +18,100 @@ export default async function LoginPage({
   const falhou = Boolean(codigo) && !negado
 
   return (
-    <main className="relative flex min-h-dvh items-center justify-center overflow-x-hidden overflow-y-auto pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] sm:pr-[max(1.5rem,env(safe-area-inset-right))] sm:pl-[max(1.5rem,env(safe-area-inset-left))]">
-      {/* Montagem do casal, desfocada (tratamento do sistema de design). */}
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-luc-bg p-6">
       <div
         aria-hidden
-        className="fixed inset-0 scale-105 bg-cover bg-[position:60%_center] sm:bg-center"
+        className="absolute inset-0 scale-[1.08] bg-cover bg-[position:center_26%]"
         style={{
-          backgroundImage: "url(/login-background.webp)",
-          filter: "blur(8px) brightness(0.5)",
+          backgroundImage: "url(/login-background.png)",
+          filter: "blur(5px) brightness(0.5) saturate(1.12)",
         }}
       />
-      {/* Véu radial ciano + gradiente, pra firmar o contraste do card. */}
       <div
         aria-hidden
-        className="fixed inset-0"
+        className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(90% 60% at 82% -10%, var(--luc-accent-16), transparent 60%), linear-gradient(180deg, color-mix(in srgb, var(--luc-bg) 55%, transparent), color-mix(in srgb, var(--luc-bg) 88%, transparent))",
+            "radial-gradient(120% 75% at 50% -8%, rgba(76,196,230,.15), transparent 55%), linear-gradient(180deg, rgba(10,12,15,.74) 0%, rgba(10,12,15,.56) 30%, rgba(10,12,15,.72) 58%, rgba(10,12,15,.94) 100%)",
         }}
       />
 
-      <section className="relative z-10 my-auto flex w-full max-w-sm flex-col items-center gap-6 rounded-luc-xl border border-luc-border bg-luc-surface-1/88 px-5 py-8 text-center shadow-2xl backdrop-blur-md sm:gap-7 sm:px-8 sm:py-10">
-        <Logo size={48} />
-        <div className="flex flex-col items-center gap-2">
-          <p className="font-mono text-[11px] text-luc-accent uppercase tracking-[0.18em]">
-            Cockpit do Lar
-          </p>
-          <h1 className="font-extrabold text-2xl text-luc-text tracking-[-0.03em]">
-            Life Under Control
-          </h1>
-          <p className="text-luc-text-2 text-sm leading-relaxed">
-            Acesso restrito ao Lar. Entre com a conta Google do casal.
-          </p>
+      <section className="relative z-10 w-full max-w-[392px]">
+        <div className="flex items-center justify-center gap-[11px]">
+          <Logo size={34} decorative />
+          <div className="text-left">
+            <h1 className="text-[17px] font-bold tracking-[-0.01em]">Life Under Control</h1>
+            <div className="text-[11px] font-semibold tracking-[0.16em] text-luc-text-3">
+              L · U · C
+            </div>
+          </div>
+        </div>
+        <p className="mt-[18px] text-center text-[13.5px] text-luc-text-2">
+          O cockpit da vida do Lar — toda métrica à vista.
+        </p>
+
+        <div className="mt-[26px] rounded-luc-xl border border-luc-border bg-luc-surface-2 p-6">
+          {negado && (
+            <p className="mb-4 rounded-luc-md border border-luc-warn/20 bg-luc-warn/10 px-3 py-2 text-sm text-luc-warn">
+              Sem acesso — esta conta não faz parte do Lar.
+            </p>
+          )}
+          {falhou && (
+            <p className="mb-4 rounded-luc-md border border-luc-warn/20 bg-luc-warn/10 px-3 py-2 text-sm text-luc-warn">
+              Não foi possível entrar. Tente novamente.
+            </p>
+          )}
+
+          <form
+            action={async () => {
+              "use server"
+              await signIn("google", { redirectTo: "/painel" })
+            }}
+          >
+            <button
+              type="submit"
+              className="inline-flex min-h-[46px] w-full touch-manipulation items-center justify-center gap-2.5 rounded-[11px] bg-[#f4f5f7] p-[13px] text-[14.5px] font-semibold text-[#1a1d22] transition-opacity hover:opacity-90 active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-luc-bg"
+            >
+              <GoogleMark />
+              Entrar com Google
+            </button>
+          </form>
+
+          <div className="mt-[18px] flex items-center justify-center gap-2">
+            <LoginPersonBadge person="thiago">T</LoginPersonBadge>
+            <LoginPersonBadge person="jakeline">J</LoginPersonBadge>
+            <span className="ml-1 text-xs text-luc-text-3">Thiago e Jakeline</span>
+          </div>
         </div>
 
-        {negado && (
-          <p className="w-full rounded-luc-md border border-luc-border bg-luc-surface-2 px-3 py-2 text-luc-warn text-sm">
-            Sem acesso — esta conta não faz parte do Lar.
-          </p>
-        )}
-        {falhou && (
-          <p className="w-full rounded-luc-md border border-luc-border bg-luc-surface-2 px-3 py-2 text-luc-warn text-sm">
-            Não foi possível entrar. Tente novamente.
-          </p>
-        )}
-
-        <form
-          className="w-full"
-          action={async () => {
-            "use server"
-            await signIn("google", { redirectTo: "/painel" })
-          }}
-        >
-          <button
-            type="submit"
-            className="inline-flex min-h-12 w-full touch-manipulation items-center justify-center gap-3 rounded-luc-md bg-luc-text px-4 py-2.5 font-medium text-luc-bg text-sm transition-opacity active:opacity-80 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-luc-bg"
-          >
-            <GoogleMark />
-            Entrar com Google
-          </button>
-        </form>
+        <p className="mt-4 text-center text-[11.5px] leading-[1.55] text-luc-faint">
+          Acesso restrito a duas Pessoas, sem cadastro.
+          <br />
+          Quem entra é autenticado; os dois veem tudo igual.
+        </p>
       </section>
     </main>
+  )
+}
+
+function LoginPersonBadge({
+  person,
+  children,
+}: {
+  person: "thiago" | "jakeline"
+  children: string
+}) {
+  return (
+    <span
+      aria-hidden
+      className={`inline-flex h-[26px] w-[26px] items-center justify-center rounded-luc-sm text-[11px] font-bold ${
+        person === "thiago"
+          ? "bg-luc-thiago-bg text-luc-thiago-fg"
+          : "bg-luc-jakeline-bg text-luc-jakeline-fg"
+      }`}
+    >
+      {children}
+    </span>
   )
 }
 

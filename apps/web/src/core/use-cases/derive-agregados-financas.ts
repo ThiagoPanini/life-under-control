@@ -24,6 +24,24 @@ export const JANELA_GASTO_MESES = 12
 /** Recorrência mensal pura — usada só para enumerar a janela de meses do gasto médio. */
 const MENSAL = { intervalMonths: 1, anchorMonth: null } as const
 
+export type PontoSerieMensal = { competencia: string; valor: number }
+
+/** Série mensal exata do total pago, com lacunas representadas por zero. */
+export function serieTotalPago(
+  bills: Bill[],
+  payments: Payment[],
+  hoje: string,
+  tamanho = 6,
+): PontoSerieMensal[] {
+  const ativas = new Set(contasAtivas(bills).map((bill) => bill.id))
+  return ocorrenciasRecentes(MENSAL, mesDe(hoje), tamanho).map((competencia) => ({
+    competencia,
+    valor: payments
+      .filter((payment) => ativas.has(payment.billId) && payment.competencia === competencia)
+      .reduce((total, payment) => total + payment.valor, 0),
+  }))
+}
+
 /** Os quatro agregados do mês exibidos no cockpit. Dinheiro em centavos (invariante #6). */
 export type AgregadosMes = {
   /** Total **pago** no mês corrente (exato): soma dos Lançamentos da competência vigente. */

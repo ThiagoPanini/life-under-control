@@ -4,71 +4,130 @@ import { systemClock } from "@/adapters/clock/system-clock"
 import { drizzleBillRepo } from "@/adapters/db/bill-repo.drizzle"
 import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
 import { drizzlePaymentRepo } from "@/adapters/db/payment-repo.drizzle"
-import { Pill } from "@/components/ds/Pill"
+import { PageHeader } from "@/components/ds/PageHeader"
 import { formatarDataBr } from "@/core/domain/bill"
 import { getPainel } from "@/core/use-cases/get-painel"
 import { listAllPayments } from "@/core/use-cases/list-all-payments"
 import { listBills } from "@/core/use-cases/list-bills"
-import { projetarAgenda } from "@/core/use-cases/project-agenda"
+import { type ItemAgenda, projetarAgenda } from "@/core/use-cases/project-agenda"
 
-// Vista pura (invariante #7): lê o banco a cada request — a projeção muda com o
-// tempo e a cada baixa. Nada de prerender estático (sem DB no build).
 export const dynamic = "force-dynamic"
 
-/**
- * Agenda (issue #23): a projeção das Contas ativas a vencer — vista pura, sem dado
- * próprio. Lista as ocorrências não-pagas do mês vigente + próximo, ordenadas no
- * tempo e **sem valor** (invariantes #5/#7). Cada item leva à baixa da (Conta,
- * competência). Hoje só Finanças alimenta; a estrutura é agnóstica de Área.
- */
+type AgendaGroup = {
+  titulo: string
+  nota?: string
+  tone: "warn" | "default"
+  itens: ItemAgenda[]
+}
+
+function monthLabel(date: string) {
+  const label = new Intl.DateTimeFormat("pt-BR", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T12:00:00Z`))
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
+function groupAgenda(items: ItemAgenda[]): AgendaGroup[] {
+  const groups: AgendaGroup[] = []
+  const open = items.filter((item) => item.estado === "em-aberto")
+  if (open.length > 0) {
+    groups.push({
+      titulo: "Atrasado",
+      nota: "venceu ou vence hoje, sem Lançamento",
+      tone: "warn",
+      itens: open,
+    })
+  }
+
+  const upcoming = new Map<string, ItemAgenda[]>()
+  for (const item of items.filter((entry) => entry.estado === "aguardando")) {
+    const key = item.vencimento.slice(0, 7)
+    upcoming.set(key, [...(upcoming.get(key) ?? []), item])
+  }
+  for (const entries of upcoming.values()) {
+    groups.push({
+      titulo: monthLabel(entries[0].vencimento),
+      nota: "projeções das Contas",
+      tone: "default",
+      itens: entries,
+    })
+  }
+  return groups
+}
+
 export default async function AgendaPage() {
   const { lar } = await getPainel(drizzleHouseholdRepo())
   const [bills, pagamentos] = await Promise.all([
     listBills(drizzleBillRepo(), lar.id),
     listAllPayments(drizzlePaymentRepo(), lar.id),
   ])
-  const itens = projetarAgenda(systemClock(), nationalBankCalendar(), bills, pagamentos)
+  const groups = groupAgenda(
+    projetarAgenda(systemClock(), nationalBankCalendar(), bills, pagamentos),
+  )
 
   return (
-    <div className="luc-page-gutter py-7 sm:py-9 lg:py-10">
-      <div className="mx-auto flex max-w-2xl flex-col gap-6">
-        <header className="flex flex-col gap-2">
-          <p className="font-mono text-[11.5px] text-luc-accent uppercase tracking-[0.18em]">
-            Agenda
-          </p>
-          <h1 className="font-extrabold text-3xl text-luc-text tracking-[-0.035em] sm:text-4xl">
-            Agenda
-          </h1>
-          <p className="text-luc-text-2">
-            O que vence no mês e no próximo — só o quando, sem valor.
-          </p>
-        </header>
+    <div className="luc-page-gutter py-7 lg:py-7">
+      <div className="mx-auto max-w-[820px]">
+        <PageHeader
+          title="Agenda"
+          description="Projeção no tempo do que vence e das Tarefas com data."
+          className="mb-[26px]"
+        />
 
-        {itens.length === 0 ? (
-          <div className="rounded-luc-lg border border-luc-border border-dashed bg-luc-surface-1 p-8">
-            <p className="text-luc-text-2 leading-relaxed">Nada a vencer por aqui. Tudo em dia.</p>
+        {groups.length === 0 ? (
+          <div className="rounded-[14px] border border-luc-border border-dashed bg-luc-surface-2 p-8 text-luc-text-2">
+            Nada a vencer por aqui. Tudo em dia.
           </div>
         ) : (
-          <ul className="flex flex-col gap-2.5">
-            {itens.map((item) => (
-              <li key={`${item.geradorId}-${item.competencia}`}>
-                <Link
-                  href={`/areas/financas/${item.geradorId}?competencia=${item.competencia}`}
-                  className="flex items-center justify-between gap-4 rounded-luc-lg border border-luc-border bg-luc-surface-1 px-5 py-4 transition-colors hover:bg-luc-surface-2"
+          groups.map((group) => (
+            <section key={group.titulo} className="mb-[26px]">
+              <div className="mb-[11px] flex items-center gap-2.5">
+                <h2
+                  className={`text-[13px] font-bold ${group.tone === "warn" ? "text-luc-warn" : "text-luc-text-strong"}`}
                 >
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    <span className="truncate font-semibold text-luc-text">{item.titulo}</span>
-                    <span className="font-mono text-[11.5px] text-luc-text-3">
-                      Vence {formatarDataBr(item.vencimento)}
-                    </span>
-                  </div>
-                  <Pill tone={item.estado === "em-aberto" ? "accent" : "muted"}>
-                    {item.estado === "em-aberto" ? "Vencida" : "A vencer"}
-                  </Pill>
-                </Link>
-              </li>
-            ))}
-          </ul>
+                  {group.titulo}
+                </h2>
+                {group.nota && <span className="text-[11.5px] text-luc-muted">{group.nota}</span>}
+              </div>
+              <ul className="overflow-hidden rounded-[14px] border border-luc-border bg-luc-surface-2">
+                {group.itens.map((item) => (
+                  <li
+                    key={`${item.geradorId}-${item.competencia}`}
+                    className="border-luc-row-line border-t first:border-t-0"
+                  >
+                    <Link
+                      href={`/areas/financas/${item.geradorId}?competencia=${item.competencia}`}
+                      className="flex min-h-[70px] items-center gap-3 px-4 py-3.5 transition-colors hover:bg-white/[0.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-luc-accent sm:gap-[15px] sm:px-[18px]"
+                    >
+                      <time className="w-[80px] shrink-0 font-mono text-[12.5px] text-luc-text-2">
+                        {formatarDataBr(item.vencimento)}
+                      </time>
+                      <span
+                        aria-hidden
+                        className={`h-2 w-2 shrink-0 rounded-full ${item.estado === "em-aberto" ? "bg-luc-warn" : "bg-luc-accent"}`}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-luc-text">
+                          {item.titulo}
+                        </span>
+                        <span className="block text-[11.5px] text-luc-muted">
+                          <span
+                            className={`font-semibold ${item.estado === "em-aberto" ? "text-luc-warn" : "text-luc-accent"}`}
+                          >
+                            {item.estado === "em-aberto" ? "pendente" : "a vencer"}
+                          </span>{" "}
+                          · Conta · projeção de Finanças
+                        </span>
+                      </span>
+                      <span className="font-mono text-[13.5px] text-luc-disabled">—</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))
         )}
       </div>
     </div>

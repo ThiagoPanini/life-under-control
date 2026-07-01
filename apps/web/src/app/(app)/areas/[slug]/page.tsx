@@ -4,36 +4,31 @@ import { Button } from "@/components/ds/Button"
 import { Pill } from "@/components/ds/Pill"
 import { AREAS } from "@/core/domain/areas"
 
-// Só as Áreas `em-breve` usam esta view genérica; as `ativa` têm rota própria
-// (ex.: /areas/financas), que sombreia este segmento dinâmico.
 export function generateStaticParams() {
   return AREAS.filter((area) => area.estado === "em-breve").map((area) => ({ slug: area.slug }))
 }
 
-/** View genérica e honesta de "em breve" para qualquer Área ainda não construída. */
 export default async function AreaPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const area = AREAS.find((a) => a.slug === slug)
-  // Área inexistente ou já `ativa` (que tem rota dedicada) não cai no genérico.
+  const area = AREAS.find((item) => item.slug === slug)
   if (!area || area.estado === "ativa") notFound()
 
   return (
-    <div className="luc-page-gutter py-7 sm:py-9 lg:py-10">
-      <div className="mx-auto flex max-w-2xl flex-col items-start gap-6">
-        <span className="flex h-14 w-14 items-center justify-center rounded-luc-lg border border-luc-border bg-luc-surface-2 text-luc-text-2">
-          <AreaIcon name={area.icon} size={28} />
+    <div className="luc-page-gutter py-7 lg:py-7">
+      <div className="mx-auto mt-[8vh] flex max-w-[560px] flex-col items-center text-center">
+        <span className="flex h-[72px] w-[72px] items-center justify-center rounded-[20px] border border-luc-border bg-white/[0.04] text-luc-text-3">
+          <AreaIcon name={area.icon} size={36} />
         </span>
-        <div className="flex max-w-full flex-wrap items-center gap-3">
-          <h1 className="min-w-0 break-words font-extrabold text-3xl text-luc-text tracking-[-0.035em] sm:text-4xl">
-            {area.nome}
-          </h1>
-          {area.estado === "em-breve" && <Pill tone="muted">em breve</Pill>}
-        </div>
-        <p className="max-w-prose text-luc-text-2 leading-relaxed">
-          Esta Área ainda não foi construída. Em breve ela ganha vida aqui — por enquanto, é só a
-          casca.
+        <Pill tone="coming-soon" className="mt-[18px] px-[11px] py-1">
+          em breve
+        </Pill>
+        <h1 className="mt-4 text-[27px] font-extrabold tracking-[-0.02em] text-luc-text">
+          {area.nome}
+        </h1>
+        <p className="mt-3 text-[14.5px] leading-[1.6] text-luc-text-2">
+          {area.resumo}. Esta Área ainda não foi ativada — sem métrica, sem prazo.
         </p>
-        <Button href="/painel" variant="ghost">
+        <Button href="/painel" variant="secondary" className="mt-[26px]">
           ← Voltar ao Painel
         </Button>
       </div>

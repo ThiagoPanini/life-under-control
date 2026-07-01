@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { deletarLancamento, editarLancamento } from "@/app/(app)/areas/financas/actions"
 import { Button } from "@/components/ds/Button"
+import { PersonChip } from "@/components/ds/PersonChip"
 import { ComprovantesLancamento } from "@/components/financas/ComprovantesLancamento"
 import { ConnectedPaymentForm } from "@/components/financas/ConnectedPaymentForm"
 import { paymentParaInicial } from "@/components/financas/payment-form-inicial"
@@ -12,7 +13,7 @@ import type { Pessoa } from "@/core/domain/household"
 import { formatBRL } from "@/core/domain/money"
 import { descreverCompetencia, type Payment } from "@/core/domain/payment"
 
-const warnCls = "border-luc-warn/40 text-luc-warn hover:border-luc-warn hover:text-luc-warn"
+const warnCls = "border border-luc-warn/40 text-luc-warn hover:border-luc-warn hover:text-luc-warn"
 
 /**
  * Lista dos Lançamentos da Conta (borda fina — Seam 3). Cada linha mostra a
@@ -74,6 +75,10 @@ function nomeDe(pessoas: Pessoa[], id: string): string {
   return pessoas.find((p) => p.id === id)?.nome ?? "—"
 }
 
+function pessoaDe(pessoas: Pessoa[], id: string): Pessoa | undefined {
+  return pessoas.find((pessoa) => pessoa.id === id)
+}
+
 function LancamentoRow({
   billId,
   lancamento,
@@ -93,7 +98,7 @@ function LancamentoRow({
 
   if (editando) {
     return (
-      <li className="rounded-luc-lg border border-luc-border bg-luc-surface-1 p-5">
+      <li className="rounded-luc-lg border border-luc-border bg-luc-surface-2 p-5">
         <ConnectedPaymentForm
           action={editarLancamento.bind(null, billId, lancamento.id)}
           pessoas={pessoas}
@@ -108,26 +113,37 @@ function LancamentoRow({
   }
 
   return (
-    <li className="flex flex-col gap-3 rounded-luc-lg border border-luc-border bg-luc-surface-1 p-5">
+    <li className="flex flex-col gap-3 rounded-luc-lg border border-luc-border bg-luc-surface-2 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="font-medium text-luc-text">{formatBRL(lancamento.valor)}</span>
-            <span className="font-mono text-[11.5px] text-luc-text-2 uppercase tracking-[0.12em]">
+            <span className="font-mono text-[14px] font-semibold text-luc-text">
+              {formatBRL(lancamento.valor)}
+            </span>
+            <span className="text-[11.5px] text-luc-text-2">
               {descreverCompetencia(lancamento.competencia, recurrence)}
             </span>
           </div>
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-luc-text-3 text-sm">
-            <span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-luc-muted">
+            <span className="font-mono">
               {lancamento.dataPagamento ? formatarDataBr(lancamento.dataPagamento) : "Sem data"}
             </span>
             <span className="text-luc-faint">·</span>
-            <span>Pago por {nomeDe(pessoas, lancamento.paidBy)}</span>
+            {pessoaDe(pessoas, lancamento.paidBy) ? (
+              <PersonChip pessoa={pessoaDe(pessoas, lancamento.paidBy) as Pessoa} compact />
+            ) : (
+              <span>Pago por {nomeDe(pessoas, lancamento.paidBy)}</span>
+            )}
           </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <Button variant="ghost" type="button" onClick={() => setEditando(true)}>
+          <Button
+            variant="ghost"
+            type="button"
+            onClick={() => setEditando(true)}
+            className="min-h-9 px-3 py-1.5 text-xs"
+          >
             Editar
           </Button>
           <DeletarLancamento billId={billId} paymentId={lancamento.id} />
@@ -150,7 +166,12 @@ function DeletarLancamento({ billId, paymentId }: { billId: string; paymentId: s
 
   if (!armado) {
     return (
-      <Button variant="ghost" type="button" onClick={() => setArmado(true)} className={warnCls}>
+      <Button
+        variant="secondary"
+        type="button"
+        onClick={() => setArmado(true)}
+        className={`${warnCls} min-h-9 px-3 py-1.5 text-xs`}
+      >
         Deletar
       </Button>
     )
@@ -158,10 +179,10 @@ function DeletarLancamento({ billId, paymentId }: { billId: string; paymentId: s
 
   return (
     <form action={acao} className="inline-flex items-center gap-2">
-      <Button variant="ghost" type="submit" className={warnCls}>
+      <Button variant="secondary" type="submit" className={warnCls}>
         Confirmar
       </Button>
-      <Button variant="ghost" type="button" onClick={() => setArmado(false)}>
+      <Button variant="secondary" type="button" onClick={() => setArmado(false)}>
         Cancelar
       </Button>
     </form>

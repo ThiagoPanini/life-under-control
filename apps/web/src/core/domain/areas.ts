@@ -13,13 +13,50 @@ export type Area = {
   nome: string
   icon: string
   estado: AreaEstado
+  resumo?: string
 }
 
 export const AREAS: Area[] = [
-  { slug: "financas", nome: "Finanças", icon: "wallet", estado: "ativa" },
-  { slug: "gastronomia", nome: "Gastronomia", icon: "chef-hat", estado: "em-breve" },
-  { slug: "supermercado", nome: "Supermercado", icon: "shopping-cart", estado: "em-breve" },
-  { slug: "saude", nome: "Saúde", icon: "heart-pulse", estado: "em-breve" },
-  { slug: "imovel", nome: "Imóvel", icon: "house", estado: "em-breve" },
-  { slug: "carro", nome: "Carro", icon: "car", estado: "em-breve" },
+  {
+    slug: "financas",
+    nome: "Finanças",
+    icon: "wallet",
+    estado: "ativa",
+    resumo: "Contas e Lançamentos do mês",
+  },
+  {
+    slug: "gastronomia",
+    nome: "Gastronomia",
+    icon: "chef-hat",
+    estado: "em-breve",
+    resumo: "Restaurantes e cafés indicados",
+  },
+  {
+    slug: "supermercado",
+    nome: "Supermercado",
+    icon: "shopping-cart",
+    estado: "em-breve",
+    resumo: "Lista de compras do mês",
+  },
+  {
+    slug: "saude",
+    nome: "Saúde",
+    icon: "heart-pulse",
+    estado: "em-breve",
+    resumo: "Consultas, exames e métricas do corpo",
+  },
+  {
+    slug: "imovel",
+    nome: "Imóvel",
+    icon: "house",
+    estado: "em-breve",
+    resumo: "Manutenção, reformas e documentos",
+  },
+  {
+    slug: "carro",
+    nome: "Carro",
+    icon: "car",
+    estado: "em-breve",
+    resumo: "Revisões, abastecimento e seguro",
+  },
 ]

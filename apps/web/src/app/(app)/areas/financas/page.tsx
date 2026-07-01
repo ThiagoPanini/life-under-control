@@ -4,12 +4,15 @@ import { systemClock } from "@/adapters/clock/system-clock"
 import { drizzleBillRepo } from "@/adapters/db/bill-repo.drizzle"
 import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
 import { drizzlePaymentRepo } from "@/adapters/db/payment-repo.drizzle"
-import { AreaIcon } from "@/components/areas/AreaIcon"
 import { Button } from "@/components/ds/Button"
 import { BillCard } from "@/components/financas/BillCard"
 import { CockpitFinancas } from "@/components/financas/CockpitFinancas"
 import { AREAS } from "@/core/domain/areas"
-import { derivarAgregadosFinancas } from "@/core/use-cases/derive-agregados-financas"
+import {
+  derivarAgregadosFinancas,
+  serieTotalPago,
+} from "@/core/use-cases/derive-agregados-financas"
+import { derivarCardConta } from "@/core/use-cases/derive-bill-card"
 import { getPainel } from "@/core/use-cases/get-painel"
 import { listAllPayments } from "@/core/use-cases/list-all-payments"
 import { listBills } from "@/core/use-cases/list-bills"
@@ -42,28 +45,30 @@ export default async function FinancasPage({
     ativas,
     pagamentos,
   )
+  const serie = serieTotalPago(ativas, pagamentos, systemClock().hoje())
+  const cards = new Map(
+    ativas.map((bill) => [
+      bill.id,
+      derivarCardConta(
+        systemClock(),
+        nationalBankCalendar(),
+        bill,
+        pagamentos.filter((payment) => payment.billId === bill.id),
+      ),
+    ]),
+  )
 
   return (
     <div className="luc-page-gutter py-7 sm:py-9 lg:py-10">
-      <div className="mx-auto flex max-w-3xl flex-col gap-8">
-        <header className="flex flex-col gap-4">
-          <span className="flex h-14 w-14 items-center justify-center rounded-luc-lg border border-luc-border bg-luc-surface-2 text-luc-text-2">
-            <AreaIcon name={financas?.icon ?? "wallet"} size={28} />
-          </span>
-          <p className="font-mono text-[11.5px] text-luc-accent uppercase tracking-[0.18em]">
-            Pagamentos
-          </p>
-          <h1 className="font-extrabold text-3xl text-luc-text tracking-[-0.035em] sm:text-4xl">
-            {financas?.nome ?? "Finanças"}
-          </h1>
-        </header>
+      <div className="mx-auto flex max-w-[1120px] flex-col gap-6">
+        <h1 className="sr-only">{financas?.nome ?? "Finanças"} · Pagamentos</h1>
 
-        {ativas.length > 0 && <CockpitFinancas agregados={agregados} />}
+        {ativas.length > 0 && <CockpitFinancas agregados={agregados} serie={serie} />}
 
         <section className="flex flex-col gap-5">
           <div className="flex items-center justify-between gap-3">
-            <p className="font-mono text-[11.5px] text-luc-text-3 uppercase tracking-[0.18em]">
-              Contas{" "}
+            <p className="text-[13px] font-bold text-luc-text-strong">
+              Contas ativas{" "}
               {ativas.length > 0 && <span className="text-luc-faint">· {ativas.length}</span>}
             </p>
             <Button href="/areas/financas/nova" variant="primary">
@@ -77,14 +82,14 @@ export default async function FinancasPage({
                 Nenhuma Conta ativa. Cadastre a primeira regra de pagamento recorrente — a Conta
                 guarda o <em>quando</em>, nunca o <em>quanto</em>.
               </p>
-              <Button href="/areas/financas/nova" variant="ghost">
+              <Button href="/areas/financas/nova" variant="secondary">
                 Cadastrar Conta
               </Button>
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
               {ativas.map((bill) => (
-                <BillCard key={bill.id} bill={bill} />
+                <BillCard key={bill.id} bill={bill} card={cards.get(bill.id)} />
               ))}
             </div>
           )}
@@ -93,7 +98,7 @@ export default async function FinancasPage({
         {encerradas.length > 0 && (
           <section className="flex flex-col gap-5">
             <div className="flex items-center justify-between gap-3">
-              <p className="font-mono text-[11.5px] text-luc-text-3 uppercase tracking-[0.18em]">
+              <p className="text-[13px] font-bold text-luc-text-strong">
                 Encerradas <span className="text-luc-faint">· {encerradas.length}</span>
               </p>
               <Link

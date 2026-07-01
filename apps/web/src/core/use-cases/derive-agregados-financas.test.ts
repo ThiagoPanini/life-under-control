@@ -8,6 +8,7 @@ import {
   derivarAgregadosFinancas,
   estimarFaltaPagar,
   gastoMensalMedio,
+  serieTotalPago,
   totalPagoNoMes,
 } from "./derive-agregados-financas"
 
@@ -70,6 +71,29 @@ describe("totalPagoNoMes (Seam 1)", () => {
   it("test_sem_pagamento_no_mes_soma_zero", () => {
     const pagos = [pagamento({ competencia: "2026-05", valor: 5000 })]
     expect(totalPagoNoMes([billBase()], pagos, "2026-06-15")).toBe(0)
+  })
+})
+
+describe("serieTotalPago (Seam 1)", () => {
+  it("test_monta_seis_competencias_em_ordem_com_zeros_explicitos", () => {
+    const bills = [
+      billBase({ id: "ativa" }),
+      billBase({ id: "encerrada", estado: "encerrada", encerradaEm: "2026-01-01" }),
+    ]
+    const pagos = [
+      pagamento({ id: "abr", billId: "ativa", competencia: "2026-04", valor: 4000 }),
+      pagamento({ id: "jun", billId: "ativa", competencia: "2026-06", valor: 6000 }),
+      pagamento({ id: "fora", billId: "encerrada", competencia: "2026-05", valor: 99999 }),
+    ]
+
+    expect(serieTotalPago(bills, pagos, "2026-06-15", 6)).toEqual([
+      { competencia: "2026-01", valor: 0 },
+      { competencia: "2026-02", valor: 0 },
+      { competencia: "2026-03", valor: 0 },
+      { competencia: "2026-04", valor: 4000 },
+      { competencia: "2026-05", valor: 0 },
+      { competencia: "2026-06", valor: 6000 },
+    ])
   })
 })
 

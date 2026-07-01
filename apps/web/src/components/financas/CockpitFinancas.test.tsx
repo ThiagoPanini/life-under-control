@@ -19,18 +19,26 @@ const base: AgregadosMes = {
   estimativaFaltaPagar: 6000,
 }
 
+const serie = [
+  { competencia: "2026-02", valor: 8000 },
+  { competencia: "2026-03", valor: 9000 },
+  { competencia: "2026-04", valor: 11000 },
+  { competencia: "2026-05", valor: 12000 },
+  { competencia: "2026-06", valor: 10000 },
+]
+
 describe("CockpitFinancas (Seam 2)", () => {
   it("test_formata_os_quatro_agregados_em_brl", () => {
-    render(<CockpitFinancas agregados={base} />)
+    render(<CockpitFinancas agregados={base} serie={serie} />)
     expect(screen.getByText("Pago no mês")).toBeInTheDocument()
-    expect(screen.getByText("R$ 100,00")).toBeInTheDocument() // pago
+    expect(screen.getAllByText("R$ 100,00").length).toBeGreaterThanOrEqual(1) // pago + tendência
     expect(screen.getByText("R$ 120,00")).toBeInTheDocument() // gasto médio
     expect(screen.getByText("R$ 60,00")).toBeInTheDocument() // falta pagar
     expect(screen.getByText("2")).toBeInTheDocument() // em aberto
   })
 
   it("test_falta_pagar_vem_rotulada_como_estimativa", () => {
-    render(<CockpitFinancas agregados={base} />)
+    render(<CockpitFinancas agregados={base} serie={serie} />)
     // marcada como estimativa: a tag junto do rótulo + a nota explicativa
     expect(screen.getAllByText("estimativa").length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText("Falta pagar").length).toBeGreaterThanOrEqual(1)
@@ -39,6 +47,7 @@ describe("CockpitFinancas (Seam 2)", () => {
   it("test_sem_historico_mostra_travessao_em_vez_de_valor", () => {
     render(
       <CockpitFinancas
+        serie={serie}
         agregados={{
           totalPagoMes: 0,
           contasEmAberto: 0,

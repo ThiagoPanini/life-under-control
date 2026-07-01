@@ -23,7 +23,7 @@ Disparado por "implementa as issues" (ou equivalente): colete as issues `status:
 1. **`CONTEXT.md`** — glossário de domínio + invariantes (núcleo estável) e o catálogo de primitivos (fronteira provisória). Código que viola invariante é bug.
 2. **`docs/adr/`** ([índice](docs/adr/README.md)) — decisões e seus porquês. Não leia todos os ADRs, apenas saiba o que existe.
 
-O sistema visual do LUC nasce no Claude Design; quando houver um contrato vivo, ele entra aqui.
+O sistema visual oficial do LUC está em [`docs/design/`](docs/design/README.md). Esse contrato vivo governa tokens, tipografia, componentes, casca, estados e vocabulário; os protótipos do Claude Design são sua origem visual, não uma dependência de execução do repo.
 
 ## Convenções (não negociáveis)
 

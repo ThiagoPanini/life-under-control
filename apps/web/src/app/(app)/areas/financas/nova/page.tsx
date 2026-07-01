@@ -1,26 +1,25 @@
 import { criarConta } from "@/app/(app)/areas/financas/actions"
 import { Button } from "@/components/ds/Button"
+import { PageHeader } from "@/components/ds/PageHeader"
+import { Surface } from "@/components/ds/Surface"
 import { ConnectedBillForm } from "@/components/financas/ConnectedBillForm"
 
 /** Cadastro de uma Conta nova (wizard). A baixa de valor é outra história (#19). */
 export default function NovaContaPage() {
   return (
-    <div className="luc-page-gutter py-7 sm:py-9 lg:py-10">
-      <div className="mx-auto flex max-w-2xl flex-col gap-7">
-        <header className="flex flex-col gap-3">
-          <Button href="/areas/financas" variant="ghost" className="self-start">
-            ← Finanças
-          </Button>
-          <h1 className="font-extrabold text-3xl text-luc-text tracking-[-0.035em] sm:text-4xl">
-            Nova Conta
-          </h1>
-          <p className="max-w-prose text-luc-text-2 leading-relaxed">
-            A regra de um pagamento que se repete: nome, ícone, com que frequência e quando vence.
-            Sem valor — ele só existe quando a conta chega.
-          </p>
-        </header>
+    <div className="luc-page-gutter py-7 lg:py-7">
+      <div className="mx-auto flex max-w-[720px] flex-col gap-6">
+        <Button href="/areas/financas" variant="ghost" className="self-start">
+          ← Finanças
+        </Button>
+        <PageHeader
+          title="Nova Conta"
+          description="A regra de um pagamento que se repete: frequência e vencimento, nunca um valor."
+        />
 
-        <ConnectedBillForm action={criarConta} />
+        <Surface className="p-5 sm:p-6">
+          <ConnectedBillForm action={criarConta} />
+        </Surface>
       </div>
     </div>
   )

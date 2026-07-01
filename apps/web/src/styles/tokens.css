@@ -1,5 +1,4 @@
-/* Life Under Control — Mirante · tokens (handoff do sistema de design).
-   "Mirante" é codinome interno; nunca aparece na UI. */
+/* Life Under Control — tokens oficiais do sistema de design. */
 :root {
   /* Fundo & superfície */
   --luc-bg: #0a0c0f;
@@ -37,8 +36,8 @@
   --luc-jakeline-bg: hsl(14 44% 23%);
 
   /* Tipografia — Manrope (texto) + JetBrains Mono (números/datas/%) */
-  --luc-font-sans: var(--font-manrope), "Manrope", system-ui, sans-serif;
-  --luc-font-mono: var(--font-jetbrains), "JetBrains Mono", monospace;
+  --luc-font-sans: "Manrope", system-ui, sans-serif;
+  --luc-font-mono: "JetBrains Mono", monospace;
 
   /* Raio */
   --luc-r-sm: 7px;

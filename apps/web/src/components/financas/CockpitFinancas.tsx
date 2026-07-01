@@ -1,80 +1,77 @@
+import { MetricCard } from "@/components/ds/MetricCard"
+import { TrendCard } from "@/components/ds/TrendCard"
 import { formatBRL } from "@/core/domain/money"
-import type { AgregadosMes } from "@/core/use-cases/derive-agregados-financas"
+import type { AgregadosMes, PontoSerieMensal } from "@/core/use-cases/derive-agregados-financas"
 
-/**
- * Cockpit de Finanças (issue #22): os quatro agregados do mês no topo da Área,
- * somando todas as Contas ativas. Só o **pago** é exato (soma dos Lançamentos da
- * competência); **falta pagar** é estimativa do histórico e vem rotulada como tal
- * — não existe valor de conta não-paga (CONTEXT.md). Mês sem histórico mostra "—".
- */
-export function CockpitFinancas({ agregados }: { agregados: AgregadosMes }) {
-  const { totalPagoMes, contasEmAberto, gastoMensalMedio, estimativaFaltaPagar } = agregados
-  return (
-    <section className="flex flex-col gap-4 rounded-luc-lg border border-luc-border bg-luc-surface-1 p-5 sm:p-6">
-      <p className="font-mono text-[11.5px] text-luc-text-3 uppercase tracking-[0.18em]">
-        Este mês
-      </p>
+const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
 
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
-        <Stat rotulo="Pago no mês" valor={formatBRL(totalPagoMes)} />
-        <Stat
-          rotulo="Em aberto"
-          valor={String(contasEmAberto)}
-          sufixo={contasEmAberto === 1 ? "conta" : "contas"}
-          alerta={contasEmAberto > 0}
-        />
-        <Stat
-          rotulo="Gasto médio · 12m"
-          valor={gastoMensalMedio == null ? "—" : formatBRL(gastoMensalMedio)}
-        />
-        <Stat
-          rotulo="Falta pagar"
-          valor={estimativaFaltaPagar == null ? "—" : formatBRL(estimativaFaltaPagar)}
-          tag="estimativa"
-        />
-      </dl>
-
-      <p className="text-luc-text-3 text-xs leading-snug">
-        <span className="font-medium text-luc-text-2">Falta pagar</span> é uma <em>estimativa</em>{" "}
-        derivada do histórico de cada Conta — só entram Contas em aberto que já foram pagas alguma
-        vez. Não há valor exato a pagar: a Conta guarda o <em>quando</em>, nunca o <em>quanto</em>.
-      </p>
-    </section>
-  )
+function monthShort(competencia: string) {
+  return MONTHS[Number(competencia.slice(5, 7)) - 1]
 }
 
-/** Uma estatística do cockpit: rótulo em cima, valor grande embaixo, com tag/sufixo opcionais. */
-function Stat({
-  rotulo,
-  valor,
-  sufixo,
-  tag,
-  alerta,
+export function CockpitFinancas({
+  agregados,
+  serie,
 }: {
-  rotulo: string
-  valor: string
-  sufixo?: string
-  tag?: string
-  alerta?: boolean
+  agregados: AgregadosMes
+  serie: PontoSerieMensal[]
 }) {
+  const { totalPagoMes, contasEmAberto, gastoMensalMedio, estimativaFaltaPagar } = agregados
+  const current = serie.at(-1)?.valor ?? totalPagoMes
+  const previous = serie.at(-2)?.valor ?? 0
+  const delta = previous > 0 ? ((current - previous) / previous) * 100 : null
+
   return (
-    <div className="flex flex-col gap-1.5">
-      <dt className="flex items-center gap-1.5 font-mono text-[11px] text-luc-text-3 uppercase tracking-[0.12em]">
-        {rotulo}
-        {tag && (
-          <span className="rounded-full bg-luc-surface-2 px-1.5 py-px text-[9px] text-luc-text-3 lowercase tracking-[0.08em]">
-            {tag}
-          </span>
-        )}
-      </dt>
-      <dd
-        className={`flex items-baseline gap-1.5 font-semibold text-xl tracking-[-0.02em] ${
-          alerta ? "text-luc-warn" : "text-luc-text"
-        }`}
-      >
-        {valor}
-        {sufixo && <span className="font-normal text-luc-text-3 text-xs">{sufixo}</span>}
-      </dd>
-    </div>
+    <section aria-labelledby="finance-readings" className="flex flex-col gap-3.5">
+      <h2 id="finance-readings" className="sr-only">
+        Leituras de Finanças
+      </h2>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <MetricCard
+          label="Pago no mês"
+          value={formatBRL(totalPagoMes)}
+          support="soma dos Lançamentos"
+        />
+        <MetricCard
+          label="Em aberto"
+          value={String(contasEmAberto)}
+          support={contasEmAberto === 1 ? "Conta" : "Contas"}
+          tone={contasEmAberto > 0 ? "warn" : "success"}
+        />
+        <MetricCard
+          label="Gasto médio · 12m"
+          value={gastoMensalMedio == null ? "—" : formatBRL(gastoMensalMedio)}
+          support="meses completos"
+        />
+        <MetricCard
+          label="Falta pagar"
+          value={estimativaFaltaPagar == null ? "—" : formatBRL(estimativaFaltaPagar)}
+          support="estimativa"
+        />
+      </div>
+
+      <TrendCard
+        label="Total pago por mês"
+        period={
+          serie.length > 0
+            ? `${monthShort(serie[0].competencia)} — ${monthShort(serie.at(-1)?.competencia ?? serie[0].competencia)}`
+            : "sem histórico"
+        }
+        value={formatBRL(current)}
+        delta={
+          delta == null
+            ? "sem base anterior"
+            : `${delta >= 0 ? "+" : "−"}${Math.abs(delta).toFixed(1).replace(".", ",")}% vs. mês anterior`
+        }
+        deltaTone={delta == null ? "muted" : delta >= 0 ? "warn" : "success"}
+        values={serie.map((point) => point.valor)}
+        labels={serie.map((point) => monthShort(point.competencia))}
+      />
+
+      <p className="px-1 text-xs leading-snug text-luc-text-3">
+        <span className="font-medium text-luc-text-2">Falta pagar</span> é uma <em>estimativa</em>{" "}
+        derivada do histórico de cada Conta. O valor exato só nasce no Lançamento.
+      </p>
+    </section>
   )
 }

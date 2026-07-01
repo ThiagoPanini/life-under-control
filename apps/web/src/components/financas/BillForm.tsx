@@ -2,9 +2,9 @@
 
 import { useEffect, useId, useState } from "react"
 import { Button } from "@/components/ds/Button"
+import { Field, FieldError, getFieldError, inputClass } from "@/components/ds/FormField"
 import { BillIcon } from "@/components/financas/BillIcon"
 import { type BillFormInicial, INICIAL_PADRAO } from "@/components/financas/bill-form-inicial"
-import { Campo, erroDoCampo, inputCls, MensagemErro } from "@/components/financas/form-field"
 import {
   BILL_ICONS,
   type ErroCampo,
@@ -94,19 +94,32 @@ export function BillForm({
     setPasso(Math.min(...passos))
   }, [erros])
 
-  const erroDe = (campo: string) => erroDoCampo(erros, campo)
+  const erroDe = (campo: string) => getFieldError(erros, campo)
 
   return (
-    <form action={formAction} className="flex flex-col gap-8">
-      <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] uppercase tracking-[0.14em]">
+    <form action={formAction} className="flex flex-col gap-8" aria-busy={pending}>
+      <ol className="flex flex-wrap items-center gap-2 text-[11px] font-semibold">
         {PASSOS.map((titulo, i) => (
           <li
             key={titulo}
             aria-current={i === passo ? "step" : undefined}
-            className={i === passo ? "text-luc-accent" : "text-luc-text-3"}
+            className={`flex items-center gap-1.5 ${
+              i === passo ? "text-luc-accent" : i < passo ? "text-luc-success" : "text-luc-text-3"
+            }`}
           >
-            {i + 1}. {titulo}
-            {i < PASSOS.length - 1 && <span className="ml-2 text-luc-faint">/</span>}
+            <span
+              className={`inline-flex h-5 w-5 items-center justify-center rounded-full border font-mono text-[9px] ${
+                i === passo
+                  ? "border-luc-accent bg-luc-accent-12"
+                  : i < passo
+                    ? "border-luc-success/30 bg-luc-success/10"
+                    : "border-luc-border bg-luc-surface-2"
+              }`}
+            >
+              {i + 1}
+            </span>
+            {titulo}
+            {i < PASSOS.length - 1 && <span className="ml-1 text-luc-faint">/</span>}
           </li>
         ))}
       </ol>
@@ -115,7 +128,7 @@ export function BillForm({
       <fieldset hidden={passo !== 0} className="flex flex-col gap-5 border-0 p-0">
         <legend className="sr-only">Identidade</legend>
 
-        <Campo label="Nome" htmlFor={`${formId}-nome`} erro={erroDe("nome")}>
+        <Field label="Nome" htmlFor={`${formId}-nome`} error={erroDe("nome")}>
           <input
             id={`${formId}-nome`}
             name="nome"
@@ -125,14 +138,16 @@ export function BillForm({
             placeholder="Condomínio, Luz, Internet…"
             value={nome}
             onChange={(e) => setNome(e.target.value)}
-            className={inputCls}
+            className={inputClass}
+            aria-invalid={Boolean(erroDe("nome"))}
+            aria-describedby={erroDe("nome") ? `${formId}-nome-error` : undefined}
           />
-        </Campo>
+        </Field>
 
-        <Campo
+        <Field
           label="Descrição (opcional)"
           htmlFor={`${formId}-descricao`}
-          erro={erroDe("descricao")}
+          error={erroDe("descricao")}
         >
           <textarea
             id={`${formId}-descricao`}
@@ -141,19 +156,21 @@ export function BillForm({
             maxLength={280}
             value={descricao}
             onChange={(e) => setDescricao(e.target.value)}
-            className={`${inputCls} resize-none`}
+            className={`${inputClass} resize-none`}
+            aria-invalid={Boolean(erroDe("descricao"))}
+            aria-describedby={erroDe("descricao") ? `${formId}-descricao-error` : undefined}
           />
-        </Campo>
+        </Field>
 
         <fieldset className="flex flex-col gap-2 border-0 p-0">
-          <legend className="mb-1 font-medium text-luc-text-2 text-sm">Ícone</legend>
+          <legend className="mb-1 text-[11.5px] font-semibold text-luc-text-3">Ícone</legend>
           <div className="grid grid-cols-5 gap-2 sm:grid-cols-8">
             {BILL_ICONS.map((ic) => (
               <label
                 key={ic}
                 className={`flex aspect-square cursor-pointer items-center justify-center rounded-luc-md border transition-colors ${
                   icon === ic
-                    ? "border-luc-accent bg-luc-accent/10 text-luc-accent"
+                    ? "border-luc-accent bg-luc-accent-12 text-luc-accent-bright"
                     : "border-luc-border bg-luc-surface-2 text-luc-text-2 hover:border-luc-border-strong"
                 }`}
               >
@@ -170,7 +187,7 @@ export function BillForm({
               </label>
             ))}
           </div>
-          {erroDe("icon") && <MensagemErro>{erroDe("icon")}</MensagemErro>}
+          {erroDe("icon") && <FieldError>{erroDe("icon")}</FieldError>}
         </fieldset>
       </fieldset>
 
@@ -178,17 +195,18 @@ export function BillForm({
       <fieldset hidden={passo !== 1} className="flex flex-col gap-5 border-0 p-0">
         <legend className="sr-only">Recorrência</legend>
 
-        <Campo
+        <Field
           label="Periodicidade"
           htmlFor={`${formId}-intervalo`}
-          erro={erroDe("intervalMonths")}
+          error={erroDe("intervalMonths")}
         >
           <select
             id={`${formId}-intervalo`}
             name="intervalMonths"
             value={intervalMonths}
             onChange={(e) => setIntervalMonths(e.target.value)}
-            className={inputCls}
+            className={inputClass}
+            aria-invalid={Boolean(erroDe("intervalMonths"))}
           >
             {PERIODICIDADES_PADRAO.map((m) => (
               <option key={m} value={m}>
@@ -196,16 +214,17 @@ export function BillForm({
               </option>
             ))}
           </select>
-        </Campo>
+        </Field>
 
         {precisaAncora && (
-          <Campo label="Mês-âncora" htmlFor={`${formId}-ancora`} erro={erroDe("anchorMonth")}>
+          <Field label="Mês-âncora" htmlFor={`${formId}-ancora`} error={erroDe("anchorMonth")}>
             <select
               id={`${formId}-ancora`}
               name="anchorMonth"
               value={anchorMonth}
               onChange={(e) => setAnchorMonth(e.target.value)}
-              className={inputCls}
+              className={inputClass}
+              aria-invalid={Boolean(erroDe("anchorMonth"))}
             >
               <option value="" disabled>
                 Em que mês cai?
@@ -216,7 +235,7 @@ export function BillForm({
                 </option>
               ))}
             </select>
-          </Campo>
+          </Field>
         )}
       </fieldset>
 
@@ -225,14 +244,16 @@ export function BillForm({
         <legend className="sr-only">Vencimento</legend>
 
         <fieldset className="flex flex-col gap-2 border-0 p-0">
-          <legend className="mb-1 font-medium text-luc-text-2 text-sm">Forma de vencimento</legend>
+          <legend className="mb-1 text-[11.5px] font-semibold text-luc-text-3">
+            Forma de vencimento
+          </legend>
           <div className="flex flex-col gap-2">
             {FORMAS.map((f) => (
               <label
                 key={f.value}
                 className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-luc-md border px-3 transition-colors ${
                   dueRuleKind === f.value
-                    ? "border-luc-accent bg-luc-accent/10 text-luc-text"
+                    ? "border-luc-accent bg-luc-accent-12 text-luc-text"
                     : "border-luc-border bg-luc-surface-2 text-luc-text-2 hover:border-luc-border-strong"
                 }`}
               >
@@ -248,11 +269,11 @@ export function BillForm({
               </label>
             ))}
           </div>
-          {erroDe("dueRuleKind") && <MensagemErro>{erroDe("dueRuleKind")}</MensagemErro>}
+          {erroDe("dueRuleKind") && <FieldError>{erroDe("dueRuleKind")}</FieldError>}
         </fieldset>
 
         {dueRuleKind === "dia-fixo" && (
-          <Campo label="Dia do mês" htmlFor={`${formId}-dia`} erro={erroDe("dueRuleDay")}>
+          <Field label="Dia do mês" htmlFor={`${formId}-dia`} error={erroDe("dueRuleDay")}>
             <input
               id={`${formId}-dia`}
               name="dueRuleDay"
@@ -262,13 +283,14 @@ export function BillForm({
               inputMode="numeric"
               value={dueRuleDay}
               onChange={(e) => setDueRuleDay(e.target.value)}
-              className={inputCls}
+              className={inputClass}
+              aria-invalid={Boolean(erroDe("dueRuleDay"))}
             />
-          </Campo>
+          </Field>
         )}
 
         {dueRuleKind === "n-esimo-dia-util" && (
-          <Campo label="Dia útil nº" htmlFor={`${formId}-nth`} erro={erroDe("dueRuleNth")}>
+          <Field label="Dia útil nº" htmlFor={`${formId}-nth`} error={erroDe("dueRuleNth")}>
             <input
               id={`${formId}-nth`}
               name="dueRuleNth"
@@ -278,22 +300,24 @@ export function BillForm({
               inputMode="numeric"
               value={dueRuleNth}
               onChange={(e) => setDueRuleNth(e.target.value)}
-              className={inputCls}
+              className={inputClass}
+              aria-invalid={Boolean(erroDe("dueRuleNth"))}
             />
-          </Campo>
+          </Field>
         )}
 
-        <Campo
+        <Field
           label="Offset de vencimento"
           htmlFor={`${formId}-offset`}
-          erro={erroDe("dueMonthOffset")}
+          error={erroDe("dueMonthOffset")}
         >
           <select
             id={`${formId}-offset`}
             name="dueMonthOffset"
             value={dueMonthOffset}
             onChange={(e) => setDueMonthOffset(e.target.value)}
-            className={inputCls}
+            className={inputClass}
+            aria-invalid={Boolean(erroDe("dueMonthOffset"))}
           >
             {OFFSETS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -301,12 +325,12 @@ export function BillForm({
               </option>
             ))}
           </select>
-        </Campo>
+        </Field>
       </fieldset>
 
       <div className="flex items-center justify-between gap-3 border-luc-border border-t pt-5">
         <Button
-          variant="ghost"
+          variant="secondary"
           onClick={() => setPasso((p) => Math.max(0, p - 1))}
           disabled={passo === 0}
           className={passo === 0 ? "invisible" : ""}

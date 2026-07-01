@@ -1,8 +1,7 @@
-import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import type { ReactNode } from "react"
 import { auth } from "@/auth"
-import { AppShell, SIDEBAR_COOKIE } from "@/components/shell/AppShell"
+import { AppShell } from "@/components/shell/AppShell"
 
 /**
  * Tudo sob (app) ganha a casca navegável e re-checa a sessão no servidor:
@@ -11,6 +10,5 @@ import { AppShell, SIDEBAR_COOKIE } from "@/components/shell/AppShell"
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
   if (!(await auth())) redirect("/login")
-  const collapsed = (await cookies()).get(SIDEBAR_COOKIE)?.value === "true"
-  return <AppShell initialCollapsed={collapsed}>{children}</AppShell>
+  return <AppShell>{children}</AppShell>
 }
