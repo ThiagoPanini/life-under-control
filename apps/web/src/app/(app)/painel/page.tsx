@@ -65,6 +65,10 @@ export default async function PainelPage() {
   const anterior = serie.at(-2)?.valor ?? 0
   const delta = anterior > 0 ? ((ultimo - anterior) / anterior) * 100 : null
 
+  // Contagem das Áreas por estado — derivada do catálogo (o estado vem dos Assuntos, ADR-0009).
+  const areasAtivas = AREAS.filter((area) => area.estado === "ativa").length
+  const areasEmBreve = AREAS.length - areasAtivas
+
   return (
     <div className="luc-page-gutter py-7 lg:py-7">
       <div className="mx-auto flex max-w-[1120px] flex-col gap-3.5">
@@ -124,7 +128,9 @@ export default async function PainelPage() {
         <section>
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="text-[13px] font-bold text-luc-text-strong">Áreas</h2>
-            <span className="text-[11.5px] text-luc-muted">1 ativa · 5 em breve</span>
+            <span className="text-[11.5px] text-luc-muted">
+              {areasAtivas} ativa{areasAtivas === 1 ? "" : "s"} · {areasEmBreve} em breve
+            </span>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {AREAS.map((area) => (

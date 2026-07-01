@@ -85,8 +85,12 @@ export default async function ContaDetailPage({
     <div className="luc-page-gutter py-7 lg:py-7">
       <div className="mx-auto flex max-w-[820px] flex-col gap-6">
         <header className="flex flex-col gap-4 rounded-[14px] border border-luc-border bg-luc-surface-2 p-5">
-          <Button href="/areas/financas" variant="ghost" className="self-start">
-            ← Finanças
+          <Button
+            href="/areas/financas/pagamentos-recorrentes"
+            variant="ghost"
+            className="self-start"
+          >
+            ← Pagamentos Recorrentes
           </Button>
           <div className="flex items-start gap-4">
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[11px] bg-luc-accent-12 text-luc-accent-bright">
@@ -110,7 +114,7 @@ export default async function ContaDetailPage({
             </div>
           </div>
           <Button
-            href={`/areas/financas/${bill.id}/editar`}
+            href={`/areas/financas/pagamentos-recorrentes/${bill.id}/editar`}
             variant="secondary"
             className="self-start"
           >

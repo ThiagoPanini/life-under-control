@@ -3,21 +3,28 @@ import { AreaIcon } from "@/components/areas/AreaIcon"
 import { Pill } from "@/components/ds/Pill"
 import type { Area } from "@/core/domain/areas"
 
-/** Card de uma Área no Painel. Área inativa mostra resumo honesto, nunca uma métrica falsa. */
+/**
+ * Card de uma Área no Painel. Área inativa mostra resumo honesto, nunca uma
+ * métrica falsa. Reusado no mini-Painel de Assuntos (ADR-0009): a Área reúne
+ * seus Assuntos como o Painel reúne as Áreas — passe `href` para apontar o card
+ * ao Assunto (`/areas/{area}/{assunto}`) em vez da Área raiz.
+ */
 export function AreaCard({
   area,
   metric,
   summary,
+  href,
 }: {
   area: Area
   metric?: string
   summary?: string
+  href?: string
 }) {
   const emBreve = area.estado === "em-breve"
   const supportingText = emBreve ? (summary ?? area.resumo) : (metric ?? area.resumo)
   return (
     <Link
-      href={`/areas/${area.slug}`}
+      href={href ?? `/areas/${area.slug}`}
       data-estado={area.estado}
       className={`group flex min-h-[74px] touch-manipulation items-center gap-3 rounded-[14px] border p-4 transition-[border-color,background-color,transform] duration-150 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-luc-bg ${
         emBreve

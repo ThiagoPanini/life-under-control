@@ -74,7 +74,7 @@ export function BillCard({ bill, card }: { bill: Bill; card?: CardConta }) {
 
   return (
     <Link
-      href={`/areas/financas/${bill.id}`}
+      href={`/areas/financas/pagamentos-recorrentes/${bill.id}`}
       className={`group block rounded-[14px] border border-luc-border bg-luc-surface-2 p-4 transition-[border-color,background-color] hover:border-luc-border-strong hover:bg-luc-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-luc-bg ${
         encerrada ? "opacity-60" : ""
       }`}

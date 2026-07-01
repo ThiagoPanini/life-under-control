@@ -611,7 +611,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
   const destinations = [
     { href: "/painel", label: "Painel", hint: "visão do Lar", icon: <LayoutDashboard /> },
     {
-      href: "/areas/financas",
+      href: "/areas/financas/pagamentos-recorrentes",
       label: "Finanças · Pagamentos",
       hint: "métricas e Contas",
       icon: <AreaIcon name="wallet" />,
