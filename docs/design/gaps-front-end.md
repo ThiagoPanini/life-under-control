@@ -61,3 +61,22 @@ Auditoria feita em 01/07/2026 contra o contrato oficial e o protótipo. Priorida
 | protótipo não cobre formulários e detalhes | preservar função e aplicar os fundamentos/componentes mais próximos |
 | protótipo não cobre mobile | preservar drawer/dock existentes e alinhar sua linguagem à casca |
 | protótipo não define hover/focus/disabled | usar os estados acessíveis derivados no catálogo |
+
+## Resultado da remediação
+
+Todos os gaps listados acima foram tratados em 01/07/2026. Itens em que a origem visual era silente seguiram as decisões explícitas do operador, sem ativar novas Áreas nem alterar payloads ou regras de domínio.
+
+| Conjunto | Situação | Evidência principal |
+|---|---|---|
+| contrato, princípios, tokens, casca e vocabulário | corrigido | `docs/design/`, `CLAUDE.md` |
+| bridge Tailwind e estados básicos | corrigido | `globals.css`, `Button`, `Pill`, `FormField` |
+| autoria por Pessoa | corrigido | tokens Thiago/Jakeline e `PersonChip` |
+| sidebar 244↔74, header, nav, command palette e mobile | corrigido | `AppShell` |
+| login e asset de fundo | corrigido | `login/page.tsx`, `login-background.png` oficial |
+| Painel, Agenda e páginas `em breve` | corrigido | rotas correspondentes e componentes DS |
+| cockpit e tendência de Finanças | corrigido | `CockpitFinancas`, `TrendCard`, `serieTotalPago` |
+| farol, grid de 12 ocorrências, média e sparkline | corrigido | `BillCard` consumindo `derivarCardConta` |
+| detalhe, Lançamentos e anexos | corrigido | rota de Conta, `LancamentosLista`, `ComprovantesLancamento` |
+| formulários, pending, disabled, erro e zona de risco | corrigido | `FormField`, `BillForm`, `PaymentForm`, `DangerZone` |
+
+Validação local final: Biome em 146 arquivos, TypeScript sem erros e 246 testes aprovados; 31 testes de adapters dependentes de infraestrutura permaneceram corretamente ignorados pela configuração da suíte.
