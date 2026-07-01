@@ -9,8 +9,12 @@ export default function NovaContaPage() {
   return (
     <div className="luc-page-gutter py-7 lg:py-7">
       <div className="mx-auto flex max-w-[720px] flex-col gap-6">
-        <Button href="/areas/financas" variant="ghost" className="self-start">
-          ← Finanças
+        <Button
+          href="/areas/financas/pagamentos-recorrentes"
+          variant="ghost"
+          className="self-start"
+        >
+          ← Pagamentos Recorrentes
         </Button>
         <PageHeader
           title="Nova Conta"

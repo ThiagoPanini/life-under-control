@@ -32,7 +32,11 @@ export default async function EditarContaPage({ params }: { params: Promise<{ id
   return (
     <div className="luc-page-gutter py-7 lg:py-7">
       <div className="mx-auto flex max-w-[720px] flex-col gap-6">
-        <Button href={`/areas/financas/${bill.id}`} variant="ghost" className="self-start">
+        <Button
+          href={`/areas/financas/pagamentos-recorrentes/${bill.id}`}
+          variant="ghost"
+          className="self-start"
+        >
           ← {bill.nome}
         </Button>
         <PageHeader

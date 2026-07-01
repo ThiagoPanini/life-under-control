@@ -51,6 +51,25 @@ describe("AreaCard (Seam 3)", () => {
     expect(screen.queryByText("em breve")).toBeNull()
     expect(screen.getByText("Finanças").closest("a")).toHaveAttribute("href", "/areas/financas")
   })
+
+  it("test_href_customizado_reusa_o_card_para_um_assunto", () => {
+    render(
+      <AreaCard
+        area={{
+          slug: "pagamentos-recorrentes",
+          nome: "Pagamentos Recorrentes",
+          icon: "wallet",
+          estado: "ativa",
+        }}
+        href="/areas/financas/pagamentos-recorrentes"
+      />,
+    )
+
+    expect(screen.getByText("Pagamentos Recorrentes").closest("a")).toHaveAttribute(
+      "href",
+      "/areas/financas/pagamentos-recorrentes",
+    )
+  })
 })
 
 describe("AppShell sidebar (Seam 3)", () => {

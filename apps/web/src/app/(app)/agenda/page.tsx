@@ -98,7 +98,7 @@ export default async function AgendaPage() {
                     className="border-luc-row-line border-t first:border-t-0"
                   >
                     <Link
-                      href={`/areas/financas/${item.geradorId}?competencia=${item.competencia}`}
+                      href={`/areas/financas/pagamentos-recorrentes/${item.geradorId}?competencia=${item.competencia}`}
                       className="flex min-h-[70px] items-center gap-3 px-4 py-3.5 transition-colors hover:bg-white/[0.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-luc-accent sm:gap-[15px] sm:px-[18px]"
                     >
                       <time className="w-[80px] shrink-0 font-mono text-[12.5px] text-luc-text-2">

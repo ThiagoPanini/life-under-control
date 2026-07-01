@@ -37,8 +37,8 @@ export type ContaFormState = { erros: ErroCampo[] }
 /** Estado do encerramento entre submissões — uma mensagem de erro (vazio = ok). */
 export type EncerrarContaState = { erro?: string }
 
-/** A lista de Finanças — destino e chave de revalidação de toda ação de Conta. */
-const ROTA_FINANCAS = "/areas/financas"
+/** A lista do Assunto Pagamentos Recorrentes — destino e chave de revalidação de toda ação de Conta (ADR-0009). */
+const ROTA_FINANCAS = "/areas/financas/pagamentos-recorrentes"
 
 /** Cauda comum de toda mutação bem-sucedida: revalida a lista e volta pra ela. */
 function voltarParaFinancas(): never {
