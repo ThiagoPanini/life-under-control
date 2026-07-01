@@ -31,7 +31,7 @@ afterEach(() => {
 })
 
 describe("AreaCard (Seam 3)", () => {
-  it("test_area_em_breve_mostra_selo_muted_e_link_correto", () => {
+  it("test_area_em_breve_mostra_selo_semantico_e_link_correto", () => {
     render(
       <AreaCard
         area={{ slug: "financas", nome: "Finanças", icon: "wallet", estado: "em-breve" }}
@@ -40,7 +40,7 @@ describe("AreaCard (Seam 3)", () => {
 
     const selo = screen.getByText("em breve")
     expect(selo).toBeInTheDocument()
-    expect(selo).toHaveAttribute("data-tone", "muted")
+    expect(selo).toHaveAttribute("data-tone", "coming-soon")
     expect(screen.getByText("Finanças").closest("a")).toHaveAttribute("href", "/areas/financas")
   })
 

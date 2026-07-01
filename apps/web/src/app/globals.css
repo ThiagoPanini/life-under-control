@@ -10,6 +10,7 @@
   --color-luc-surface-3: var(--luc-surface-3);
   --color-luc-border: var(--luc-border);
   --color-luc-border-strong: var(--luc-border-strong);
+  --color-luc-row-line: var(--luc-row-line);
   --color-luc-text: var(--luc-text);
   --color-luc-text-strong: var(--luc-text-strong);
   --color-luc-text-2: var(--luc-text-2);
@@ -19,11 +20,18 @@
   --color-luc-disabled: var(--luc-disabled);
   --color-luc-accent: var(--luc-accent);
   --color-luc-accent-bright: var(--luc-accent-bright);
+  --color-luc-accent-16: var(--luc-accent-16);
+  --color-luc-accent-12: var(--luc-accent-12);
+  --color-luc-accent-06: var(--luc-accent-06);
   --color-luc-success: var(--luc-success);
   --color-luc-warn: var(--luc-warn);
+  --color-luc-thiago-fg: var(--luc-thiago-fg);
+  --color-luc-thiago-bg: var(--luc-thiago-bg);
+  --color-luc-jakeline-fg: var(--luc-jakeline-fg);
+  --color-luc-jakeline-bg: var(--luc-jakeline-bg);
 
-  --font-sans: var(--luc-font-sans);
-  --font-mono: var(--luc-font-mono);
+  --font-sans: var(--font-manrope), var(--luc-font-sans);
+  --font-mono: var(--font-jetbrains), var(--luc-font-mono);
 
   --radius-luc-sm: var(--luc-r-sm);
   --radius-luc-md: var(--luc-r-md);
@@ -46,8 +54,33 @@ html {
 body {
   min-height: 100dvh;
   overflow-x: clip;
-  font-family: var(--luc-font-sans);
+  font-family: var(--font-manrope), var(--luc-font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+* {
+  scrollbar-color: var(--luc-border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: var(--luc-border-strong);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::selection {
+  background: var(--luc-accent-16);
+  color: var(--luc-text);
 }
 
 a,

@@ -1,12 +1,15 @@
 import type { ReactNode } from "react"
 
-/** Selo compacto do design system (Mirante). `tone` define a cor. */
-export type PillTone = "neutral" | "muted" | "accent"
+/** Selo compacto de estado. Cor sempre acompanha um rótulo textual. */
+export type PillTone = "neutral" | "muted" | "accent" | "success" | "warn" | "coming-soon"
 
 const TONES: Record<PillTone, string> = {
-  neutral: "border-luc-border bg-luc-surface-2 text-luc-text-2",
-  muted: "border-luc-border bg-luc-surface-2 text-luc-text-3",
-  accent: "border-luc-border bg-luc-surface-3 text-luc-accent",
+  neutral: "border-transparent bg-white/[0.06] text-luc-text-2",
+  muted: "border-transparent bg-white/[0.05] text-luc-text-3",
+  accent: "border-transparent bg-luc-accent-16 text-luc-accent-bright",
+  success: "border-transparent bg-luc-success/10 text-luc-success",
+  warn: "border-transparent bg-luc-warn/10 text-luc-warn",
+  "coming-soon": "border-luc-warn/20 bg-luc-warn/10 text-luc-warn",
 }
 
 export function Pill({
@@ -21,7 +24,7 @@ export function Pill({
   return (
     <span
       data-tone={tone}
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-luc-sm border px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.12em] ${TONES[tone]} ${className}`}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-luc-sm border px-2 py-0.5 text-[11px] font-semibold ${TONES[tone]} ${className}`}
     >
       {children}
     </span>
