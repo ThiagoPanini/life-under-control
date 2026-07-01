@@ -7,7 +7,7 @@ import {
   LogOut,
   Menu,
   PanelLeft,
-  PanelLeftClose,
+  Search,
   X,
 } from "lucide-react"
 import Link from "next/link"
@@ -16,11 +16,9 @@ import { type ReactNode, useEffect, useRef, useState } from "react"
 import { logout } from "@/app/actions"
 import { AreaIcon } from "@/components/areas/AreaIcon"
 import { Logo } from "@/components/brand/Logo"
-import { AREAS } from "@/core/domain/areas"
+import { AREAS, type Area } from "@/core/domain/areas"
 
-/** Cookie da preferência de colapso — lido no servidor pra pintar a largura
- * certa já no primeiro frame (sem flash de hidratação). */
-export const SIDEBAR_COOKIE = "luc:sidebar-collapsed"
+export const SIDEBAR_STORAGE_KEY = "luc:sidebar-collapsed"
 
 /** A rota está dentro de uma Área (a própria ou uma sub-rota como /nova)? */
 function naArea(pathname: string, slug: string): boolean {
@@ -31,15 +29,10 @@ const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-luc-bg"
 
 /** Casca responsiva do app: sidebar no desktop e navegação dedicada no mobile. */
-export function AppShell({
-  children,
-  initialCollapsed = false,
-}: {
-  children: ReactNode
-  initialCollapsed?: boolean
-}) {
-  const [collapsed, setCollapsed] = useState(initialCollapsed)
+export function AppShell({ children }: { children: ReactNode }) {
+  const [collapsed, setCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [commandOpen, setCommandOpen] = useState(false)
   const pathname = usePathname()
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null)
   const mobileCloseButtonRef = useRef<HTMLButtonElement>(null)
@@ -53,8 +46,29 @@ export function AppShell({
         : (AREAS.find((area) => naArea(pathname, area.slug))?.nome ?? "Life Under Control")
 
   useEffect(() => {
-    if (pathname) setMobileMenuOpen(false)
+    setCollapsed(localStorage.getItem(SIDEBAR_STORAGE_KEY) === "1")
+  }, [])
+
+  useEffect(() => {
+    if (pathname) {
+      setMobileMenuOpen(false)
+      setCommandOpen(false)
+    }
   }, [pathname])
+
+  useEffect(() => {
+    function handleCommandKey(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault()
+        setCommandOpen((current) => !current)
+      } else if (event.key === "Escape") {
+        setCommandOpen(false)
+      }
+    }
+
+    document.addEventListener("keydown", handleCommandKey)
+    return () => document.removeEventListener("keydown", handleCommandKey)
+  }, [])
 
   useEffect(() => {
     const desktopMedia = window.matchMedia?.("(min-width: 64rem)")
@@ -110,8 +124,7 @@ export function AppShell({
   function toggleDesktopSidebar() {
     setCollapsed((current) => {
       const next = !current
-      // biome-ignore lint/suspicious/noDocumentCookie: cookie simples de preferência de UI, lido no SSR.
-      document.cookie = `${SIDEBAR_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, next ? "1" : "0")
       return next
     })
   }
@@ -132,7 +145,7 @@ export function AppShell({
       >
         Pular para o conteúdo
       </a>
-      <DesktopSidebar pathname={pathname} collapsed={collapsed} onToggle={toggleDesktopSidebar} />
+      <DesktopSidebar pathname={pathname} collapsed={collapsed} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-[calc(4rem+env(safe-area-inset-top))] items-end border-luc-border border-b bg-luc-bg/92 pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] pb-3 pt-[env(safe-area-inset-top)] backdrop-blur-xl lg:hidden">
@@ -159,6 +172,13 @@ export function AppShell({
           </button>
         </header>
 
+        <DesktopHeader
+          label={currentLabel}
+          collapsed={collapsed}
+          onToggle={toggleDesktopSidebar}
+          onOpenCommand={() => setCommandOpen(true)}
+        />
+
         <main
           id="conteudo-principal"
           tabIndex={-1}
@@ -176,24 +196,64 @@ export function AppShell({
         onClose={closeMobileMenu}
       />
       <MobileDock pathname={pathname} menuOpen={mobileMenuOpen} onOpenAreas={openMobileMenu} />
+      <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} />
     </div>
   )
 }
 
-function DesktopSidebar({
-  pathname,
+function DesktopHeader({
+  label,
   collapsed,
   onToggle,
+  onOpenCommand,
 }: {
-  pathname: string
+  label: string
   collapsed: boolean
   onToggle: () => void
+  onOpenCommand: () => void
 }) {
+  return (
+    <header className="sticky top-0 z-30 hidden h-14 shrink-0 items-center justify-between border-luc-border border-b bg-luc-bg/70 px-6 backdrop-blur-lg lg:flex">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+          className={`inline-flex h-[30px] w-[30px] items-center justify-center rounded-[8px] border border-luc-border bg-luc-surface-2 text-luc-text-3 transition-colors hover:border-luc-border-strong hover:text-luc-text ${FOCUS}`}
+        >
+          <PanelLeft size={16} strokeWidth={1.8} aria-hidden />
+        </button>
+        <div className="text-sm font-bold text-luc-text">{label}</div>
+      </div>
+
+      <div className="flex items-center gap-3.5">
+        <button
+          type="button"
+          onClick={onOpenCommand}
+          aria-label="Buscar"
+          className={`inline-flex min-h-[34px] items-center gap-2 rounded-luc-md border border-luc-border bg-luc-surface-2 px-3 text-[12.5px] text-luc-text-3 transition-colors hover:border-luc-border-strong hover:text-luc-text ${FOCUS}`}
+        >
+          <Search size={14} strokeWidth={1.8} aria-hidden />
+          Buscar
+          <kbd className="rounded-[5px] border border-luc-border-strong px-1.5 font-mono text-[11px] text-luc-muted">
+            ⌘K
+          </kbd>
+        </button>
+        <div className="flex items-center gap-1">
+          <ShellPersonBadge person="thiago" initial="T" name="Thiago" />
+          <ShellPersonBadge person="jakeline" initial="J" name="Jakeline" />
+        </div>
+      </div>
+    </header>
+  )
+}
+
+function DesktopSidebar({ pathname, collapsed }: { pathname: string; collapsed: boolean }) {
   return (
     <aside
       data-collapsed={collapsed}
       style={{ width: collapsed ? "var(--luc-sidebar-w-collapsed)" : "var(--luc-sidebar-w)" }}
-      className="sticky top-0 hidden h-dvh shrink-0 flex-col gap-6 overflow-y-auto overscroll-contain border-luc-border border-r bg-luc-surface-1 px-3 py-5 transition-[width] duration-200 lg:flex"
+      className="sticky top-0 hidden h-dvh shrink-0 flex-col gap-4 overflow-y-auto overscroll-contain border-luc-border border-r bg-luc-surface-1 px-3 py-[18px] transition-[width] [transition-duration:180ms] lg:flex"
     >
       <Link
         href="/painel"
@@ -216,6 +276,14 @@ function DesktopSidebar({
           collapsed={collapsed}
         >
           <LayoutDashboard size={18} strokeWidth={1.7} aria-hidden />
+        </NavItem>
+        <NavItem
+          href="/areas/financas"
+          label="Finanças"
+          active={naArea(pathname, "financas")}
+          collapsed={collapsed}
+        >
+          <AreaIcon name="wallet" size={18} />
         </NavItem>
         <NavItem
           href="/agenda"
@@ -241,6 +309,7 @@ function DesktopSidebar({
               label={area.nome}
               active={naArea(pathname, area.slug)}
               collapsed={collapsed}
+              areaState={area.estado}
             >
               <AreaIcon name={area.icon} size={18} />
             </NavItem>
@@ -248,7 +317,18 @@ function DesktopSidebar({
         </nav>
       </div>
 
-      <div className="mt-auto flex flex-col gap-1 border-luc-border border-t pt-3">
+      <div className="mt-auto flex flex-col gap-2 border-luc-border border-t pt-3">
+        <div className={`flex items-center ${collapsed ? "flex-col gap-1.5" : "gap-1.5 px-2"}`}>
+          <ShellPersonBadge person="thiago" initial="T" name="Thiago" />
+          <ShellPersonBadge person="jakeline" initial="J" name="Jakeline" />
+          {!collapsed && (
+            <span className="ml-1 text-[10.5px] leading-tight text-luc-muted">
+              Thiago · Jakeline
+              <br />
+              <span className="text-luc-disabled">acesso simétrico</span>
+            </span>
+          )}
+        </div>
         <form action={logout}>
           <button
             type="submit"
@@ -260,20 +340,6 @@ function DesktopSidebar({
             {!collapsed && <span className="text-sm">Sair</span>}
           </button>
         </form>
-
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-          className={`flex min-h-11 items-center rounded-luc-md text-luc-text-2 transition-colors hover:bg-luc-surface-2 hover:text-luc-text ${collapsed ? "justify-center px-0" : "gap-2.5 px-2.5"} ${FOCUS}`}
-        >
-          {collapsed ? (
-            <PanelLeft size={18} aria-hidden />
-          ) : (
-            <PanelLeftClose size={18} aria-hidden />
-          )}
-          {!collapsed && <span className="text-sm">Recolher</span>}
-        </button>
       </div>
     </aside>
   )
@@ -305,7 +371,7 @@ function MobileMenu({
         aria-hidden
         aria-label="Fechar menu"
         onClick={onClose}
-        className={`absolute inset-0 bg-black/70 transition-opacity duration-200 ${open ? "opacity-100" : "opacity-0"}`}
+        className={`absolute inset-0 bg-luc-bg/80 transition-opacity duration-200 ${open ? "opacity-100" : "opacity-0"}`}
       />
       <aside
         id="mobile-navigation-drawer"
@@ -367,6 +433,7 @@ function MobileMenu({
                 label={area.nome}
                 active={naArea(pathname, area.slug)}
                 onNavigate={onClose}
+                areaState={area.estado}
               >
                 <AreaIcon name={area.icon} size={19} />
               </NavItem>
@@ -455,6 +522,7 @@ function NavItem({
   active,
   collapsed = false,
   onNavigate,
+  areaState,
   children,
 }: {
   href: string
@@ -462,6 +530,7 @@ function NavItem({
   active: boolean
   collapsed?: boolean
   onNavigate?: () => void
+  areaState?: Area["estado"]
   children: ReactNode
 }) {
   return (
@@ -470,16 +539,130 @@ function NavItem({
       aria-current={active ? "page" : undefined}
       title={collapsed ? label : undefined}
       onClick={onNavigate}
-      className={`flex min-h-11 items-center rounded-luc-md text-sm transition-colors ${FOCUS} ${
+      className={`relative flex min-h-10 items-center rounded-luc-md text-[13.5px] font-semibold transition-colors ${FOCUS} ${
         collapsed ? "justify-center px-0" : "gap-3 px-3"
       } ${
         active
-          ? "bg-luc-surface-2 text-luc-text"
+          ? "bg-luc-accent-12 text-luc-text"
           : "text-luc-text-2 hover:bg-luc-surface-2 hover:text-luc-text"
       }`}
     >
+      {active && (
+        <span
+          aria-hidden
+          className="absolute top-2 bottom-2 -left-3 w-[2.5px] rounded-full bg-luc-accent"
+        />
+      )}
       <span className="shrink-0">{children}</span>
-      {!collapsed && <span className="truncate">{label}</span>}
+      {!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
+      {!collapsed && areaState === "ativa" && (
+        <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-luc-success" />
+      )}
+      {!collapsed && areaState === "em-breve" && (
+        <span className="shrink-0 rounded-[5px] border border-luc-border px-1.5 py-px text-[9.5px] font-medium text-luc-faint">
+          em breve
+        </span>
+      )}
+      {collapsed && areaState === "ativa" && (
+        <span
+          aria-hidden
+          className="absolute top-1.5 right-2.5 h-[5px] w-[5px] rounded-full bg-luc-success"
+        />
+      )}
     </Link>
+  )
+}
+
+function ShellPersonBadge({
+  person,
+  initial,
+  name,
+}: {
+  person: "thiago" | "jakeline"
+  initial: string
+  name: string
+}) {
+  return (
+    <span
+      role="img"
+      aria-label={name}
+      title={name}
+      className={`inline-flex h-[27px] w-[27px] items-center justify-center rounded-[8px] text-[11px] font-bold ${
+        person === "thiago"
+          ? "bg-luc-thiago-bg text-luc-thiago-fg"
+          : "bg-luc-jakeline-bg text-luc-jakeline-fg"
+      }`}
+    >
+      {initial}
+    </span>
+  )
+}
+
+function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    dialogRef.current?.querySelector<HTMLAnchorElement>("a[href]")?.focus()
+  }, [open])
+
+  if (!open) return null
+
+  const destinations = [
+    { href: "/painel", label: "Painel", hint: "visão do Lar", icon: <LayoutDashboard /> },
+    {
+      href: "/areas/financas",
+      label: "Finanças · Pagamentos",
+      hint: "métricas e Contas",
+      icon: <AreaIcon name="wallet" />,
+    },
+    { href: "/agenda", label: "Agenda", hint: "o que vence", icon: <Calendar /> },
+    ...AREAS.filter((area) => area.slug !== "financas").map((area) => ({
+      href: `/areas/${area.slug}`,
+      label: area.nome,
+      hint: "em breve",
+      icon: <AreaIcon name={area.icon} />,
+    })),
+  ]
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[14vh]">
+      <button
+        type="button"
+        aria-label="Fechar busca"
+        onClick={onClose}
+        className="absolute inset-0 bg-luc-bg/70 backdrop-blur-[3px]"
+      />
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="command-palette-title"
+        className="relative w-full max-w-[520px] overflow-hidden rounded-[15px] border border-luc-border-strong bg-luc-surface-3 shadow-[0_24px_60px_rgba(0,0,0,.5)]"
+      >
+        <div className="flex items-center gap-3 border-luc-border border-b px-[18px] py-[15px]">
+          <Search size={16} strokeWidth={1.8} className="text-luc-text-3" aria-hidden />
+          <h2 id="command-palette-title" className="text-sm text-luc-muted">
+            Ir para…
+          </h2>
+        </div>
+        <nav aria-label="Destinos" className="p-[7px]">
+          {destinations.map((destination) => (
+            <Link
+              key={destination.href}
+              href={destination.href}
+              onClick={onClose}
+              className={`flex items-center gap-3 rounded-luc-md px-3 py-2.5 text-[13.5px] text-luc-text transition-colors hover:bg-white/[0.04] ${FOCUS}`}
+            >
+              <span className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-white/[0.05] text-luc-text-2 [&>svg]:h-[15px] [&>svg]:w-[15px] [&>svg]:stroke-[1.7]">
+                {destination.icon}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{destination.label}</span>
+              <span className="text-[11.5px] text-luc-muted">{destination.hint}</span>
+            </Link>
+          ))}
+        </nav>
+      </div>
+    </div>
   )
 }

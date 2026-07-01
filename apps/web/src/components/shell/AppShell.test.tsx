@@ -26,8 +26,7 @@ import { AppShell } from "./AppShell"
 
 afterEach(() => {
   cleanup()
-  // biome-ignore lint/suspicious/noDocumentCookie: limpeza do cookie entre testes.
-  document.cookie = "luc:sidebar-collapsed=; path=/; max-age=0"
+  localStorage.clear()
 })
 
 describe("AreaCard (Seam 3)", () => {
@@ -55,7 +54,7 @@ describe("AreaCard (Seam 3)", () => {
 })
 
 describe("AppShell sidebar (Seam 3)", () => {
-  it("test_colapso_grava_cookie", async () => {
+  it("test_colapso_grava_preferencia_local", async () => {
     const user = userEvent.setup()
     const { container } = render(
       <AppShell>
@@ -67,18 +66,41 @@ describe("AppShell sidebar (Seam 3)", () => {
 
     await user.click(screen.getByRole("button", { name: "Recolher menu" }))
 
-    expect(document.cookie).toContain("luc:sidebar-collapsed=true")
+    expect(localStorage.getItem("luc:sidebar-collapsed")).toBe("1")
     expect(aside).toHaveAttribute("data-collapsed", "true")
   })
 
-  it("test_inicia_colapsado_pela_preferencia_do_servidor", () => {
-    const { container } = render(
-      <AppShell initialCollapsed>
-        <div>conteúdo</div>
-      </AppShell>,
-    )
+  it("test_inicia_colapsado_pela_preferencia_local", async () => {
+    localStorage.setItem("luc:sidebar-collapsed", "1")
+    const { container } = render(<AppShell>conteúdo</AppShell>)
 
+    expect(await screen.findByRole("button", { name: "Expandir menu" })).toBeInTheDocument()
     expect(container.querySelector("aside")).toHaveAttribute("data-collapsed", "true")
+  })
+
+  it("test_navegacao_principal_destaca_financas", () => {
+    render(<AppShell>conteúdo</AppShell>)
+    const principal = screen.getByRole("navigation", { name: "Principal" })
+
+    expect(within(principal).getByRole("link", { name: "Finanças" })).toHaveAttribute(
+      "href",
+      "/areas/financas",
+    )
+  })
+
+  it("test_command_palette_abre_pelo_atalho_e_lista_destinos_reais", async () => {
+    const user = userEvent.setup()
+    render(<AppShell>conteúdo</AppShell>)
+
+    await user.keyboard("{Control>}k{/Control}")
+
+    const dialog = screen.getByRole("dialog", { name: "Ir para…" })
+    expect(within(dialog).getByRole("link", { name: /Painel/ })).toHaveAttribute("href", "/painel")
+    expect(within(dialog).getByRole("link", { name: /Finanças/ })).toHaveAttribute(
+      "href",
+      "/areas/financas",
+    )
+    expect(within(dialog).getByRole("link", { name: /Agenda/ })).toHaveAttribute("href", "/agenda")
   })
 })
 
