@@ -8,6 +8,7 @@ import {
   encerrarConta,
 } from "@/app/(app)/areas/financas/actions"
 import { Button } from "@/components/ds/Button"
+import { inputClass } from "@/components/ds/FormField"
 import type { BillEstado } from "@/core/domain/bill"
 import type { DependentesBill } from "@/core/ports/bill-repo"
 
@@ -29,10 +30,8 @@ export function DangerZone({
   dependentes: DependentesBill
 }) {
   return (
-    <section className="flex flex-col gap-5 rounded-luc-lg border border-luc-warn/30 bg-luc-warn/[0.03] p-5">
-      <p className="font-mono text-[11.5px] text-luc-warn uppercase tracking-[0.18em]">
-        Zona de risco
-      </p>
+    <section className="flex flex-col gap-5 rounded-luc-lg border border-luc-warn/20 bg-luc-surface-2 p-5">
+      <h2 className="text-sm font-bold text-luc-warn">Zona de risco</h2>
 
       {estado === "ativa" && <EncerrarBloco billId={billId} hoje={hoje} />}
 
@@ -63,10 +62,10 @@ function EncerrarBloco({ billId, hoje }: { billId: string; hoje: string }) {
             name="encerradaEm"
             type="date"
             defaultValue={hoje}
-            className="min-h-11 rounded-luc-md border border-luc-border bg-luc-surface-2 px-3 py-2 text-luc-text outline-none transition-colors focus-visible:border-luc-accent focus-visible:ring-2 focus-visible:ring-luc-accent/40"
+            className={inputClass}
           />
         </label>
-        <Button variant="ghost" type="submit" disabled={pending}>
+        <Button variant="secondary" type="submit" disabled={pending}>
           {pending ? "Encerrando…" : "Encerrar"}
         </Button>
       </div>
@@ -94,13 +93,13 @@ function DeletarBloco({ billId, dependentes }: { billId: string; dependentes: De
       {armado ? (
         <form action={acao} className="flex flex-wrap items-center gap-3">
           <ConfirmarExclusao />
-          <Button variant="ghost" type="button" onClick={() => setArmado(false)}>
+          <Button variant="secondary" type="button" onClick={() => setArmado(false)}>
             Cancelar
           </Button>
         </form>
       ) : (
         <Button
-          variant="ghost"
+          variant="secondary"
           type="button"
           onClick={() => setArmado(true)}
           className="self-start border-luc-warn/40 text-luc-warn hover:border-luc-warn hover:text-luc-warn"
@@ -117,7 +116,7 @@ function ConfirmarExclusao() {
   const { pending } = useFormStatus()
   return (
     <Button
-      variant="ghost"
+      variant="secondary"
       type="submit"
       disabled={pending}
       className="border-luc-warn/40 text-luc-warn hover:border-luc-warn hover:text-luc-warn"

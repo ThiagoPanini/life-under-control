@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react"
 import { Button } from "@/components/ds/Button"
-import { Campo, erroDoCampo, inputCls } from "@/components/financas/form-field"
+import { Field, getFieldError, inputClass } from "@/components/ds/FormField"
 import type { PaymentFormInicial } from "@/components/financas/payment-form-inicial"
 import type { ErroCampo } from "@/core/domain/bill"
 
@@ -45,14 +45,14 @@ export function PaymentForm({
   const [paidBy, setPaidBy] = useState(inicial.paidBy)
   const formId = useId()
 
-  const erroDe = (campo: string) => erroDoCampo(erros, campo)
+  const erroDe = (campo: string) => getFieldError(erros, campo)
 
   // Aviso (não trava): já existe um Lançamento naquela competência?
   const avisaCompetencia = competencia !== "" && competenciasComLancamento.includes(competencia)
 
   return (
-    <form action={formAction} className="flex flex-col gap-5">
-      <Campo label="Valor" htmlFor={`${formId}-valor`} erro={erroDe("valor")}>
+    <form action={formAction} className="flex flex-col gap-5" aria-busy={pending}>
+      <Field label="Valor" htmlFor={`${formId}-valor`} error={erroDe("valor")}>
         <input
           id={`${formId}-valor`}
           name="valor"
@@ -62,44 +62,52 @@ export function PaymentForm({
           placeholder="0,00"
           value={valor}
           onChange={(e) => setValor(e.target.value)}
-          className={inputCls}
+          className={inputClass}
+          aria-invalid={Boolean(erroDe("valor"))}
+          aria-describedby={erroDe("valor") ? `${formId}-valor-error` : undefined}
         />
-      </Campo>
+      </Field>
 
-      <Campo label="Competência" htmlFor={`${formId}-competencia`} erro={erroDe("competencia")}>
+      <Field label="Competência" htmlFor={`${formId}-competencia`} error={erroDe("competencia")}>
         <input
           id={`${formId}-competencia`}
           name="competencia"
           type="month"
           value={competencia}
           onChange={(e) => setCompetencia(e.target.value)}
-          className={inputCls}
+          className={inputClass}
+          aria-invalid={Boolean(erroDe("competencia"))}
+          aria-describedby={erroDe("competencia") ? `${formId}-competencia-error` : undefined}
         />
         {avisaCompetencia && (
           <p role="status" className="text-luc-warn text-sm leading-snug">
             Já existe um Lançamento nesta competência. Pode registrar mesmo assim.
           </p>
         )}
-      </Campo>
+      </Field>
 
-      <Campo label="Data de pagamento" htmlFor={`${formId}-data`} erro={erroDe("dataPagamento")}>
+      <Field label="Data de pagamento" htmlFor={`${formId}-data`} error={erroDe("dataPagamento")}>
         <input
           id={`${formId}-data`}
           name="dataPagamento"
           type="date"
           value={dataPagamento}
           onChange={(e) => setDataPagamento(e.target.value)}
-          className={inputCls}
+          className={inputClass}
+          aria-invalid={Boolean(erroDe("dataPagamento"))}
+          aria-describedby={erroDe("dataPagamento") ? `${formId}-data-error` : undefined}
         />
-      </Campo>
+      </Field>
 
-      <Campo label="Quem pagou" htmlFor={`${formId}-paidBy`} erro={erroDe("paidBy")}>
+      <Field label="Quem pagou" htmlFor={`${formId}-paidBy`} error={erroDe("paidBy")}>
         <select
           id={`${formId}-paidBy`}
           name="paidBy"
           value={paidBy}
           onChange={(e) => setPaidBy(e.target.value)}
-          className={inputCls}
+          className={inputClass}
+          aria-invalid={Boolean(erroDe("paidBy"))}
+          aria-describedby={erroDe("paidBy") ? `${formId}-paidBy-error` : undefined}
         >
           {pessoas.map((p) => (
             <option key={p.id} value={p.id}>
@@ -107,11 +115,11 @@ export function PaymentForm({
             </option>
           ))}
         </select>
-      </Campo>
+      </Field>
 
       <div className="flex items-center justify-end gap-3 pt-1">
         {onCancelar && (
-          <Button variant="ghost" type="button" onClick={onCancelar}>
+          <Button variant="secondary" type="button" onClick={onCancelar}>
             Cancelar
           </Button>
         )}

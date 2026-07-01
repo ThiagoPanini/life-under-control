@@ -114,13 +114,13 @@ export function ComprovantesLancamento({
   }
 
   return (
-    <div className="flex flex-col gap-2 border-luc-border/60 border-t pt-3">
+    <div className="flex flex-col gap-2 border-luc-row-line border-t pt-3">
       {comprovantes.length > 0 && (
         <ul className="flex flex-col gap-1.5">
           {comprovantes.map((c) => (
             <li
               key={c.id}
-              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-luc-md border border-luc-border bg-luc-surface-2 px-3 py-2"
+              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-luc-md border border-luc-row-line bg-luc-surface-1 px-3 py-2"
             >
               <button
                 type="button"
@@ -137,7 +137,7 @@ export function ComprovantesLancamento({
                   type="button"
                   onClick={() => remover(c.id)}
                   disabled={removendo === c.id}
-                  className="text-luc-text-3 text-xs hover:text-luc-warn disabled:opacity-50"
+                  className="rounded-luc-sm text-xs text-luc-text-3 hover:text-luc-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent disabled:cursor-not-allowed disabled:text-luc-disabled"
                 >
                   {removendo === c.id ? "Removendo…" : "Remover"}
                 </button>
@@ -149,7 +149,7 @@ export function ComprovantesLancamento({
 
       <div className="flex flex-wrap items-center gap-3">
         <Button
-          variant="ghost"
+          variant="secondary"
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={enviando}

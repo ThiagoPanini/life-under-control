@@ -8,6 +8,7 @@ import { criarLancamento } from "@/app/(app)/areas/financas/actions"
 import { auth } from "@/auth"
 import { Button } from "@/components/ds/Button"
 import { Pill } from "@/components/ds/Pill"
+import { Surface } from "@/components/ds/Surface"
 import { BillIcon } from "@/components/financas/BillIcon"
 import { ConnectedPaymentForm } from "@/components/financas/ConnectedPaymentForm"
 import { LancamentosLista } from "@/components/financas/LancamentosLista"
@@ -26,8 +27,8 @@ export const dynamic = "force-dynamic"
 
 /**
  * Detalhe da Conta: a regra no topo, a baixa de um Lançamento e a lista dos
- * Lançamentos (com editar/deletar). O card cheio — farol, grid, média, sparkline
- * — chega em #21; aqui mora a baixa (#19).
+ * Lançamentos (com editar/deletar). O card derivado mora na visão de Finanças;
+ * aqui a regra e os fatos ganham espaço operacional.
  */
 export default async function ContaDetailPage({
   params,
@@ -81,14 +82,14 @@ export default async function ContaDetailPage({
     )
 
   return (
-    <div className="luc-page-gutter py-7 sm:py-9 lg:py-10">
-      <div className="mx-auto flex max-w-2xl flex-col gap-8">
-        <header className="flex flex-col gap-4">
+    <div className="luc-page-gutter py-7 lg:py-7">
+      <div className="mx-auto flex max-w-[820px] flex-col gap-6">
+        <header className="flex flex-col gap-4 rounded-[14px] border border-luc-border bg-luc-surface-2 p-5">
           <Button href="/areas/financas" variant="ghost" className="self-start">
             ← Finanças
           </Button>
           <div className="flex items-start gap-4">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-luc-md border border-luc-border bg-luc-surface-2 text-luc-text-2">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[11px] bg-luc-accent-12 text-luc-accent-bright">
               <BillIcon name={bill.icon} size={24} />
             </span>
             <div className="flex min-w-0 flex-col gap-1.5">
@@ -108,15 +109,17 @@ export default async function ContaDetailPage({
               </div>
             </div>
           </div>
-          <Button href={`/areas/financas/${bill.id}/editar`} variant="ghost" className="self-start">
+          <Button
+            href={`/areas/financas/${bill.id}/editar`}
+            variant="secondary"
+            className="self-start"
+          >
             Editar Conta
           </Button>
         </header>
 
-        <section className="flex flex-col gap-5 rounded-luc-lg border border-luc-border bg-luc-surface-1 p-5 sm:p-6">
-          <p className="font-mono text-[11.5px] text-luc-accent uppercase tracking-[0.18em]">
-            Dar baixa
-          </p>
+        <Surface className="flex flex-col gap-5 p-5 sm:p-6">
+          <h2 className="text-sm font-bold text-luc-text-strong">Dar baixa</h2>
           {/* key pela contagem: depois de uma baixa o detalhe revalida e a
               contagem muda → o formulário remonta limpo (não retém os valores). */}
           <ConnectedPaymentForm
@@ -126,15 +129,15 @@ export default async function ContaDetailPage({
             inicial={inicialBaixa}
             competenciasComLancamento={competenciasComLancamento}
           />
-        </section>
+        </Surface>
 
         <section className="flex flex-col gap-5">
-          <p className="font-mono text-[11.5px] text-luc-text-3 uppercase tracking-[0.18em]">
+          <h2 className="text-sm font-bold text-luc-text-strong">
             Lançamentos{" "}
             {lancamentos.length > 0 && (
               <span className="text-luc-faint">· {lancamentos.length}</span>
             )}
-          </p>
+          </h2>
           <LancamentosLista
             billId={bill.id}
             lancamentos={lancamentos}
