@@ -22,3 +22,14 @@ export function emailNaAllowlist(email: string | null | undefined, allowlist: st
   if (!email) return false
   return allowlist.includes(email.trim().toLowerCase())
 }
+
+/**
+ * Tempo de vida da sessão JWT, em segundos (30 dias). Explícito de propósito:
+ * o default do Auth.js já é ~30 dias, mas fixá-lo torna a política intencional
+ * e imune a mudança silenciosa da lib. Este é também o teto da janela do
+ * TOCTOU da allowlist (ADR-0004): como o `LUC_ALLOWLIST` só é checado no
+ * callback `signIn` (time-of-check), remover uma Pessoa não revoga um JWT já
+ * emitido antes deste prazo — mitigação nuclear é rotacionar `AUTH_SECRET`.
+ * Aceitável no Lar de 2 Pessoas (acesso simétrico, remoção é evento raro).
+ */
+export const SESSION_MAX_AGE_SEGUNDOS = 30 * 24 * 60 * 60
