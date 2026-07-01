@@ -222,4 +222,51 @@ describe("importBackfill (Seam 2 — import determinístico)", () => {
     expect(r.falhasAnexo).toHaveLength(2)
     expect(await repo.listarPayments("h-1", "bill-luz")).toHaveLength(2)
   })
+
+  it("test_anexo_recebe_id_uuid_e_nao_o_derivado_do_payment", async () => {
+    const repo = fakePaymentRepo()
+    const store = fakeAttachmentStore()
+    const att = fakeAttachmentRepo()
+    const comBytes = async () => ({
+      conteudo: new Uint8Array([1, 2, 3, 4]),
+      tipoMime: "image/jpeg",
+    })
+
+    const r = await importBackfill(repo, store, att, comBytes, "h-1", [
+      linha({ recibo: { arquivo: "luz/2024/conta-luz-202403.jpeg", tipoMime: "image/jpeg" } }),
+    ])
+
+    const pay = r.criados[0]
+    const anexos = await att.listarAttachments("h-1", pay.id)
+    expect(anexos).toHaveLength(1)
+    // `attachments.id` é coluna `uuid` no Postgres: o id do Anexo tem de ser um UUID,
+    // não o antigo `${paymentId}-0` — que estourava `22P02 invalid input syntax for
+    // type uuid` na ingestão real (o comprovante subia pro R2, mas nenhuma linha entrava).
+    expect(anexos[0].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+    expect(anexos[0].id).not.toBe(`${pay.id}-0`)
+  })
+
+  it("test_usa_o_gerador_de_id_injetado_pro_anexo", async () => {
+    const repo = fakePaymentRepo()
+    const store = fakeAttachmentStore()
+    const att = fakeAttachmentRepo()
+    const comBytes = async () => ({
+      conteudo: new Uint8Array([1, 2, 3, 4]),
+      tipoMime: "image/jpeg",
+    })
+    const idFixo = "11111111-1111-4111-8111-111111111111"
+
+    const r = await importBackfill(
+      repo,
+      store,
+      att,
+      comBytes,
+      "h-1",
+      [linha({ recibo: { arquivo: "luz/2024/conta-luz-202403.jpeg", tipoMime: "image/jpeg" } })],
+      () => idFixo,
+    )
+
+    const anexos = await att.listarAttachments("h-1", r.criados[0].id)
+    expect(anexos[0].id).toBe(idFixo)
+  })
 })

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import { chaveComprovante } from "../domain/attachment"
 import type { LinhaManifesto } from "../domain/backfill"
 import { type Payment, validarDadosPayment } from "../domain/payment"
@@ -58,6 +59,7 @@ export async function importBackfill(
   carregarRecibo: CarregarRecibo,
   householdId: string,
   manifesto: LinhaManifesto[],
+  novoId: () => string = randomUUID,
 ): Promise<ResultadoImport> {
   const resultado: ResultadoImport = {
     criados: [],
@@ -69,16 +71,18 @@ export async function importBackfill(
   }
 
   /**
-   * Sobe o comprovante e registra o Anexo, reusando `registerAttachment`. Idempotente
-   * pelo id derivado (`<paymentId>-0`): re-anexar sobrescreve o mesmo objeto/registro,
-   * não duplica. Devolve `false` (sem lançar) quando o arquivo está inacessível ou o
+   * Sobe o comprovante e registra o Anexo, reusando `registerAttachment`. O id do
+   * Anexo é um UUID novo (`novoId`) — `attachments.id` é coluna `uuid` no Postgres,
+   * então um id derivado do Lançamento (`<paymentId>-0`) não serve: estoura `22P02`.
+   * A idempotência é do chamador — só invoca isto quando o Lançamento ainda não tem
+   * anexo. Devolve `false` (sem lançar) quando o arquivo está inacessível ou o
    * upload/registro falha — o Lançamento fica sem anexo, reparável numa próxima rodada.
    */
   async function anexar(paymentId: string, paidBy: string, arquivo: string): Promise<boolean> {
     const bytes = await carregarRecibo(arquivo)
     if (!bytes) return false // arquivo inacessível: o Lançamento fica, sem anexo
 
-    const attachmentId = `${paymentId}-0`
+    const attachmentId = novoId()
     const chave = chaveComprovante(householdId, paymentId, attachmentId)
     try {
       await attachmentStore.enviar(chave, bytes.conteudo, bytes.tipoMime)
