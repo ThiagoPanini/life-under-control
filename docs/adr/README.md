@@ -35,3 +35,4 @@ Para um **refinamento** (a decisão segue válida, muda um detalhe), edite o ADR
 - [0006 — Faseamento por Áreas: cara completa, ativação uma a uma](0006-faseamento-por-areas.md)
 - [0007 — Autonomia total do agente, com o dado do casal protegido](0007-autonomia-total-do-agente.md)
 - [0008 — Comprovantes (Anexos) em object storage S3-compatível (Cloudflare R2), via port](0008-anexos-object-storage-r2.md)
+- [0009 — Assunto: nível estrutural dentro da Área, unidade de especialização dos primitivos](0009-assunto-nivel-estrutural-especializacao.md)

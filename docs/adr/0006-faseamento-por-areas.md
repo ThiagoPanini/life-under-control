@@ -29,6 +29,10 @@ Sem essa distinção fixada, o projeto se obriga a construir seis Áreas para "l
 - **Negativas / aceito:** Áreas `em breve` por muito tempo podem parecer abandono. Aceito: a honestidade visual ("em breve") é melhor que esconder a ambição ou que prometer datas. O estado é honesto justamente por não carregar prazo.
 - O estado de Área (`em breve`/`ativa`) é um dado de primeira classe do Painel — e provavelmente a primeira coisa que o sistema visual precisa representar.
 
+### Revisão — faseamento também por Assunto; "Finanças (Pagamentos)" superado (2026-07-01)
+
+O ciclo `em breve`/`ativa` passa a valer também um nível abaixo: uma Área `ativa` é composta de Assuntos, cada um `em breve` ou `ativa`, e se apresenta como um mini-Painel deles (Pagamentos Recorrentes `ativa`; Investimentos `em breve`). Com isso, o apelido "Finanças (Pagamentos)" usado acima fica superado — Finanças deixou de *ser* Pagamentos; agora *contém* o Assunto Pagamentos Recorrentes ao lado de outros. Ver [ADR-0009](0009-assunto-nivel-estrutural-especializacao.md).
+
 ## Opções rejeitadas
 
 - **Lançar só com as Áreas prontas (Painel parcial).** Mostraria só Finanças no início — honesto, mas joga fora a alma do produto (o cockpit da vida inteira) e a sensação de completude que o dono quer desde a largada.

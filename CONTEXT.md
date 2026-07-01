@@ -9,7 +9,7 @@ O glossário tem duas camadas, de durabilidade diferente — saber em qual você
 - **Núcleo estável** — as **Invariantes** ao final. Regras de *significado* que não mudam; código que as viola é bug. É a rocha sobre a qual o resto se apoia.
 - **Fronteira provisória** — o catálogo de **primitivos** e o vocabulário de cada Área. São as formas *descobertas até aqui* — hoje, sobretudo de Finanças, a única Área trabalhada a fundo. Não é um schema fechado; é uma linguagem-padrão **descritiva** que mantém as Áreas coerentes. Cresce conforme cada Área é trabalhada: um primitivo novo só entra quando os exemplos reais de uma Área param de caber nos atuais. Modelar uma vida a dois é descoberta contínua — espere esta camada mudar, e mude-a de propósito.
 
-**Spine + especialização.** Cada primitivo é um *spine* genérico; cada Área o **especializa** com nome e estrutura próprios — um Lançamento é um Registro de Finanças; uma Conta é o Gerador de Finanças. Ao virar `ativa`, uma Área *declara* suas especializações; não se reescreve um modelo por Área. *Como* isso vira tabela é matéria de ADR, não daqui.
+**Spine + especialização.** Cada primitivo é um *spine* genérico; cada **Assunto** de uma Área o **especializa** com nome e estrutura próprios — um Lançamento é o Registro de Pagamentos Recorrentes; uma Conta é o Gerador de Pagamentos Recorrentes. Uma Área *agrupa* seus Assuntos; é o Assunto que *declara* suas especializações, e dois Assuntos nunca se misturam no mesmo modelo. *Como* isso vira tabela é matéria de ADR, não daqui.
 
 ## Linguagem
 
@@ -23,6 +23,8 @@ O glossário tem duas camadas, de durabilidade diferente — saber em qual você
 
 **Área** (`Area`) — Um domínio da vida apresentado como módulo no portal: Finanças, Saúde, Gastronomia, Imóvel, Supermercado, Carro. Cada Área está `em breve` ou `ativa`. _Evite_: categoria, seção.
 
+**Assunto** (`Subject`) — Um recorte estrutural dentro de uma Área, com seu próprio modelo (seus próprios primitivos especializados), que não se mistura com os demais Assuntos da mesma Área. Uma Área `ativa` é composta de um ou mais Assuntos, cada um `em breve` ou `ativa`; a Área reúne seus Assuntos como o Painel reúne as Áreas. É o Assunto — não a Área — que especializa os primitivos. Nem toda Área precisa de Assuntos: é uma forma descoberta em Finanças, a Área-piloto, que outras podem ou não adotar. Instância de Finanças: Pagamentos Recorrentes. _Evite_: categoria, seção, sub-área, módulo, aba.
+
 **Painel** (`Dashboard`) — A visão geral de largada: todas as Áreas lado a lado, a maioria ainda `em breve`. _Evite_: dashboard, home.
 
 ### Os primitivos (fronteira)
@@ -33,7 +35,7 @@ As formas recorrentes descobertas até aqui. Dois grupos: **itens** (o que você
 
 **Tarefa** (`Task`) — Algo a fazer, de estado pendente→feito, sempre ancorado numa Área; quando tem data, aparece na Agenda. _Evite_: afazer, compromisso, to-do, pendência (são a mesma coisa — use Tarefa).
 
-**Registro** (`Entry`) — Um fato já consumado, com data e às vezes valor, ancorado numa Área; é o *spine* dos fatos, que cada Área especializa (em Finanças, o Lançamento). _Evite_: log, evento, transação.
+**Registro** (`Entry`) — Um fato já consumado, com data e às vezes valor, ancorado numa Área; é o *spine* dos fatos, que cada Assunto especializa (em Pagamentos Recorrentes, o Lançamento). _Evite_: log, evento, transação.
 
 **Métrica** (`Measurement`) — Um ponto numa série temporal de um número que se acompanha: peso, resultado de exame, preço de um item, carboidratos. _Evite_: indicador, KPI, estatística.
 
@@ -41,7 +43,7 @@ As formas recorrentes descobertas até aqui. Dois grupos: **itens** (o que você
 
 **Geradores**
 
-**Gerador** *(nome e identificador de código provisórios — firmam quando a 2ª Área chegar)* — Uma regra permanente que projeta ocorrências futuras no tempo sem materializá-las. Cada ocorrência aparece projetada na Agenda; ao se concretizar, ou nasce um fato (um Registro) ou se cumpre uma Tarefa, conforme exija ação. Instância de Finanças: Conta. _Evite_: agendamento, cron, lembrete.
+**Gerador** *(nome e identificador de código provisórios — firmam quando a 2ª Área chegar)* — Uma regra permanente que projeta ocorrências futuras no tempo sem materializá-las. Cada ocorrência aparece projetada na Agenda; ao se concretizar, ou nasce um fato (um Registro) ou se cumpre uma Tarefa, conforme exija ação. Instância em Pagamentos Recorrentes (Finanças): Conta. _Evite_: agendamento, cron, lembrete.
 
 ### As vistas transversais
 
@@ -51,11 +53,11 @@ As formas recorrentes descobertas até aqui. Dois grupos: **itens** (o que você
 
 ### Finanças (Área-âncora)
 
-Única Área trabalhada a fundo por enquanto; as demais ganham vocabulário aqui quando forem trabalhadas.
+Única Área trabalhada a fundo por enquanto; as demais ganham vocabulário aqui quando forem trabalhadas. Finanças é composta de Assuntos: o primeiro é **Pagamentos Recorrentes** (`ativa`), lar da Conta e do Lançamento; outros (Investimentos…) seguem `em breve` até serem trabalhados.
 
-**Conta** (`Bill`) — A instância do Gerador em Finanças: a regra de um pagamento que se repete (condomínio, luz, fatura); guarda a periodicidade e a regra do vencimento esperado, nunca um valor fixo. Está `ativa` ou `encerrada` — encerrar (com data) para de projetar dali pra frente e guarda o histórico, sem apagar nada. _Evite_: despesa, boleto, assinatura, conta bancária.
+**Conta** (`Bill`) — A instância do Gerador em Pagamentos Recorrentes: a regra de um pagamento que se repete (condomínio, luz, fatura); guarda a periodicidade e a regra do vencimento esperado, nunca um valor fixo. Está `ativa` ou `encerrada` — encerrar (com data) para de projetar dali pra frente e guarda o histórico, sem apagar nada. _Evite_: despesa, boleto, assinatura, conta bancária.
 
-**Lançamento** (`Payment`) — A especialização de Registro em Finanças: o registro de um pagamento efetuado; nasce na quitação, com o valor real do momento e a data de pagamento, e ganha Competência e origem (uma Conta ou avulso). _Evite_: pagamento previsto, fatura, parcela.
+**Lançamento** (`Payment`) — A especialização de Registro em Pagamentos Recorrentes: o registro de um pagamento efetuado; nasce na quitação, com o valor real do momento e a data de pagamento, e ganha Competência. Todo Lançamento nasce de uma Conta — o LUC não registra gasto avulso (um lanche de fim de semana não entra; a conta de luz do mês, sim). É a vida-administrativa *recorrente* da Fronteira de escopo. _Evite_: pagamento previsto, fatura, parcela, gasto avulso.
 
 **Competência** (`ReferencePeriod`) — O período a que um Lançamento se refere (o condomínio "de julho"), independente da data em que foi pago. _Evite_: mês de pagamento, vencimento.
 
@@ -92,7 +94,7 @@ O LUC é um cockpit para a vida-administrativa recorrente de um casal. Dizer o q
 
 **"Despesa" — termo banido.** Foi usado para duas coisas distintas (um gasto financeiro e a lista do supermercado). Não use "despesa": um pagamento é um Lançamento; a lista de mercado é a Área Supermercado.
 
-**Área × categoria.** Área é o módulo de primeiro nível (Finanças). Uma classificação interna (Moradia, Lazer) é outra coisa e não deve ser chamada de Área.
+**Área × Assunto × categoria.** Três coisas distintas. **Área** é o módulo de primeiro nível (Finanças). **Assunto** é um recorte estrutural *dentro* da Área, com modelo próprio (Pagamentos Recorrentes) — um sub-módulo, não um rótulo. Uma **classificação interna transversal** (Moradia, Lazer) seria uma terceira coisa — um rótulo sobre itens — que hoje não existe; se vier, não é Área nem Assunto.
 
 ## Invariantes (núcleo estável)
 

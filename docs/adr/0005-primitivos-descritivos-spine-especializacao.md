@@ -35,6 +35,10 @@ O **mecanismo de persistência** dessa especialização (tabela única com discr
 
 A 1ª Área ativa firmou o padrão na prática: Finanças persiste em **tabelas próprias** (`bills`, `payments`, `attachments`), com os tipos no vocabulário especializado (`Bill`/`Payment`/`Attachment`) — **não** num spine genérico (`generators`/`entries`). O spine só será **extraído por refactor** se a 2ª Área mostrar a mesma forma (gatilho de extração do [ADR-0003](0003-nucleo-dominio-multi-borda.md)). É a filosofia deste ADR em ato: descritivo agora, generalização quando a repetição aparecer — não presumida de uma Área só.
 
+### Revisão — a unidade de especialização é o Assunto, não a Área (2026-07-01)
+
+Finanças, ao crescer, mostrou que uma Área abriga mais de um modelo (Pagamentos Recorrentes e, à frente, Investimentos) — especializações disjuntas que não cabem no mesmo contexto. A especialização dos primitivos passa a acontecer no **Assunto**, um nível estrutural dentro da Área; a Área vira um agrupamento de Assuntos. A filosofia deste ADR não muda (descritivo, spine + especialização, tabelas próprias por especialização) — só desce um nível. Ver [ADR-0009](0009-assunto-nivel-estrutural-especializacao.md).
+
 ## Opções rejeitadas
 
 - **Schema prescritivo (N tipos genéricos, Áreas configuram).** Consistência por construção, mas exige que a ontologia derivada de Finanças valha para Saúde/Carro/Imóvel — não verificável hoje. É a aposta cara que o projeto declarou querer evitar.
