@@ -5,6 +5,7 @@ import {
   House,
   type LucideIcon,
   ShoppingCart,
+  TrendingUp,
   Wallet,
 } from "lucide-react"
 
@@ -16,6 +17,7 @@ const ICONS: Record<string, LucideIcon> = {
   "heart-pulse": HeartPulse,
   house: House,
   car: Car,
+  "trending-up": TrendingUp,
 }
 
 export function AreaIcon({ name, size = 20 }: { name: string; size?: number }) {

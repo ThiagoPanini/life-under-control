@@ -14,6 +14,14 @@ describe("catálogo de Assuntos (ADR-0009)", () => {
   it("test_area_sem_assuntos_declarados_retorna_vazio", () => {
     expect(assuntosDaArea("saude")).toEqual([])
   })
+
+  it("test_financas_declara_investimentos_em_breve", () => {
+    const investimentos = assuntosDaArea("financas").find((s) => s.slug === "investimentos")
+
+    expect(investimentos).toBeDefined()
+    expect(investimentos?.estado).toBe("em-breve")
+    expect(investimentos?.areaSlug).toBe("financas")
+  })
 })
 
 describe("derivarEstadoArea (ADR-0009)", () => {

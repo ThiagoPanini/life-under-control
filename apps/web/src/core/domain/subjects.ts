@@ -29,6 +29,14 @@ export const SUBJECTS: Subject[] = [
     areaSlug: "financas",
     resumo: "Contas e Lançamentos do mês",
   },
+  {
+    slug: "investimentos",
+    nome: "Investimentos",
+    icon: "trending-up",
+    estado: "em-breve",
+    areaSlug: "financas",
+    resumo: "Posições e aportes",
+  },
 ]
 
 /** Os Assuntos declarados de uma Área, na ordem do catálogo. */
