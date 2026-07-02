@@ -60,6 +60,11 @@ export function AppShell({
   const mobileCloseButtonRef = useRef<HTMLButtonElement>(null)
   const mobileDialogRef = useRef<HTMLElement>(null)
 
+  const navModel = buildNavModel(pathname)
+  const rotaAtivaSlug = navModel.find((area) => area.ativa)?.slug
+  const [expandedAreas, setExpandedAreas] = useState<Set<string>>(() => new Set())
+  const primeiraRotaRef = useRef(true)
+
   const currentLabel =
     pathname === "/painel"
       ? "Painel"
@@ -70,6 +75,25 @@ export function AppShell({
   useEffect(() => {
     setCollapsed(localStorage.getItem(SIDEBAR_STORAGE_KEY) === "1")
   }, [])
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: hidratação de montagem — só usa rotaAtivaSlug se não houver preferência persistida
+  useEffect(() => {
+    const persisted = localStorage.getItem(SIDEBAR_EXPANDED_STORAGE_KEY)
+    const inicial = persisted ? parseSlugSet(persisted) : new Set<string>()
+    if (!persisted && rotaAtivaSlug) inicial.add(rotaAtivaSlug)
+    setExpandedAreas(inicial)
+  }, [])
+
+  useEffect(() => {
+    if (primeiraRotaRef.current) {
+      primeiraRotaRef.current = false
+      return
+    }
+    if (!rotaAtivaSlug) return
+    setExpandedAreas((current) =>
+      current.has(rotaAtivaSlug) ? current : new Set(current).add(rotaAtivaSlug),
+    )
+  }, [rotaAtivaSlug])
 
   useEffect(() => {
     if (pathname) {
@@ -151,6 +175,16 @@ export function AppShell({
     })
   }
 
+  function toggleArea(slug: string) {
+    setExpandedAreas((current) => {
+      const next = new Set(current)
+      if (next.has(slug)) next.delete(slug)
+      else next.add(slug)
+      localStorage.setItem(SIDEBAR_EXPANDED_STORAGE_KEY, JSON.stringify([...next]))
+      return next
+    })
+  }
+
   function openMobileMenu() {
     setMobileMenuOpen(true)
   }
@@ -167,7 +201,14 @@ export function AppShell({
       >
         Pular para o conteúdo
       </a>
-      <DesktopSidebar pathname={pathname} collapsed={collapsed} pessoas={pessoas} />
+      <DesktopSidebar
+        pathname={pathname}
+        collapsed={collapsed}
+        pessoas={pessoas}
+        navModel={navModel}
+        expandedAreas={expandedAreas}
+        onToggleArea={toggleArea}
+      />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-[calc(4rem+env(safe-area-inset-top))] items-end border-luc-border border-b bg-luc-bg/92 pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] pb-3 pt-[env(safe-area-inset-top)] backdrop-blur-xl lg:hidden">
@@ -217,6 +258,9 @@ export function AppShell({
         dialogRef={mobileDialogRef}
         closeButtonRef={mobileCloseButtonRef}
         onClose={closeMobileMenu}
+        navModel={navModel}
+        expandedAreas={expandedAreas}
+        onToggleArea={toggleArea}
       />
       <MobileDock pathname={pathname} menuOpen={mobileMenuOpen} onOpenAreas={openMobileMenu} />
       <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} />
@@ -289,45 +333,17 @@ function DesktopSidebar({
   pathname,
   collapsed,
   pessoas,
+  navModel,
+  expandedAreas,
+  onToggleArea,
 }: {
   pathname: string
   collapsed: boolean
   pessoas: ShellPessoa[]
+  navModel: NavArea[]
+  expandedAreas: Set<string>
+  onToggleArea: (slug: string) => void
 }) {
-  const navModel = buildNavModel(pathname)
-  const rotaAtivaSlug = navModel.find((area) => area.ativa)?.slug
-  const [expandedAreas, setExpandedAreas] = useState<Set<string>>(() => new Set())
-  const primeiraRotaRef = useRef(true)
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: hidratação de montagem — só usa rotaAtivaSlug se não houver preferência persistida
-  useEffect(() => {
-    const persisted = localStorage.getItem(SIDEBAR_EXPANDED_STORAGE_KEY)
-    const inicial = persisted ? parseSlugSet(persisted) : new Set<string>()
-    if (!persisted && rotaAtivaSlug) inicial.add(rotaAtivaSlug)
-    setExpandedAreas(inicial)
-  }, [])
-
-  useEffect(() => {
-    if (primeiraRotaRef.current) {
-      primeiraRotaRef.current = false
-      return
-    }
-    if (!rotaAtivaSlug) return
-    setExpandedAreas((current) =>
-      current.has(rotaAtivaSlug) ? current : new Set(current).add(rotaAtivaSlug),
-    )
-  }, [rotaAtivaSlug])
-
-  function toggleArea(slug: string) {
-    setExpandedAreas((current) => {
-      const next = new Set(current)
-      if (next.has(slug)) next.delete(slug)
-      else next.add(slug)
-      localStorage.setItem(SIDEBAR_EXPANDED_STORAGE_KEY, JSON.stringify([...next]))
-      return next
-    })
-  }
-
   return (
     <aside
       data-collapsed={collapsed}
@@ -391,7 +407,7 @@ function DesktopSidebar({
                   key={area.slug}
                   area={area}
                   expanded={expandedAreas.has(area.slug)}
-                  onToggle={() => toggleArea(area.slug)}
+                  onToggle={() => onToggleArea(area.slug)}
                 />
               ))}
         </nav>
@@ -427,26 +443,40 @@ function DesktopSidebar({
 }
 
 /**
- * Linha de Área na sidebar expandida (issue #46, ADR-0009): Área com Assuntos é
- * um toggle puro (nunca navega); Área em-breve sem Assuntos fica inerte.
+ * Linha de Área no accordion Área→Assunto (issue #46, #53, ADR-0009): Área com
+ * Assuntos é um toggle puro (nunca navega); Área em-breve sem Assuntos fica
+ * inerte. Reusada por `DesktopSidebar` e `MobileMenu` — mesmo modelo de
+ * navegação entre bordas — variando só o alvo de toque (`size`) e o fechamento
+ * do drawer ao navegar (`onNavigate`, mobile-only).
  */
 function AreaNavGroup({
   area,
   expanded,
   onToggle,
+  onNavigate,
+  size = "desktop",
 }: {
   area: NavArea
   expanded: boolean
   onToggle: () => void
+  onNavigate?: () => void
+  size?: "desktop" | "mobile"
 }) {
-  const assuntosId = `area-assuntos-${area.slug}`
+  const assuntosId = `${size}-area-assuntos-${area.slug}`
+  const rowMinH = size === "mobile" ? "min-h-11" : "min-h-10"
+  const subjectMinH = size === "mobile" ? "min-h-11" : "min-h-8"
+  const iconSize = size === "mobile" ? 19 : 18
+  const idleTone =
+    size === "mobile"
+      ? "text-luc-text-2 active:bg-luc-surface-2 active:text-luc-text"
+      : "text-luc-text-2 hover:bg-luc-surface-2 hover:text-luc-text"
 
   if (!area.expandivel) {
     return (
       <div
         aria-disabled="true"
         aria-current={area.ativa ? "page" : undefined}
-        className={`relative flex min-h-10 items-center gap-3 rounded-luc-md px-3 text-[13.5px] font-semibold ${
+        className={`relative flex ${rowMinH} items-center gap-3 rounded-luc-md px-3 text-[13.5px] font-semibold ${
           area.ativa ? "bg-luc-accent-12 text-luc-text" : "text-luc-disabled"
         }`}
       >
@@ -457,7 +487,7 @@ function AreaNavGroup({
           />
         )}
         <span className="shrink-0">
-          <AreaIcon name={area.icon} size={18} />
+          <AreaIcon name={area.icon} size={iconSize} />
         </span>
         <span className="min-w-0 flex-1 truncate">{area.nome}</span>
         <span className="shrink-0 rounded-[5px] border border-luc-border px-1.5 py-px text-[9.5px] font-medium text-luc-faint">
@@ -474,10 +504,8 @@ function AreaNavGroup({
         aria-expanded={expanded}
         aria-controls={assuntosId}
         onClick={onToggle}
-        className={`relative flex min-h-10 w-full items-center gap-3 rounded-luc-md px-3 text-[13.5px] font-semibold transition-colors ${FOCUS} ${
-          area.ativa
-            ? "bg-luc-accent-12 text-luc-text"
-            : "text-luc-text-2 hover:bg-luc-surface-2 hover:text-luc-text"
+        className={`relative flex ${rowMinH} w-full items-center gap-3 rounded-luc-md px-3 text-[13.5px] font-semibold transition-colors ${FOCUS} ${
+          area.ativa ? "bg-luc-accent-12 text-luc-text" : idleTone
         }`}
       >
         <ChevronRight
@@ -487,7 +515,7 @@ function AreaNavGroup({
           className={`shrink-0 text-luc-text-3 transition-transform [transition-duration:160ms] ${expanded ? "rotate-90" : ""}`}
         />
         <span className="shrink-0">
-          <AreaIcon name={area.icon} size={18} />
+          <AreaIcon name={area.icon} size={iconSize} />
         </span>
         <span className="min-w-0 flex-1 truncate text-left">{area.nome}</span>
         {area.estado === "ativa" && (
@@ -505,7 +533,7 @@ function AreaNavGroup({
               <div
                 key={subject.slug}
                 aria-disabled="true"
-                className="flex min-h-8 items-center gap-2 rounded-luc-md px-2.5 text-[13px] text-luc-disabled"
+                className={`flex ${subjectMinH} items-center gap-2 rounded-luc-md px-2.5 text-[13px] text-luc-disabled`}
               >
                 <span className="min-w-0 flex-1 truncate">{subject.nome}</span>
                 <Pill tone="warn">em breve</Pill>
@@ -515,10 +543,9 @@ function AreaNavGroup({
                 key={subject.slug}
                 href={subject.href}
                 aria-current={subject.ativa ? "page" : undefined}
-                className={`relative flex min-h-8 items-center rounded-luc-md px-2.5 text-[13px] font-medium transition-colors ${FOCUS} ${
-                  subject.ativa
-                    ? "bg-luc-accent-12 text-luc-text"
-                    : "text-luc-text-2 hover:bg-luc-surface-2 hover:text-luc-text"
+                onClick={onNavigate}
+                className={`relative flex ${subjectMinH} items-center rounded-luc-md px-2.5 text-[13px] font-medium transition-colors ${FOCUS} ${
+                  subject.ativa ? "bg-luc-accent-12 text-luc-text" : idleTone
                 }`}
               >
                 {subject.ativa && (
@@ -543,12 +570,18 @@ function MobileMenu({
   dialogRef,
   closeButtonRef,
   onClose,
+  navModel,
+  expandedAreas,
+  onToggleArea,
 }: {
   open: boolean
   pathname: string
   dialogRef: React.RefObject<HTMLElement | null>
   closeButtonRef: React.RefObject<HTMLButtonElement | null>
   onClose: () => void
+  navModel: NavArea[]
+  expandedAreas: Set<string>
+  onToggleArea: (slug: string) => void
 }) {
   return (
     <div
@@ -618,17 +651,15 @@ function MobileMenu({
             Áreas
           </p>
           <nav aria-label="Áreas móvel" className="flex flex-col gap-1">
-            {AREAS.map((area) => (
-              <NavItem
+            {navModel.map((area) => (
+              <AreaNavGroup
                 key={area.slug}
-                href={`/areas/${area.slug}`}
-                label={area.nome}
-                active={naArea(pathname, area.slug)}
+                area={area}
+                expanded={expandedAreas.has(area.slug)}
+                onToggle={() => onToggleArea(area.slug)}
                 onNavigate={onClose}
-                areaState={area.estado}
-              >
-                <AreaIcon name={area.icon} size={19} />
-              </NavItem>
+                size="mobile"
+              />
             ))}
           </nav>
         </div>
