@@ -13,7 +13,15 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react"
+import {
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react"
 import { logout } from "@/app/actions"
 import { AreaIcon } from "@/components/areas/AreaIcon"
 import { Logo } from "@/components/brand/Logo"
@@ -390,18 +398,22 @@ function DesktopSidebar({
         )}
         <nav aria-label="Áreas" className="flex flex-col gap-1">
           {collapsed
-            ? AREAS.map((area) => (
-                <NavItem
-                  key={area.slug}
-                  href={`/areas/${area.slug}`}
-                  label={area.nome}
-                  active={naArea(pathname, area.slug)}
-                  collapsed={collapsed}
-                  areaState={area.estado}
-                >
-                  <AreaIcon name={area.icon} size={18} />
-                </NavItem>
-              ))
+            ? navModel.map((area) =>
+                area.expandivel ? (
+                  <AreaFlyoutTrigger key={area.slug} area={area} />
+                ) : (
+                  <NavItem
+                    key={area.slug}
+                    href={area.href}
+                    label={area.nome}
+                    active={area.ativa}
+                    collapsed={collapsed}
+                    areaState={area.estado}
+                  >
+                    <AreaIcon name={area.icon} size={18} />
+                  </NavItem>
+                ),
+              )
             : navModel.map((area) => (
                 <AreaNavGroup
                   key={area.slug}
@@ -559,6 +571,173 @@ function AreaNavGroup({
             ),
           )}
         </nav>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Ícone de Área com Assuntos no rail colapsado (issue #52): hover, foco e clique abrem
+ * um flyout ancorado — nunca navega direto, preservando o toggle puro de #46. Não modal:
+ * Esc fecha e devolve o foco ao gatilho, foco fora fecha, Tab não fica preso no flyout.
+ */
+function AreaFlyoutTrigger({ area }: { area: NavArea }) {
+  const [open, setOpen] = useState(false)
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const suppressReopenRef = useRef(false)
+  const flyoutId = `area-flyout-${area.slug}`
+
+  // O <aside> ancestral tem overflow-y-auto; pela spec de overflow, isso força
+  // overflow-x a computar "auto" também e clipa um flyout absolute dentro dele.
+  // position: fixed com coordenadas medidas do gatilho escapa do clip (sem portal).
+  useLayoutEffect(() => {
+    if (!open) return
+    const rect = triggerRef.current?.getBoundingClientRect()
+    if (rect) setPosition({ top: rect.top, left: rect.right + 6 })
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    function handleDocumentKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return
+      // .focus() no gatilho pode disparar um focus genuíno (foco não estava nele
+      // ainda, ex. flyout aberto só por hover) — suprime o onFocus reabrindo em seguida.
+      suppressReopenRef.current = true
+      setOpen(false)
+      triggerRef.current?.focus()
+    }
+    function closeOnScroll() {
+      setOpen(false)
+    }
+    document.addEventListener("keydown", handleDocumentKeyDown)
+    document.addEventListener("scroll", closeOnScroll, true)
+    window.addEventListener("resize", closeOnScroll)
+    return () => {
+      document.removeEventListener("keydown", handleDocumentKeyDown)
+      document.removeEventListener("scroll", closeOnScroll, true)
+      window.removeEventListener("resize", closeOnScroll)
+    }
+  }, [open])
+
+  function closeIfFocusLeftFlyout() {
+    if (!wrapperRef.current?.contains(document.activeElement)) setOpen(false)
+  }
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return
+    const items = [...event.currentTarget.querySelectorAll<HTMLAnchorElement>("a[href]")]
+    if (items.length === 0) return
+    event.preventDefault()
+    const currentIndex = items.indexOf(document.activeElement as HTMLAnchorElement)
+    const delta = event.key === "ArrowDown" ? 1 : -1
+    const nextIndex =
+      currentIndex === -1
+        ? delta === 1
+          ? 0
+          : items.length - 1
+        : (currentIndex + delta + items.length) % items.length
+    items[nextIndex]?.focus()
+  }
+
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: região de hover/foco do flyout — botão e links dentro já carregam os papéis interativos; role aqui força <fieldset>, semântica errada.
+    <div
+      ref={wrapperRef}
+      className="relative"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={closeIfFocusLeftFlyout}
+      onFocus={() => {
+        if (suppressReopenRef.current) {
+          suppressReopenRef.current = false
+          return
+        }
+        setOpen(true)
+      }}
+      onBlur={() => {
+        // relatedTarget não é confiável em blur por mouse no Safari/WebKit — reavalia
+        // document.activeElement depois que o foco assenta, em vez de confiar nele.
+        window.setTimeout(closeIfFocusLeftFlyout, 0)
+      }}
+      onKeyDown={handleKeyDown}
+    >
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-label={area.nome}
+        title={area.nome}
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-controls={open ? flyoutId : undefined}
+        aria-current={area.ativa ? "page" : undefined}
+        onClick={() => setOpen(true)}
+        className={`relative flex min-h-10 w-full items-center justify-center rounded-luc-md text-[13.5px] font-semibold transition-colors ${FOCUS} ${
+          area.ativa
+            ? "bg-luc-accent-12 text-luc-text"
+            : "text-luc-text-2 hover:bg-luc-surface-2 hover:text-luc-text"
+        }`}
+      >
+        {area.ativa && (
+          <span
+            aria-hidden
+            className="absolute top-2 bottom-2 -left-3 w-[2.5px] rounded-full bg-luc-accent"
+          />
+        )}
+        <AreaIcon name={area.icon} size={18} />
+        {area.estado === "ativa" && (
+          <span
+            aria-hidden
+            className="absolute top-1.5 right-2.5 h-[5px] w-[5px] rounded-full bg-luc-success"
+          />
+        )}
+      </button>
+      {open && position && (
+        <div
+          id={flyoutId}
+          style={{ top: position.top, left: position.left }}
+          className="fixed z-20 w-[216px] rounded-luc-md border border-luc-border-strong bg-luc-surface-3 p-1.5 shadow-[0_24px_60px_rgba(0,0,0,.5)] [animation:luc-flyout-fade-up_140ms_ease-out]"
+        >
+          <div className="flex items-center gap-2 px-2.5 py-2">
+            <span
+              aria-hidden
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                area.estado === "ativa" ? "bg-luc-success" : "bg-luc-disabled"
+              }`}
+            />
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-luc-text">
+              {area.nome}
+            </span>
+          </div>
+          <nav aria-label={`Assuntos de ${area.nome}`} className="flex flex-col gap-0.5">
+            {area.assuntos.map((subject) =>
+              subject.inerte ? (
+                <div
+                  key={subject.slug}
+                  aria-disabled="true"
+                  className="flex min-h-8 items-center gap-2 rounded-luc-md px-2.5 text-[13px] text-luc-disabled"
+                >
+                  <span className="min-w-0 flex-1 truncate">{subject.nome}</span>
+                  <Pill tone="warn">em breve</Pill>
+                </div>
+              ) : (
+                <Link
+                  key={subject.slug}
+                  href={subject.href}
+                  aria-current={subject.ativa ? "page" : undefined}
+                  onClick={() => setOpen(false)}
+                  className={`flex min-h-8 items-center rounded-luc-md px-2.5 text-[13px] font-medium transition-colors ${FOCUS} ${
+                    subject.ativa
+                      ? "bg-luc-accent-12 text-luc-text"
+                      : "text-luc-text-2 hover:bg-luc-surface-2 hover:text-luc-text"
+                  }`}
+                >
+                  <span className="min-w-0 flex-1 truncate">{subject.nome}</span>
+                </Link>
+              ),
+            )}
+          </nav>
+        </div>
       )}
     </div>
   )

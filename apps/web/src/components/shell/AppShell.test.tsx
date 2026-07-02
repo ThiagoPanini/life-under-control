@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest"
-import { cleanup, render, screen, within } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { ComponentProps, ReactNode } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -265,6 +265,184 @@ describe("AppShell sidebar (Seam 3)", () => {
     )
     expect(within(dialog).getByRole("link", { name: /Agenda/ })).toHaveAttribute("href", "/agenda")
     expect(within(dialog).queryByRole("link", { name: /Saúde/ })).toBeNull()
+  })
+})
+
+describe("AppShell sidebar colapsada — flyout de Assuntos (issue #52)", () => {
+  function renderColapsada() {
+    localStorage.setItem("luc:sidebar-collapsed", "1")
+    return render(<AppShell>conteúdo</AppShell>)
+  }
+
+  it("test_area_com_assuntos_colapsada_e_botao_sem_href_em_vez_de_link", () => {
+    renderColapsada()
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+
+    expect(within(areas).getByRole("button", { name: "Finanças" })).toBeInTheDocument()
+    expect(within(areas).queryByRole("link", { name: "Finanças" })).toBeNull()
+  })
+
+  it("test_area_sem_assuntos_colapsada_continua_link_direto_como_hoje", () => {
+    renderColapsada()
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+
+    expect(within(areas).getByRole("link", { name: "Saúde" })).toHaveAttribute(
+      "href",
+      "/areas/saude",
+    )
+  })
+
+  it("test_hover_no_icone_abre_flyout_com_nome_da_area_e_assuntos", async () => {
+    const user = userEvent.setup()
+    renderColapsada()
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+    const trigger = within(areas).getByRole("button", { name: "Finanças" })
+
+    await user.hover(trigger)
+
+    const flyout = within(areas).getByRole("navigation", { name: "Assuntos de Finanças" })
+    expect(within(flyout).getByRole("link", { name: "Pagamentos Recorrentes" })).toHaveAttribute(
+      "href",
+      "/areas/financas/pagamentos-recorrentes",
+    )
+    expect(trigger).toHaveAttribute("aria-expanded", "true")
+  })
+
+  it("test_foco_no_icone_abre_flyout", () => {
+    renderColapsada()
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+    const trigger = within(areas).getByRole("button", { name: "Finanças" })
+
+    fireEvent.focusIn(trigger)
+
+    expect(trigger).toHaveAttribute("aria-expanded", "true")
+  })
+
+  it("test_clique_no_icone_abre_flyout_sem_navegar", async () => {
+    const user = userEvent.setup()
+    renderColapsada()
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+    const trigger = within(areas).getByRole("button", { name: "Finanças" })
+
+    expect(trigger.tagName).toBe("BUTTON")
+    expect(trigger).not.toHaveAttribute("href")
+
+    await user.click(trigger)
+
+    expect(trigger).toHaveAttribute("aria-expanded", "true")
+  })
+
+  it("test_escape_fecha_flyout_e_devolve_foco_ao_gatilho", async () => {
+    const user = userEvent.setup()
+    renderColapsada()
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+    const trigger = within(areas).getByRole("button", { name: "Finanças" })
+
+    await user.click(trigger)
+    expect(trigger).toHaveAttribute("aria-expanded", "true")
+
+    await user.keyboard("{Escape}")
+
+    expect(trigger).toHaveAttribute("aria-expanded", "false")
+    expect(trigger).toHaveFocus()
+  })
+
+  it("test_foco_fora_do_flyout_fecha", async () => {
+    const user = userEvent.setup()
+    renderColapsada()
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+    const trigger = within(areas).getByRole("button", { name: "Finanças" })
+    const fora = screen.getByRole("button", { name: "Buscar" })
+
+    await user.click(trigger)
+    await user.tab()
+    expect(trigger).toHaveAttribute("aria-expanded", "true")
+
+    await user.click(fora)
+
+    await waitFor(() => expect(trigger).toHaveAttribute("aria-expanded", "false"))
+  })
+
+  it("test_mouse_sai_do_gatilho_mas_foco_permanece_no_flyout_nao_fecha", async () => {
+    const user = userEvent.setup()
+    renderColapsada()
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+    const trigger = within(areas).getByRole("button", { name: "Finanças" })
+
+    await user.click(trigger)
+    trigger.focus()
+    await user.keyboard("{ArrowDown}")
+    const link = within(areas).getByRole("link", { name: "Pagamentos Recorrentes" })
+    expect(link).toHaveFocus()
+
+    fireEvent.mouseLeave(trigger.parentElement as HTMLElement)
+
+    expect(trigger).toHaveAttribute("aria-expanded", "true")
+    expect(link).toHaveFocus()
+  })
+
+  it("test_escape_fecha_flyout_aberto_so_por_hover_mesmo_sem_foco_dentro", async () => {
+    const user = userEvent.setup()
+    renderColapsada()
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+    const trigger = within(areas).getByRole("button", { name: "Finanças" })
+
+    await user.hover(trigger)
+    expect(trigger).toHaveAttribute("aria-expanded", "true")
+
+    await user.keyboard("{Escape}")
+
+    expect(trigger).toHaveAttribute("aria-expanded", "false")
+  })
+
+  it("test_area_ativa_expandivel_expoe_aria_current_no_gatilho_colapsado", () => {
+    usePathnameMock.mockReturnValue("/areas/financas/pagamentos-recorrentes")
+    renderColapsada()
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+
+    expect(within(areas).getByRole("button", { name: "Finanças" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    )
+  })
+
+  it("test_aria_controls_do_gatilho_so_existe_com_flyout_aberto", async () => {
+    const user = userEvent.setup()
+    renderColapsada()
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+    const trigger = within(areas).getByRole("button", { name: "Finanças" })
+
+    expect(trigger).not.toHaveAttribute("aria-controls")
+
+    await user.click(trigger)
+
+    expect(trigger).toHaveAttribute("aria-controls", expect.stringContaining("area-flyout-"))
+  })
+
+  it("test_seta_para_baixo_navega_pelos_assuntos_dentro_do_flyout", async () => {
+    const user = userEvent.setup()
+    renderColapsada()
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+    const trigger = within(areas).getByRole("button", { name: "Finanças" })
+
+    await user.click(trigger)
+    trigger.focus()
+    await user.keyboard("{ArrowDown}")
+
+    expect(within(areas).getByRole("link", { name: "Pagamentos Recorrentes" })).toHaveFocus()
+  })
+
+  it("test_assunto_em_breve_no_flyout_fica_inerte", async () => {
+    const user = userEvent.setup()
+    renderColapsada()
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+    const trigger = within(areas).getByRole("button", { name: "Finanças" })
+
+    await user.click(trigger)
+
+    const investimentos = within(areas).getByText("Investimentos").closest("[aria-disabled]")
+    expect(investimentos).toHaveAttribute("aria-disabled", "true")
+    expect(within(areas).queryByRole("link", { name: "Investimentos" })).toBeNull()
   })
 })
 
