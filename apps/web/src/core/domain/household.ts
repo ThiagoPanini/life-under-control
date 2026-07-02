@@ -12,6 +12,8 @@ export type Pessoa = {
   hue: number
   /** Letra de exibição (ex.: "T", "J"). */
   inicial: string
+  /** Chave do avatar no R2 (foto do Google espelhada no login); `null` sem foto. */
+  avatarKey: string | null
 }
 
 export type Lar = {
@@ -29,4 +31,14 @@ export function coresPessoa(hue: number): CoresPessoa {
     fg: `hsl(${hue} 76% 74%)`,
     bg: `hsl(${hue} 44% 23%)`,
   }
+}
+
+/**
+ * Deriva a chave do avatar de uma Pessoa no bucket R2: `identity/users/{id}/avatar`.
+ * Namespace `identity` (não uma Área, ADR-0006): a Pessoa é identidade cross-Área.
+ * Uma chave fixa por Pessoa — reenviar sobrescreve (idempotente, mesmo padrão do
+ * comprovante — `chaveComprovante`).
+ */
+export function chaveAvatar(userId: string): string {
+  return `identity/users/${userId}/avatar`
 }

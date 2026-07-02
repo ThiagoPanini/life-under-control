@@ -2,7 +2,19 @@
 
 import "@testing-library/jest-dom/vitest"
 import { cleanup, render, screen } from "@testing-library/react"
-import { afterEach, describe, expect, it } from "vitest"
+import type { ComponentProps } from "react"
+import { afterEach, describe, expect, it, vi } from "vitest"
+
+// next/image detecta "carregada" via naturalWidth, sempre 0 no jsdom — mockamos
+// pro <img> nativo (mesmo raciocínio do PersonAvatar.test.tsx).
+vi.mock("next/image", () => ({
+  default: (props: ComponentProps<"img">) => (
+    // biome-ignore lint/a11y/useAltText: alt vem de `props` no teste
+    // biome-ignore lint/performance/noImgElement: mock de next/image no teste
+    <img {...props} />
+  ),
+}))
+
 import { AreaCard } from "./AreaCard"
 import { Button } from "./Button"
 import { PersonChip } from "./PersonChip"
@@ -55,6 +67,7 @@ describe("contrato dos componentes do design system", () => {
           email: "thiago@example.com",
           inicial: "T",
           hue: 211,
+          avatarKey: null,
         }}
         compact
       />,
@@ -63,6 +76,29 @@ describe("contrato dos componentes do design system", () => {
     const initial = screen.getByLabelText("Thiago")
     expect(initial.style.color).toBe("var(--luc-thiago-fg)")
     expect(initial.style.backgroundColor).toBe("var(--luc-thiago-bg)")
+  })
+
+  it("mostra a foto no lugar da inicial quando a Pessoa tem avatarUrl", () => {
+    render(
+      <PersonChip
+        pessoa={{
+          id: "pessoa-1",
+          nome: "Thiago",
+          email: "thiago@example.com",
+          inicial: "T",
+          hue: 211,
+          avatarKey: "identity/users/pessoa-1/avatar",
+          avatarUrl: "https://conta.r2.cloudflarestorage.com/foto.jpg",
+        }}
+        compact
+      />,
+    )
+
+    expect(screen.queryByLabelText("Thiago")).toBeNull()
+    expect(screen.getByAltText("Thiago")).toHaveAttribute(
+      "src",
+      "https://conta.r2.cloudflarestorage.com/foto.jpg",
+    )
   })
 
   it("mostra métrica real apenas na Área ativa", () => {

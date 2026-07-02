@@ -21,6 +21,9 @@ export const users = pgTable("users", {
   nome: text("nome").notNull(),
   hue: integer("hue").notNull(),
   inicial: text("inicial").notNull(),
+  // Chave do avatar no R2 (foto do Google espelhada no login, #51). Nula até o
+  // 1º login bem-sucedido — o badge cai no fallback inicial+hue.
+  avatarKey: text("avatar_key"),
 })
 
 /**

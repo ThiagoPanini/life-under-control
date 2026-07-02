@@ -9,9 +9,9 @@ import { ConnectedPaymentForm } from "@/components/financas/ConnectedPaymentForm
 import { paymentParaInicial } from "@/components/financas/payment-form-inicial"
 import type { Attachment } from "@/core/domain/attachment"
 import { formatarDataBr, type Recurrence } from "@/core/domain/bill"
-import type { Pessoa } from "@/core/domain/household"
 import { formatBRL } from "@/core/domain/money"
 import { descreverCompetencia, type Payment } from "@/core/domain/payment"
+import type { PessoaComAvatar } from "@/core/use-cases/resolve-avatares"
 
 const warnCls = "border border-luc-warn/40 text-luc-warn hover:border-luc-warn hover:text-luc-warn"
 
@@ -30,7 +30,7 @@ export function LancamentosLista({
 }: {
   billId: string
   lancamentos: Payment[]
-  pessoas: Pessoa[]
+  pessoas: PessoaComAvatar[]
   recurrence: Recurrence
   /** Comprovantes de cada Lançamento, por id (vazio quando não há). */
   comprovantesPorLancamento: Record<string, Attachment[]>
@@ -71,11 +71,11 @@ function chaveDeLinha(p: Payment): string {
   return `${p.id}:${p.valor}:${p.dataPagamento ?? ""}:${p.competencia}:${p.paidBy}`
 }
 
-function nomeDe(pessoas: Pessoa[], id: string): string {
+function nomeDe(pessoas: PessoaComAvatar[], id: string): string {
   return pessoas.find((p) => p.id === id)?.nome ?? "—"
 }
 
-function pessoaDe(pessoas: Pessoa[], id: string): Pessoa | undefined {
+function pessoaDe(pessoas: PessoaComAvatar[], id: string): PessoaComAvatar | undefined {
   return pessoas.find((pessoa) => pessoa.id === id)
 }
 
@@ -89,7 +89,7 @@ function LancamentoRow({
 }: {
   billId: string
   lancamento: Payment
-  pessoas: Pessoa[]
+  pessoas: PessoaComAvatar[]
   recurrence: Recurrence
   comprovantes: Attachment[]
   competenciasDeOutros: string[]
@@ -130,7 +130,10 @@ function LancamentoRow({
             </span>
             <span className="text-luc-faint">·</span>
             {pessoaDe(pessoas, lancamento.paidBy) ? (
-              <PersonChip pessoa={pessoaDe(pessoas, lancamento.paidBy) as Pessoa} compact />
+              <PersonChip
+                pessoa={pessoaDe(pessoas, lancamento.paidBy) as PessoaComAvatar}
+                compact
+              />
             ) : (
               <span>Pago por {nomeDe(pessoas, lancamento.paidBy)}</span>
             )}

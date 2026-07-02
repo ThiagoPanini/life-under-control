@@ -21,9 +21,18 @@ vi.mock("next/link", () => ({
     </a>
   ),
 }))
+// next/image detecta "carregada" via naturalWidth, sempre 0 no jsdom — mockamos
+// pro <img> nativo (mesmo raciocínio do PersonAvatar.test.tsx).
+vi.mock("next/image", () => ({
+  default: (props: ComponentProps<"img">) => (
+    // biome-ignore lint/a11y/useAltText: alt vem de `props` no teste
+    // biome-ignore lint/performance/noImgElement: mock de next/image no teste
+    <img {...props} />
+  ),
+}))
 
 import { AreaCard } from "@/components/ds/AreaCard"
-import { AppShell } from "./AppShell"
+import { AppShell, type ShellPessoa } from "./AppShell"
 
 afterEach(() => {
   cleanup()
@@ -97,6 +106,37 @@ describe("AppShell sidebar (Seam 3)", () => {
 
     expect(await screen.findByRole("button", { name: "Expandir menu" })).toBeInTheDocument()
     expect(container.querySelector("aside")).toHaveAttribute("data-collapsed", "true")
+  })
+
+  it("test_pessoas_com_avatarurl_mostram_foto_no_header_e_no_rodape_da_sidebar", () => {
+    const pessoas: ShellPessoa[] = [
+      {
+        id: "u-1",
+        nome: "Thiago",
+        inicial: "T",
+        avatarUrl: "https://conta.r2.cloudflarestorage.com/t.jpg",
+      },
+      { id: "u-2", nome: "Jakeline", inicial: "J", avatarUrl: null },
+    ]
+    render(
+      <AppShell pessoas={pessoas}>
+        <div>conteúdo</div>
+      </AppShell>,
+    )
+
+    expect(screen.getAllByAltText("Thiago")).toHaveLength(2) // header + rodapé
+    expect(screen.getAllByLabelText("Jakeline")).toHaveLength(2) // fallback inicial, sem foto
+  })
+
+  it("test_sem_pessoas_a_casca_ainda_mostra_os_dois_badges_com_fallback", () => {
+    render(
+      <AppShell>
+        <div>conteúdo</div>
+      </AppShell>,
+    )
+
+    expect(screen.getAllByLabelText("Thiago")).toHaveLength(2)
+    expect(screen.getAllByLabelText("Jakeline")).toHaveLength(2)
   })
 
   it("test_navegacao_principal_nao_lista_mais_financas", () => {

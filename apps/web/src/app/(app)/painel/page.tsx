@@ -3,6 +3,7 @@ import { systemClock } from "@/adapters/clock/system-clock"
 import { drizzleBillRepo } from "@/adapters/db/bill-repo.drizzle"
 import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
 import { drizzlePaymentRepo } from "@/adapters/db/payment-repo.drizzle"
+import { r2AttachmentStore } from "@/adapters/r2/r2-attachment-store"
 import { AreaCard } from "@/components/ds/AreaCard"
 import { MetricCard } from "@/components/ds/MetricCard"
 import { PageHeader } from "@/components/ds/PageHeader"
@@ -20,6 +21,7 @@ import {
 import { getPainel } from "@/core/use-cases/get-painel"
 import { listAllPayments } from "@/core/use-cases/list-all-payments"
 import { listBills } from "@/core/use-cases/list-bills"
+import { resolveAvatares } from "@/core/use-cases/resolve-avatares"
 
 export const dynamic = "force-dynamic"
 
@@ -51,9 +53,10 @@ function dataLonga(iso: string) {
 
 export default async function PainelPage() {
   const { lar } = await getPainel(drizzleHouseholdRepo())
-  const [bills, pagamentos] = await Promise.all([
+  const [bills, pagamentos, pessoas] = await Promise.all([
     listBills(drizzleBillRepo(), lar.id),
     listAllPayments(drizzlePaymentRepo(), lar.id),
+    resolveAvatares(lar.pessoas, r2AttachmentStore()),
   ])
   const ativas = bills.filter((bill) => bill.estado === "ativa")
   const agregados = derivarAgregadosFinancas(
@@ -79,9 +82,7 @@ export default async function PainelPage() {
           eyebrow={dataLonga(hoje)}
           title="Painel do Lar"
           description={`${lar.nome} em números — métricas no topo, tendência ao lado.`}
-          actions={lar.pessoas.map((pessoa) => (
-            <PersonChip key={pessoa.id} pessoa={pessoa} compact />
-          ))}
+          actions={pessoas.map((pessoa) => <PersonChip key={pessoa.id} pessoa={pessoa} compact />)}
           className="mb-1.5"
         />
 
