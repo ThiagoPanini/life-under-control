@@ -5,6 +5,7 @@ import {
   descreverVencimento,
   ehDataIsoValida,
   formatarDataBr,
+  mesCurto,
   validarDadosBill,
 } from "./bill"
 
@@ -204,5 +205,13 @@ describe("ehDataIsoValida (Seam 1)", () => {
 describe("formatarDataBr (Seam 1)", () => {
   it("test_iso_vira_pt_br", () => {
     expect(formatarDataBr("2026-06-29")).toBe("29/06/2026")
+  })
+})
+
+describe("mesCurto (Seam 1)", () => {
+  it("test_competencia_vira_abreviacao_pt_br", () => {
+    expect(mesCurto("2026-01")).toBe("jan")
+    expect(mesCurto("2026-06")).toBe("jun")
+    expect(mesCurto("2026-12")).toBe("dez")
   })
 })

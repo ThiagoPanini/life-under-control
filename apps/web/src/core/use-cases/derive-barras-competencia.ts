@@ -52,12 +52,26 @@ export function valoresFechados(pontos: PontoBarraCompetencia[]): number[] {
   return pontos.filter((ponto) => ponto.estado === "fechado").map((ponto) => ponto.valor)
 }
 
+/**
+ * Uma Conta encerrada ainda esperava ocorrência **antes** de fechar — não
+ * incluí-la apagaria um "esperava e não pagou" real (ex.: mês perdido antes de
+ * cancelar a assinatura), disfarçando-o de lacuna. Mas ela não pode esperar
+ * nada **depois** do próprio fechamento — daí o teto no mês de `encerradaEm`.
+ */
 function competenciasEsperadas(bills: Bill[], mesCorrente: string, tamanho: number): Set<string> {
   const esperadas = new Set<string>()
-  for (const bill of bills.filter((b) => b.estado === "ativa")) {
-    for (const competencia of ocorrenciasRecentes(bill.recurrence, mesCorrente, tamanho)) {
+  for (const bill of bills) {
+    const refCompetencia =
+      bill.estado === "encerrada" && bill.encerradaEm
+        ? menorCompetencia(mesDe(bill.encerradaEm), mesCorrente)
+        : mesCorrente
+    for (const competencia of ocorrenciasRecentes(bill.recurrence, refCompetencia, tamanho)) {
       esperadas.add(competencia)
     }
   }
   return esperadas
+}
+
+function menorCompetencia(a: string, b: string): string {
+  return a < b ? a : b
 }

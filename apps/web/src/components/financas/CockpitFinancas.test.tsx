@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest"
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, render, screen, within } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
 import type { AgregadosMes, SerieTotalPago } from "@/core/use-cases/derive-agregados-financas"
 import { CockpitFinancas } from "./CockpitFinancas"
@@ -34,8 +34,10 @@ describe("CockpitFinancas (Seam 2)", () => {
   it("test_formata_os_quatro_agregados_em_brl", () => {
     render(<CockpitFinancas agregados={base} serie={serie} bills={[]} hoje="2026-06-15" />)
     expect(screen.getByText("Pago no mês")).toBeInTheDocument()
-    expect(screen.getAllByText("R$ 100,00").length).toBeGreaterThanOrEqual(1) // pago + barra jun
-    expect(screen.getAllByText("R$ 120,00").length).toBeGreaterThanOrEqual(1) // gasto médio + barra mai
+    const pago = screen.getByText("Pago no mês").closest("section") as HTMLElement
+    expect(within(pago).getByText("R$ 100,00")).toBeInTheDocument()
+    const gastoMedio = screen.getByText("Gasto médio · 12m").closest("section") as HTMLElement
+    expect(within(gastoMedio).getByText("R$ 120,00")).toBeInTheDocument()
     expect(screen.getByText("R$ 60,00")).toBeInTheDocument() // falta pagar
     expect(screen.getByText("2")).toBeInTheDocument() // em aberto
   })

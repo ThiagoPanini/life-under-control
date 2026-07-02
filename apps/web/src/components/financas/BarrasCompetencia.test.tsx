@@ -65,4 +65,10 @@ describe("BarrasCompetencia (Seam 2)", () => {
     )
     expect(screen.getByText("sem dado")).toBeInTheDocument() // dentro da tabela sr-only
   })
+
+  it("test_sem_pontos_mostra_mensagem_em_vez_de_grafico_vazio", () => {
+    render(<BarrasCompetencia titulo="Total pago por competência" pontos={[]} mediaMensal={null} />)
+    expect(screen.getByText(/sem histórico/i)).toBeInTheDocument()
+    expect(screen.queryByTestId("barra-competencia")).not.toBeInTheDocument()
+  })
 })

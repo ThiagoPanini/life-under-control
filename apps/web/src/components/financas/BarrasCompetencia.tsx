@@ -4,6 +4,7 @@ import { Group } from "@visx/group"
 import { scaleBand, scaleLinear } from "@visx/scale"
 import { Bar } from "@visx/shape"
 import { useState } from "react"
+import { mesCurto } from "@/core/domain/bill"
 import { formatBRL } from "@/core/domain/money"
 import type { PontoBarraCompetencia } from "@/core/use-cases/derive-barras-competencia"
 
@@ -13,14 +14,8 @@ const PAD_TOP = 22
 const PAD_BOTTOM = 28
 const PAD_X = 8
 
-const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
-
-function mesCurto(competencia: string) {
-  return MONTHS[Number(competencia.slice(5, 7)) - 1]
-}
-
 function mesLongo(competencia: string) {
-  const [ano, _mes] = competencia.split("-")
+  const ano = competencia.split("-")[0]
   return `${mesCurto(competencia)}/${ano.slice(2)}`
 }
 
@@ -67,6 +62,17 @@ export function BarrasCompetencia({
   estado?: "neutro" | "success" | "warn"
 }) {
   const [ativo, setAtivo] = useState<string | null>(null)
+
+  if (pontos.length === 0) {
+    return (
+      <section
+        className={`rounded-[14px] border border-luc-border border-t-[3px] bg-luc-surface-2 p-4 sm:px-[18px] ${CAP[estado]}`}
+      >
+        <h2 className="text-[12.5px] font-bold text-luc-text-strong">{titulo}</h2>
+        <p className="mt-2 text-xs text-luc-text-3">Sem histórico de competências pagas ainda.</p>
+      </section>
+    )
+  }
 
   const maxValor = Math.max(1, mediaMensal ?? 0, ...pontos.map((ponto) => ponto.valor))
   const xScale = scaleBand<string>({
@@ -134,7 +140,7 @@ export function BarrasCompetencia({
                 "data-testid": "barra-competencia",
                 "data-estado": ponto.estado,
                 tabIndex: 0,
-                role: "img",
+                role: "graphics-symbol",
                 "aria-label": textoBarra(ponto),
                 onMouseEnter: () => setAtivo(ponto.competencia),
                 onMouseLeave: () =>

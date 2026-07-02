@@ -92,6 +92,54 @@ describe("pontosBarraCompetencia (Seam 1)", () => {
     const serie = serieTotalPago([], [], "2026-06-15")
     expect(pontosBarraCompetencia(serie, [], "2026-06-15")).toEqual([])
   })
+
+  it("test_conta_encerrada_com_competencia_esperada_antes_do_fechamento_fica_fechado_nao_lacuna", () => {
+    // A Conta trimestral (âncora junho) segue ativa mas não espera nada em abr/mai — só a
+    // encerrada esperava (mensal) antes de fechar em 20/04. Abril tem que ficar "fechado"
+    // (fato real: esperava e não pagou), nunca "lacuna" (que diria que nada esperava ali).
+    const billAtiva = billBase({
+      id: "bill-ativa",
+      recurrence: { intervalMonths: 3, anchorMonth: 6 },
+    })
+    const billEncerrada = billBase({
+      id: "bill-encerrada",
+      estado: "encerrada",
+      encerradaEm: "2026-04-20",
+    })
+    const bills = [billAtiva, billEncerrada]
+    const serie = serieTotalPago(bills, [], "2026-06-15", 3)
+
+    const pontos = pontosBarraCompetencia(serie, bills, "2026-06-15")
+
+    expect(pontos.find((p) => p.competencia === "2026-04")).toEqual({
+      competencia: "2026-04",
+      valor: 0,
+      estado: "fechado",
+    })
+  })
+
+  it("test_conta_encerrada_nao_gera_expectativa_apos_o_proprio_fechamento", () => {
+    // Maio já é depois do fechamento (20/04) da encerrada — ela não pode "esperar" ali.
+    const billAtiva = billBase({
+      id: "bill-ativa",
+      recurrence: { intervalMonths: 3, anchorMonth: 6 },
+    })
+    const billEncerrada = billBase({
+      id: "bill-encerrada",
+      estado: "encerrada",
+      encerradaEm: "2026-04-20",
+    })
+    const bills = [billAtiva, billEncerrada]
+    const serie = serieTotalPago(bills, [], "2026-06-15", 3)
+
+    const pontos = pontosBarraCompetencia(serie, bills, "2026-06-15")
+
+    expect(pontos.find((p) => p.competencia === "2026-05")).toEqual({
+      competencia: "2026-05",
+      valor: 0,
+      estado: "lacuna",
+    })
+  })
 })
 
 describe("valoresFechados (Seam 1)", () => {

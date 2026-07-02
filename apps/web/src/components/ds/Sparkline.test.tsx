@@ -20,4 +20,12 @@ describe("Sparkline (Seam 2)", () => {
     expect(container.querySelector("svg")).toBeInTheDocument()
     expect(container.querySelector("circle")).not.toBeInTheDocument()
   })
+
+  it("test_valores_todos_iguais_nao_gera_coordenadas_nan", () => {
+    const { container } = render(<Sparkline values={[5000, 5000, 5000]} label="Total pago" />)
+    const circle = container.querySelector("circle")
+    expect(circle).toBeInTheDocument()
+    expect(Number(circle?.getAttribute("cy"))).not.toBeNaN()
+    expect(container.querySelector("path")?.getAttribute("d")).not.toMatch(/NaN/)
+  })
 })

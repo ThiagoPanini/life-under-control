@@ -113,6 +113,27 @@ export const MESES = [
   "Dezembro",
 ]
 
+/** Abreviação pt-BR de mês (índice 0 = jan), pro rótulo compacto de competência/eixo. */
+export const MESES_CURTOS = [
+  "jan",
+  "fev",
+  "mar",
+  "abr",
+  "mai",
+  "jun",
+  "jul",
+  "ago",
+  "set",
+  "out",
+  "nov",
+  "dez",
+]
+
+/** Mês abreviado de uma competência (`YYYY-MM` → `"jan"`). */
+export function mesCurto(competencia: string): string {
+  return MESES_CURTOS[Number(competencia.slice(5, 7)) - 1]
+}
+
 /** Nome pt-BR de cada periodicidade conhecida (intervalo em meses → rótulo). */
 export const RECORRENCIA_NOMES: Record<number, string> = {
   1: "Mensal",

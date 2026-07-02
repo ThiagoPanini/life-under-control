@@ -91,7 +91,7 @@ export default async function FinancasPage() {
               title="Panorama"
               subtitle="Métricas do mês e a tendência dos pagamentos"
             />
-            <CockpitFinancas agregados={agregados} serie={serie} bills={ativas} hoje={hoje} />
+            <CockpitFinancas agregados={agregados} serie={serie} bills={bills} hoje={hoje} />
           </section>
         )}
 
