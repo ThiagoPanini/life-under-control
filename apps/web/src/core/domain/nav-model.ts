@@ -28,7 +28,8 @@ export type NavArea = {
   assuntos: NavSubject[]
 }
 
-function naArea(pathname: string, slug: string): boolean {
+/** A rota está dentro de uma Área (a própria ou uma sub-rota como /nova)? */
+export function naArea(pathname: string, slug: string): boolean {
   return pathname === `/areas/${slug}` || pathname.startsWith(`/areas/${slug}/`)
 }
 
@@ -59,7 +60,7 @@ export function buildNavModel(
           icon: subject.icon,
           href,
           estado: subject.estado,
-          ativa: pathname === href,
+          ativa: pathname === href || pathname.startsWith(`${href}/`),
           inerte: subject.estado === "em-breve",
         }
       }),

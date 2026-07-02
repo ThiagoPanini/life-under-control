@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { assuntoUnicoAtivo, buildNavModel } from "./nav-model"
+import { assuntoUnicoAtivo, buildNavModel, naArea } from "./nav-model"
 import type { Subject } from "./subjects"
 
 describe("buildNavModel (ADR-0009, issue #46)", () => {
@@ -39,6 +39,24 @@ describe("buildNavModel (ADR-0009, issue #46)", () => {
     expect(financas?.ativa).toBe(true)
     expect(pagamentos?.ativa).toBe(true)
     expect(outraArea?.ativa).toBe(false)
+  })
+
+  it("test_trilha_ativa_marca_assunto_em_sub_rota_aninhada", () => {
+    const navModel = buildNavModel("/areas/financas/pagamentos-recorrentes/nova")
+    const financas = navModel.find((area) => area.slug === "financas")
+    const pagamentos = financas?.assuntos.find(
+      (assunto) => assunto.slug === "pagamentos-recorrentes",
+    )
+
+    expect(pagamentos?.ativa).toBe(true)
+  })
+})
+
+describe("naArea — dedup do helper de trilha ativa (issue #46, code review)", () => {
+  it("test_naarea_reconhece_raiz_e_sub_rota_mas_nao_outra_area", () => {
+    expect(naArea("/areas/financas", "financas")).toBe(true)
+    expect(naArea("/areas/financas/pagamentos-recorrentes", "financas")).toBe(true)
+    expect(naArea("/areas/saude", "financas")).toBe(false)
   })
 })
 

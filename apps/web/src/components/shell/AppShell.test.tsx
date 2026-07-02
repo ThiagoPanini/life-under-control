@@ -154,6 +154,41 @@ describe("AppShell sidebar (Seam 3)", () => {
     expect(JSON.parse(localStorage.getItem("luc:sidebar-expanded") ?? "[]")).toContain("financas")
   })
 
+  it("test_colapso_manual_da_area_ativa_sobrevive_a_recarga", async () => {
+    const user = userEvent.setup()
+    usePathnameMock.mockReturnValue("/areas/financas/pagamentos-recorrentes")
+    const { unmount } = render(<AppShell>conteúdo</AppShell>)
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+    const toggle = within(areas).getByRole("button", { name: "Finanças" })
+    expect(toggle).toHaveAttribute("aria-expanded", "true")
+
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute("aria-expanded", "false")
+    unmount()
+
+    render(<AppShell>conteúdo</AppShell>)
+    const areasDepoisDoReload = screen.getByRole("navigation", { name: "Áreas" })
+    expect(within(areasDepoisDoReload).getByRole("button", { name: "Finanças" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    )
+  })
+
+  it("test_preferencia_local_corrompida_nao_quebra_a_sidebar", () => {
+    localStorage.setItem("luc:sidebar-expanded", "{ isso não é json")
+
+    expect(() => render(<AppShell>conteúdo</AppShell>)).not.toThrow()
+  })
+
+  it("test_area_em_breve_ativa_ganha_destaque_visual_na_rota_atual", () => {
+    usePathnameMock.mockReturnValue("/areas/saude")
+    render(<AppShell>conteúdo</AppShell>)
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+    const saude = within(areas).getByText("Saúde").closest("[aria-disabled]")
+
+    expect(saude).toHaveAttribute("aria-current", "page")
+  })
+
   it("test_area_em_breve_sem_assuntos_fica_inerte", () => {
     render(<AppShell>conteúdo</AppShell>)
     const areas = screen.getByRole("navigation", { name: "Áreas" })

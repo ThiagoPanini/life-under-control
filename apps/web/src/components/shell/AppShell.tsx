@@ -19,16 +19,11 @@ import { AreaIcon } from "@/components/areas/AreaIcon"
 import { Logo } from "@/components/brand/Logo"
 import { Pill } from "@/components/ds/Pill"
 import { AREAS, type Area } from "@/core/domain/areas"
-import { buildNavModel, type NavArea } from "@/core/domain/nav-model"
+import { buildNavModel, type NavArea, naArea } from "@/core/domain/nav-model"
 import { SUBJECTS } from "@/core/domain/subjects"
 
 export const SIDEBAR_STORAGE_KEY = "luc:sidebar-collapsed"
 export const SIDEBAR_EXPANDED_STORAGE_KEY = "luc:sidebar-expanded"
-
-/** A rota está dentro de uma Área (a própria ou uma sub-rota como /nova)? */
-function naArea(pathname: string, slug: string): boolean {
-  return pathname === `/areas/${slug}` || pathname.startsWith(`/areas/${slug}/`)
-}
 
 const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-luc-bg"
@@ -253,24 +248,36 @@ function DesktopHeader({
   )
 }
 
+/** Lê o array de slugs persistido; qualquer formato inesperado vira conjunto vazio, nunca exceção. */
+function parseSlugSet(raw: string): Set<string> {
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return new Set()
+    return new Set(parsed.filter((item): item is string => typeof item === "string"))
+  } catch {
+    return new Set()
+  }
+}
+
 function DesktopSidebar({ pathname, collapsed }: { pathname: string; collapsed: boolean }) {
   const navModel = buildNavModel(pathname)
   const rotaAtivaSlug = navModel.find((area) => area.ativa)?.slug
-  const [expandedAreas, setExpandedAreas] = useState<Set<string>>(
-    () => new Set(rotaAtivaSlug ? [rotaAtivaSlug] : []),
-  )
+  const [expandedAreas, setExpandedAreas] = useState<Set<string>>(() => new Set())
+  const primeiraRotaRef = useRef(true)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: hidratação de montagem — só usa rotaAtivaSlug se não houver preferência persistida
   useEffect(() => {
     const persisted = localStorage.getItem(SIDEBAR_EXPANDED_STORAGE_KEY)
-    if (!persisted) return
-    setExpandedAreas((current) => {
-      const next = new Set(current)
-      for (const slug of JSON.parse(persisted) as string[]) next.add(slug)
-      return next
-    })
+    const inicial = persisted ? parseSlugSet(persisted) : new Set<string>()
+    if (!persisted && rotaAtivaSlug) inicial.add(rotaAtivaSlug)
+    setExpandedAreas(inicial)
   }, [])
 
   useEffect(() => {
+    if (primeiraRotaRef.current) {
+      primeiraRotaRef.current = false
+      return
+    }
     if (!rotaAtivaSlug) return
     setExpandedAreas((current) =>
       current.has(rotaAtivaSlug) ? current : new Set(current).add(rotaAtivaSlug),
@@ -403,8 +410,17 @@ function AreaNavGroup({
     return (
       <div
         aria-disabled="true"
-        className="flex min-h-10 items-center gap-3 rounded-luc-md px-3 text-[13.5px] font-semibold text-luc-disabled"
+        aria-current={area.ativa ? "page" : undefined}
+        className={`relative flex min-h-10 items-center gap-3 rounded-luc-md px-3 text-[13.5px] font-semibold ${
+          area.ativa ? "bg-luc-accent-12 text-luc-text" : "text-luc-disabled"
+        }`}
       >
+        {area.ativa && (
+          <span
+            aria-hidden
+            className="absolute top-2 bottom-2 -left-3 w-[2.5px] rounded-full bg-luc-accent"
+          />
+        )}
         <span className="shrink-0">
           <AreaIcon name={area.icon} size={18} />
         </span>
