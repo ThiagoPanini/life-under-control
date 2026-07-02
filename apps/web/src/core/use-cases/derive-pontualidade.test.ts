@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest"
 import type { Bill } from "@/core/domain/bill"
 import type { Payment } from "@/core/domain/payment"
 import { fakeCalendar } from "./calendar.fake"
-import { addMeses } from "./derive-bill-card"
-import { calcularPontualidade12m } from "./derive-pontualidade"
+import { addMeses, type GridCelula, gridOcorrencias } from "./derive-bill-card"
+import { calcularPontualidade12m, calcularPontualidadeDaConta } from "./derive-pontualidade"
 
 /** Conta mensal, dia-fixo 10, sem offset — base que cada teste muta. */
 function billBase(over: Partial<Bill> = {}): Bill {
@@ -88,5 +88,46 @@ describe("calcularPontualidade12m (Seam 1)", () => {
       estado: "calculada",
       percentual: 50, // 3 em-dia / (3 em-dia + 3 em-aberto)
     })
+  })
+})
+
+function celula(over: Partial<GridCelula> = {}): GridCelula {
+  return {
+    competencia: "2026-06",
+    vencimento: "2026-06-10",
+    estado: "em-dia",
+    valor: 10000,
+    ...over,
+  }
+}
+
+describe("calcularPontualidadeDaConta (Seam 1)", () => {
+  it("test_grid_vazio_sem_historico", () => {
+    expect(calcularPontualidadeDaConta([])).toEqual({ estado: "sem-historico" })
+  })
+
+  it("test_aguardando_e_pago_sem_data_fora_do_denominador", () => {
+    const grid = [
+      celula({ competencia: "a", estado: "em-dia" }),
+      celula({ competencia: "b", estado: "atraso-leve" }),
+      celula({ competencia: "c", estado: "aguardando", valor: null }),
+      celula({ competencia: "d", estado: "pago-sem-data" }),
+    ]
+    expect(calcularPontualidadeDaConta(grid)).toEqual({ estado: "calculada", percentual: 50 })
+  })
+
+  it("test_conta_encerrada_ainda_conta_pontualidade_da_propria_conta", () => {
+    // calcularPontualidade12m exclui Conta encerrada do agregado do Lar — mas o
+    // grid da própria Conta (já filtrado na página de detalhe, #59) não some.
+    const bill = billBase({ estado: "encerrada", encerradaEm: "2026-05-01" })
+    const pagos = JANELA.slice(0, 6).map((c, i) =>
+      pagamento({ id: `p-${i}`, competencia: c, dataPagamento: `${c}-08` }),
+    )
+    const grid = gridOcorrencias(bill, pagos, "2026-06-12", fakeCalendar())
+
+    expect(calcularPontualidade12m([bill], pagos, "2026-06-12", fakeCalendar())).toEqual({
+      estado: "sem-historico",
+    })
+    expect(calcularPontualidadeDaConta(grid)).toEqual({ estado: "calculada", percentual: 50 })
   })
 })

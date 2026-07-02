@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import { nationalBankCalendar } from "@/adapters/calendar/national-bank-calendar"
 import { systemClock } from "@/adapters/clock/system-clock"
 import { drizzleAttachmentRepo } from "@/adapters/db/attachment-repo.drizzle"
 import { drizzleBillRepo } from "@/adapters/db/bill-repo.drizzle"
@@ -8,16 +9,26 @@ import { r2AttachmentStore } from "@/adapters/r2/r2-attachment-store"
 import { criarLancamento } from "@/app/(app)/areas/financas/actions"
 import { auth } from "@/auth"
 import { Button } from "@/components/ds/Button"
+import { MetricCard } from "@/components/ds/MetricCard"
 import { Pill } from "@/components/ds/Pill"
 import { Surface } from "@/components/ds/Surface"
 import { BillLogoTile } from "@/components/financas/BillLogoTile"
+import { FAROL } from "@/components/financas/BillCard"
 import { ConnectedPaymentForm } from "@/components/financas/ConnectedPaymentForm"
+import { HistoriaConta } from "@/components/financas/HistoriaConta"
 import { LancamentosLista } from "@/components/financas/LancamentosLista"
 import type { PaymentFormInicial } from "@/components/financas/payment-form-inicial"
 import type { Attachment } from "@/core/domain/attachment"
 import { descreverRecorrencia, descreverVencimento, formatarDataBr } from "@/core/domain/bill"
-import { centavosParaCampo } from "@/core/domain/money"
-import { ehCompetenciaValida } from "@/core/domain/payment"
+import { centavosParaCampo, formatBRL } from "@/core/domain/money"
+import { descreverCompetencia, ehCompetenciaValida } from "@/core/domain/payment"
+import { derivarCardConta } from "@/core/use-cases/derive-bill-card"
+import {
+  fraseDaOcorrencia,
+  leituraLongaDaOcorrencia,
+  type Ocorrencia,
+} from "@/core/use-cases/derive-estado-ocorrencia"
+import { calcularPontualidadeDaConta } from "@/core/use-cases/derive-pontualidade"
 import { getBill } from "@/core/use-cases/get-bill"
 import { getLogoUrl } from "@/core/use-cases/get-logo-url"
 import { getPainel } from "@/core/use-cases/get-painel"
@@ -63,6 +74,23 @@ export default async function ContaDetailPage({
     ? (compParam as string)
     : hoje.slice(0, 7)
   const ultimo = lancamentos[0]
+
+  // Card derivado (#21/#59): farol, grid de 12 ocorrências, média e pontualidade
+  // só fazem sentido pra uma Conta ativa — encerrada não projeta vencimento vigente.
+  const card =
+    bill.estado === "ativa"
+      ? derivarCardConta(systemClock(), nationalBankCalendar(), bill, lancamentos)
+      : null
+  const celulaVigente = card?.grid[card.grid.length - 1]
+  const ocorrenciaVigente: Ocorrencia | null = celulaVigente
+    ? {
+        vencimento: celulaVigente.vencimento,
+        competencia: celulaVigente.competencia,
+        recurrence: bill.recurrence,
+        quitada: celulaVigente.valor != null,
+      }
+    : null
+  const pontualidade = card ? calcularPontualidadeDaConta(card.grid) : null
   // "Quem pagou" default = a Pessoa logada, casada por e-mail (case-insensitive,
   // resiliente à normalização do OAuth). Sem casar (atribuição completa depende
   // do auth, #7), cai na 1ª Pessoa — e o campo é editável antes de gravar.
@@ -109,8 +137,19 @@ export default async function ContaDetailPage({
                 {bill.estado === "encerrada" && bill.encerradaEm && (
                   <Pill tone="muted">Encerrada · {formatarDataBr(bill.encerradaEm)}</Pill>
                 )}
+                {card && ocorrenciaVigente && (
+                  <Pill tone={FAROL[card.farol].tone}>
+                    <span aria-hidden className={`h-2 w-2 rounded-full ${FAROL[card.farol].dot}`} />
+                    {fraseDaOcorrencia(ocorrenciaVigente, hoje)}
+                  </Pill>
+                )}
               </div>
               {bill.descricao && <p className="text-luc-text-3 leading-snug">{bill.descricao}</p>}
+              {card && ocorrenciaVigente && (
+                <p className="text-[12.5px] text-luc-text-2">
+                  {leituraLongaDaOcorrencia(ocorrenciaVigente, hoje)}
+                </p>
+              )}
               <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11.5px] text-luc-text-2">
                 <span>{descreverRecorrencia(bill.recurrence)}</span>
                 <span className="text-luc-faint">·</span>
@@ -127,7 +166,48 @@ export default async function ContaDetailPage({
           </Button>
         </header>
 
-        <Surface className="flex flex-col gap-5 p-5 sm:p-6">
+        {card && pontualidade && (
+          <section aria-labelledby="instrumentos-heading" className="flex flex-col gap-3">
+            <h2 id="instrumentos-heading" className="text-sm font-bold text-luc-text-strong">
+              Instrumentos
+            </h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <MetricCard
+                label="Último Lançamento"
+                value={ultimo ? formatBRL(ultimo.valor) : "—"}
+                support={
+                  ultimo
+                    ? descreverCompetencia(ultimo.competencia, bill.recurrence)
+                    : "sem Lançamento ainda"
+                }
+              />
+              <MetricCard
+                label="Média 12m"
+                value={card.media == null ? "—" : formatBRL(card.media)}
+              />
+              <MetricCard
+                label="Pontualidade 12m"
+                value={pontualidade.estado === "sem-historico" ? "—" : `${pontualidade.percentual}%`}
+                support={
+                  pontualidade.estado === "calculada"
+                    ? `${pontualidade.percentual}% dos vencimentos no prazo`
+                    : undefined
+                }
+              />
+            </div>
+          </section>
+        )}
+
+        {card && (
+          <section className="flex flex-col gap-5">
+            <h2 className="text-sm font-bold text-luc-text-strong">
+              História <span className="text-luc-faint">· {card.grid.length} competências</span>
+            </h2>
+            <HistoriaConta grid={card.grid} />
+          </section>
+        )}
+
+        <Surface id="dar-baixa" className="flex scroll-mt-6 flex-col gap-5 p-5 sm:p-6">
           <h2 className="text-sm font-bold text-luc-text-strong">Dar baixa</h2>
           {/* key pela contagem: depois de uma baixa o detalhe revalida e a
               contagem muda → o formulário remonta limpo (não retém os valores). */}
@@ -154,6 +234,12 @@ export default async function ContaDetailPage({
             recurrence={bill.recurrence}
             comprovantesPorLancamento={comprovantesPorLancamento}
           />
+          {lancamentos.length > 0 && (
+            <p className="text-[11px] text-luc-faint leading-relaxed">
+              o Lançamento fotografa o valor do momento — reajustar a Conta nunca reescreve o
+              passado
+            </p>
+          )}
         </section>
       </div>
     </div>

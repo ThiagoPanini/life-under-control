@@ -1,4 +1,4 @@
-import type { Recurrence } from "@/core/domain/bill"
+import { descreverMesPorExtenso, formatarDataBr, type Recurrence } from "@/core/domain/bill"
 import { descreverCompetencia } from "@/core/domain/payment"
 import { type FarolEstado, LIMIAR_PROXIMIDADE_DIAS } from "./derive-bill-card"
 
@@ -58,6 +58,22 @@ export function fraseDaOcorrencia(ocorrencia: Ocorrencia, hoje: string): string 
   if (dias === 0) return "vence hoje"
   if (dias <= LIMIAR_PROXIMIDADE_DIAS) return `vence em ${dias} ${dias === 1 ? "dia" : "dias"}`
   return `em ${dias} ${dias === 1 ? "dia" : "dias"}`
+}
+
+/**
+ * Leitura longa da ocorrência, para o header-card do detalhe da Conta (#59):
+ * "competência de junho sem Lançamento — venceu 28/06/2026" · "— vence hoje" ·
+ * "— vence 20/07/2026" · "competência de junho quitada" (quitada não repete o
+ * vencimento — a pílula/frase curta já cobre "quando pagou").
+ */
+export function leituraLongaDaOcorrencia(ocorrencia: Ocorrencia, hoje: string): string {
+  const mes = descreverMesPorExtenso(ocorrencia.competencia).split(" de ")[0]
+  if (ocorrencia.quitada) return `competência de ${mes} quitada`
+
+  const dias = diasAteVencimento(hoje, ocorrencia.vencimento)
+  if (dias < 0) return `competência de ${mes} sem Lançamento — venceu ${formatarDataBr(ocorrencia.vencimento)}`
+  if (dias === 0) return `competência de ${mes} sem Lançamento — vence hoje`
+  return `competência de ${mes} sem Lançamento — vence ${formatarDataBr(ocorrencia.vencimento)}`
 }
 
 /** Ordena ocorrências por urgência: vermelho → amarelo → cinza → verde; empate pela proximidade do vencimento. */
