@@ -1,70 +1,89 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest"
-import { cleanup, render, screen, within } from "@testing-library/react"
-import { afterEach, describe, expect, it } from "vitest"
-import type { AgregadosMes, SerieTotalPago } from "@/core/use-cases/derive-agregados-financas"
+import { cleanup, render, screen } from "@testing-library/react"
+import type { ComponentProps, ReactNode } from "react"
+import { afterEach, describe, expect, it, vi } from "vitest"
+import type { FormaCompetencia } from "@/core/use-cases/derive-forma-competencia"
+import type { Pontualidade12m } from "@/core/use-cases/derive-pontualidade"
+
+vi.mock("next/link", () => ({
+  default: ({
+    href,
+    children,
+    ...rest
+  }: { href: string; children: ReactNode } & ComponentProps<"a">) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}))
+
+vi.stubGlobal(
+  "matchMedia",
+  vi.fn().mockImplementation((query: string) => ({
+    matches: true, // reduced-motion nos testes: sem animação a esperar
+    media: query,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  })),
+)
+
 import { CockpitFinancas } from "./CockpitFinancas"
 
 /**
- * Seam 2 (borda): a apresentação do cockpit. A lógica dos agregados é do núcleo
- * (Seam 1); aqui só que os números aparecem formatados e que "falta pagar" vem
- * claramente marcado como estimativa.
+ * Seam 2 (borda): a composição do cockpit — Bloco Competência + Pista +
+ * pendências anteriores + Instrumentos herói+3. A lógica de cada agregado é
+ * do núcleo (#61/#58); aqui só que a `FormaCompetencia` chega e aparece.
  */
 afterEach(cleanup)
 
-const base: AgregadosMes = {
-  totalPagoMes: 10000,
-  contasEmAberto: 2,
-  gastoMensalMedio: 12000,
-  estimativaFaltaPagar: 6000,
-}
-
-const serie: SerieTotalPago = {
-  estado: "com-dados",
-  pontos: [
-    { competencia: "2026-02", valor: 8000, emCurso: false },
-    { competencia: "2026-03", valor: 9000, emCurso: false },
-    { competencia: "2026-04", valor: 11000, emCurso: false },
-    { competencia: "2026-05", valor: 12000, emCurso: false },
-    { competencia: "2026-06", valor: 10000, emCurso: true },
+const forma: FormaCompetencia = {
+  projetado: { estado: "estimado", valor: 120000 },
+  pago: 95000,
+  faltaPagar: { estado: "estimado", valor: 25000 },
+  quitadas: { quitadas: 3, total: 5 },
+  marcadores: [
+    {
+      dia: "2026-07-10",
+      competencia: "2026-07",
+      contaId: "luz",
+      titulo: "Luz",
+      estado: "a-vencer",
+      valorEsperado: 9000,
+    },
+  ],
+  pendenciasAnteriores: [
+    { contaId: "internet", titulo: "Internet", competencia: "2026-06", vencimento: "2026-06-05" },
   ],
 }
 
+const pontualidade: Pontualidade12m = { estado: "calculada", percentual: 87 }
+
 describe("CockpitFinancas (Seam 2)", () => {
-  it("test_formata_os_quatro_agregados_em_brl", () => {
-    render(<CockpitFinancas agregados={base} serie={serie} bills={[]} hoje="2026-06-15" />)
-    expect(screen.getByText("Pago no mês")).toBeInTheDocument()
-    const pago = screen.getByText("Pago no mês").closest("section") as HTMLElement
-    expect(within(pago).getByText("R$ 100,00")).toBeInTheDocument()
-    const gastoMedio = screen.getByText("Gasto médio · 12m").closest("section") as HTMLElement
-    expect(within(gastoMedio).getByText("R$ 120,00")).toBeInTheDocument()
-    expect(screen.getByText("R$ 60,00")).toBeInTheDocument() // falta pagar
-    expect(screen.getByText("2")).toBeInTheDocument() // em aberto
-  })
-
-  it("test_falta_pagar_vem_rotulada_como_estimativa", () => {
-    render(<CockpitFinancas agregados={base} serie={serie} bills={[]} hoje="2026-06-15" />)
-    // marcada como estimativa: a tag junto do rótulo + a nota explicativa
-    expect(screen.getAllByText("estimativa").length).toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText("Falta pagar").length).toBeGreaterThanOrEqual(1)
-  })
-
-  it("test_sem_historico_mostra_travessao_em_vez_de_valor", () => {
+  it("test_compoe_bloco_competencia_pista_pendencias_e_instrumentos", () => {
     render(
       <CockpitFinancas
-        serie={serie}
-        bills={[]}
-        hoje="2026-06-15"
-        agregados={{
-          totalPagoMes: 0,
-          contasEmAberto: 0,
-          gastoMensalMedio: null,
-          estimativaFaltaPagar: null,
-        }}
+        competencia="2026-07"
+        hoje="2026-07-12"
+        forma={forma}
+        gastoMensalMedio={80000}
+        pontualidade={pontualidade}
       />,
     )
-    // gasto médio e falta pagar nulos → "—" (dois travessões)
-    expect(screen.getAllByText("—")).toHaveLength(2)
-    expect(screen.getByText("R$ 0,00")).toBeInTheDocument() // pago exato continua exato
+
+    // Bloco Competência
+    expect(screen.getByText("julho de 2026")).toBeInTheDocument()
+    expect(screen.getByText("3/5 quitadas")).toBeInTheDocument()
+
+    // Pendências anteriores
+    expect(screen.getByText("◂ junho: Internet em aberto")).toBeInTheDocument()
+
+    // Instrumentos herói+3
+    expect(screen.getByText("Falta pagar · julho")).toBeInTheDocument()
+    expect(screen.getByText("R$ 250,00")).toBeInTheDocument()
+    expect(screen.getByText("~R$ 90,00 pedem atenção agora")).toBeInTheDocument()
+    expect(screen.getByText("R$ 950,00")).toBeInTheDocument() // total pago · mês = forma.pago
+    expect(screen.getByText("R$ 800,00")).toBeInTheDocument() // gasto médio · 12m
+    expect(screen.getByText("87%")).toBeInTheDocument() // pontualidade · 12m
   })
 })

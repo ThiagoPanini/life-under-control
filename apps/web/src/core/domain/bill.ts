@@ -239,6 +239,12 @@ export function descreverRecorrencia(r: Recurrence): string {
   return base
 }
 
+/** Mês da Competência por extenso, minúsculo (bloco Competência, #58): "2026-07" → "julho de 2026". */
+export function descreverMesPorExtenso(competencia: string): string {
+  const [ano, mes] = competencia.split("-")
+  return `${MESES[Number(mes) - 1].toLowerCase()} de ${ano}`
+}
+
 /** Descreve a regra de vencimento em pt-BR ("Vence dia 10", "5º dia útil (competência +1)"). */
 export function descreverVencimento(dueRule: DueRule, dueMonthOffset: number): string {
   let base: string

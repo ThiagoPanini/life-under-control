@@ -302,11 +302,7 @@ describe("AppShell mobile", () => {
 
     const dialog = screen.getByRole("dialog", { name: "Life Under Control" })
     const areaNavigation = within(dialog).getByRole("navigation", { name: "Áreas móvel" })
-    expect(within(areaNavigation).getAllByRole("link")).toHaveLength(6)
-    expect(within(areaNavigation).getByRole("link", { name: "Finanças" })).toHaveAttribute(
-      "href",
-      "/areas/financas",
-    )
+    expect(within(areaNavigation).getByRole("button", { name: "Finanças" })).toBeInTheDocument()
     expect(within(dialog).getByRole("button", { name: "Fechar menu" })).toHaveFocus()
     expect(document.body).toHaveStyle({ overflow: "hidden" })
 
@@ -315,5 +311,103 @@ describe("AppShell mobile", () => {
     expect(container.querySelector("div[data-open]")).toHaveAttribute("data-open", "false")
     expect(openButton).toHaveFocus()
     expect(document.body).not.toHaveStyle({ overflow: "hidden" })
+  })
+
+  it("test_area_no_drawer_expande_assuntos_ao_tocar_sem_navegar", async () => {
+    const user = userEvent.setup()
+    render(
+      <AppShell>
+        <div>conteúdo</div>
+      </AppShell>,
+    )
+    await user.click(screen.getByRole("button", { name: "Abrir menu" }))
+    const areaNavigation = screen.getByRole("navigation", { name: "Áreas móvel" })
+    const toggle = within(areaNavigation).getByRole("button", { name: "Finanças" })
+
+    expect(toggle).toHaveAttribute("aria-expanded", "false")
+    expect(
+      within(areaNavigation).queryByRole("link", { name: "Pagamentos Recorrentes" }),
+    ).toBeNull()
+
+    await user.click(toggle)
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true")
+    expect(
+      within(areaNavigation).getByRole("link", { name: "Pagamentos Recorrentes" }),
+    ).toHaveAttribute("href", "/areas/financas/pagamentos-recorrentes")
+  })
+
+  it("test_assunto_ativo_no_drawer_navega_e_fecha_o_menu", async () => {
+    const user = userEvent.setup()
+    usePathnameMock.mockReturnValue("/areas/financas/pagamentos-recorrentes")
+    const { container } = render(
+      <AppShell>
+        <div>conteúdo</div>
+      </AppShell>,
+    )
+    await user.click(screen.getByRole("button", { name: "Abrir menu" }))
+    const areaNavigation = screen.getByRole("navigation", { name: "Áreas móvel" })
+    const link = within(areaNavigation).getByRole("link", { name: "Pagamentos Recorrentes" })
+    expect(link).toHaveAttribute("aria-current", "page")
+
+    await user.click(link)
+
+    expect(container.querySelector("div[data-open]")).toHaveAttribute("data-open", "false")
+  })
+
+  it("test_area_e_assunto_em_breve_ficam_inertes_no_drawer", async () => {
+    const user = userEvent.setup()
+    render(
+      <AppShell>
+        <div>conteúdo</div>
+      </AppShell>,
+    )
+    await user.click(screen.getByRole("button", { name: "Abrir menu" }))
+    const areaNavigation = screen.getByRole("navigation", { name: "Áreas móvel" })
+    const saude = within(areaNavigation).getByText("Saúde").closest("[aria-disabled]")
+    expect(saude).toHaveAttribute("aria-disabled", "true")
+    expect(within(areaNavigation).queryByRole("button", { name: "Saúde" })).toBeNull()
+
+    await user.click(within(areaNavigation).getByRole("button", { name: "Finanças" }))
+    const investimentos = within(areaNavigation)
+      .getByText("Investimentos")
+      .closest("[aria-disabled]")
+    expect(investimentos).toHaveAttribute("aria-disabled", "true")
+    expect(within(areaNavigation).queryByRole("link", { name: "Investimentos" })).toBeNull()
+  })
+
+  it("test_alvos_de_toque_da_area_e_do_assunto_tem_pelo_menos_44px", async () => {
+    const user = userEvent.setup()
+    render(
+      <AppShell>
+        <div>conteúdo</div>
+      </AppShell>,
+    )
+    await user.click(screen.getByRole("button", { name: "Abrir menu" }))
+    const areaNavigation = screen.getByRole("navigation", { name: "Áreas móvel" })
+    const toggle = within(areaNavigation).getByRole("button", { name: "Finanças" })
+    expect(toggle).toHaveClass("min-h-11")
+
+    await user.click(toggle)
+    expect(
+      within(areaNavigation).getByRole("link", { name: "Pagamentos Recorrentes" }),
+    ).toHaveClass("min-h-11")
+  })
+
+  it("test_expansao_do_drawer_reusa_a_mesma_chave_persistida_do_desktop", async () => {
+    localStorage.setItem("luc:sidebar-expanded", JSON.stringify(["financas"]))
+    render(
+      <AppShell>
+        <div>conteúdo</div>
+      </AppShell>,
+    )
+    const user = userEvent.setup()
+    await user.click(screen.getByRole("button", { name: "Abrir menu" }))
+    const areaNavigation = screen.getByRole("navigation", { name: "Áreas móvel" })
+
+    expect(within(areaNavigation).getByRole("button", { name: "Finanças" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    )
   })
 })
