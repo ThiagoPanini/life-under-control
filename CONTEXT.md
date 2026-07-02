@@ -96,6 +96,8 @@ O LUC é um cockpit para a vida-administrativa recorrente de um casal. Dizer o q
 
 **Área × Assunto × categoria.** Três coisas distintas. **Área** é o módulo de primeiro nível (Finanças). **Assunto** é um recorte estrutural *dentro* da Área, com modelo próprio (Pagamentos Recorrentes) — um sub-módulo, não um rótulo. Uma **classificação interna transversal** (Moradia, Lazer) seria uma terceira coisa — um rótulo sobre itens — que hoje não existe; se vier, não é Área nem Assunto.
 
+**Mês em curso × mês fechado.** O mês corrente é sempre um mês **em curso**: exibe o acumulado até aqui e **nunca entra em comparação** — variação mês-a-mês só existe entre meses **fechados** (o último fechado contra o anterior). Um mês recém-começado não é "queda de 100%"; é um mês parcial, e a UI o marca como "em curso". A distinção é derivada do relógio (`Clock`), nunca persistida — corolário da invariante #3.
+
 ## Invariantes (núcleo estável)
 
 Regras de domínio que sempre valem; código que as viola é bug. Esta é a camada que **não** muda — distinta da fronteira de primitivos, que cresce.
