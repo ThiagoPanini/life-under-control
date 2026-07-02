@@ -36,6 +36,13 @@
       "when": 1782767800222,
       "tag": "0004_add_attachments",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782997519798,
+      "tag": "0005_add_avatar_key",
+      "breakpoints": true
     }
   ]
 }

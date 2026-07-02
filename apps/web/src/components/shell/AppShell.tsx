@@ -13,10 +13,11 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { type ReactNode, useEffect, useRef, useState } from "react"
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react"
 import { logout } from "@/app/actions"
 import { AreaIcon } from "@/components/areas/AreaIcon"
 import { Logo } from "@/components/brand/Logo"
+import { PersonAvatar } from "@/components/ds/PersonAvatar"
 import { Pill } from "@/components/ds/Pill"
 import { AREAS, type Area } from "@/core/domain/areas"
 import { buildNavModel, type NavArea, naArea } from "@/core/domain/nav-model"
@@ -28,8 +29,28 @@ export const SIDEBAR_EXPANDED_STORAGE_KEY = "luc:sidebar-expanded"
 const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-luc-bg"
 
+/** A Pessoa como a casca precisa pra desenhar o badge (id, exibição, foto). */
+export type ShellPessoa = {
+  id: string
+  nome: string
+  inicial: string
+  avatarUrl?: string | null
+}
+
+/** Sem sessão carregada (ex.: testes de componente isolado), a casca ainda desenha os dois badges — só sem foto. */
+const PESSOAS_PADRAO: ShellPessoa[] = [
+  { id: "thiago", nome: "Thiago", inicial: "T" },
+  { id: "jakeline", nome: "Jakeline", inicial: "J" },
+]
+
 /** Casca responsiva do app: sidebar no desktop e navegação dedicada no mobile. */
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  pessoas = PESSOAS_PADRAO,
+}: {
+  children: ReactNode
+  pessoas?: ShellPessoa[]
+}) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [commandOpen, setCommandOpen] = useState(false)
@@ -145,7 +166,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         Pular para o conteúdo
       </a>
-      <DesktopSidebar pathname={pathname} collapsed={collapsed} />
+      <DesktopSidebar pathname={pathname} collapsed={collapsed} pessoas={pessoas} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-[calc(4rem+env(safe-area-inset-top))] items-end border-luc-border border-b bg-luc-bg/92 pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] pb-3 pt-[env(safe-area-inset-top)] backdrop-blur-xl lg:hidden">
@@ -177,6 +198,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           collapsed={collapsed}
           onToggle={toggleDesktopSidebar}
           onOpenCommand={() => setCommandOpen(true)}
+          pessoas={pessoas}
         />
 
         <main
@@ -206,11 +228,13 @@ function DesktopHeader({
   collapsed,
   onToggle,
   onOpenCommand,
+  pessoas,
 }: {
   label: string
   collapsed: boolean
   onToggle: () => void
   onOpenCommand: () => void
+  pessoas: ShellPessoa[]
 }) {
   return (
     <header className="sticky top-0 z-30 hidden h-14 shrink-0 items-center justify-between border-luc-border border-b bg-luc-bg/70 px-6 backdrop-blur-lg lg:flex">
@@ -240,8 +264,9 @@ function DesktopHeader({
           </kbd>
         </button>
         <div className="flex items-center gap-1">
-          <ShellPersonBadge person="thiago" initial="T" name="Thiago" />
-          <ShellPersonBadge person="jakeline" initial="J" name="Jakeline" />
+          {pessoas.map((pessoa) => (
+            <ShellPersonBadge key={pessoa.id} pessoa={pessoa} />
+          ))}
         </div>
       </div>
     </header>
@@ -259,7 +284,15 @@ function parseSlugSet(raw: string): Set<string> {
   }
 }
 
-function DesktopSidebar({ pathname, collapsed }: { pathname: string; collapsed: boolean }) {
+function DesktopSidebar({
+  pathname,
+  collapsed,
+  pessoas,
+}: {
+  pathname: string
+  collapsed: boolean
+  pessoas: ShellPessoa[]
+}) {
   const navModel = buildNavModel(pathname)
   const rotaAtivaSlug = navModel.find((area) => area.ativa)?.slug
   const [expandedAreas, setExpandedAreas] = useState<Set<string>>(() => new Set())
@@ -365,8 +398,9 @@ function DesktopSidebar({ pathname, collapsed }: { pathname: string; collapsed: 
 
       <div className="mt-auto flex flex-col gap-2 border-luc-border border-t pt-3">
         <div className={`flex items-center ${collapsed ? "flex-col gap-1.5" : "gap-1.5 px-2"}`}>
-          <ShellPersonBadge person="thiago" initial="T" name="Thiago" />
-          <ShellPersonBadge person="jakeline" initial="J" name="Jakeline" />
+          {pessoas.map((pessoa) => (
+            <ShellPersonBadge key={pessoa.id} pessoa={pessoa} />
+          ))}
           {!collapsed && (
             <span className="ml-1 text-[10.5px] leading-tight text-luc-muted">
               Thiago · Jakeline
@@ -730,28 +764,27 @@ function NavItem({
   )
 }
 
-function ShellPersonBadge({
-  person,
-  initial,
-  name,
-}: {
-  person: "thiago" | "jakeline"
-  initial: string
-  name: string
-}) {
+/** Chave de cor por Pessoa (o Lar tem exatamente 2 — invariante #2); qualquer 3ª cai em "thiago". */
+function shellPersonKey(nome: string): "thiago" | "jakeline" {
+  return nome.toLocaleLowerCase("pt-BR") === "jakeline" ? "jakeline" : "thiago"
+}
+
+function ShellPersonBadge({ pessoa }: { pessoa: ShellPessoa }) {
+  const key = shellPersonKey(pessoa.nome)
+  const colors = {
+    color: `var(--luc-${key}-fg)`,
+    backgroundColor: `var(--luc-${key}-bg)`,
+  } satisfies CSSProperties
+
   return (
-    <span
-      role="img"
-      aria-label={name}
-      title={name}
-      className={`inline-flex h-[27px] w-[27px] items-center justify-center rounded-[8px] text-[11px] font-bold ${
-        person === "thiago"
-          ? "bg-luc-thiago-bg text-luc-thiago-fg"
-          : "bg-luc-jakeline-bg text-luc-jakeline-fg"
-      }`}
-    >
-      {initial}
-    </span>
+    <PersonAvatar
+      avatarUrl={pessoa.avatarUrl}
+      inicial={pessoa.inicial}
+      nome={pessoa.nome}
+      size={26}
+      colors={colors}
+      className="rounded-[8px]"
+    />
   )
 }
 

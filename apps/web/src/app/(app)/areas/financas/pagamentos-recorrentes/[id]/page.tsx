@@ -4,6 +4,7 @@ import { drizzleAttachmentRepo } from "@/adapters/db/attachment-repo.drizzle"
 import { drizzleBillRepo } from "@/adapters/db/bill-repo.drizzle"
 import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
 import { drizzlePaymentRepo } from "@/adapters/db/payment-repo.drizzle"
+import { r2AttachmentStore } from "@/adapters/r2/r2-attachment-store"
 import { criarLancamento } from "@/app/(app)/areas/financas/actions"
 import { auth } from "@/auth"
 import { Button } from "@/components/ds/Button"
@@ -21,6 +22,7 @@ import { getBill } from "@/core/use-cases/get-bill"
 import { getPainel } from "@/core/use-cases/get-painel"
 import { listAttachmentsDeLancamentos } from "@/core/use-cases/list-attachments"
 import { listPayments } from "@/core/use-cases/list-payments"
+import { resolveAvatares } from "@/core/use-cases/resolve-avatares"
 
 // Lê o banco a cada request: os Lançamentos mudam; nada de prerender (sem DB no build).
 export const dynamic = "force-dynamic"
@@ -42,10 +44,11 @@ export default async function ContaDetailPage({
 
   // Dado o Lar, a Conta, seus Lançamentos e a sessão são independentes — em paralelo.
   const { lar } = await getPainel(drizzleHouseholdRepo())
-  const [bill, lancamentos, session] = await Promise.all([
+  const [bill, lancamentos, session, pessoasComAvatar] = await Promise.all([
     getBill(drizzleBillRepo(), lar.id, id),
     listPayments(drizzlePaymentRepo(), lar.id, id),
     auth(),
+    resolveAvatares(lar.pessoas, r2AttachmentStore()),
   ])
   if (!bill) notFound()
 
@@ -145,7 +148,7 @@ export default async function ContaDetailPage({
           <LancamentosLista
             billId={bill.id}
             lancamentos={lancamentos}
-            pessoas={lar.pessoas}
+            pessoas={pessoasComAvatar}
             recurrence={bill.recurrence}
             comprovantesPorLancamento={comprovantesPorLancamento}
           />

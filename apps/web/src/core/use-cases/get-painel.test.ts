@@ -12,8 +12,22 @@ const casaPanini: Lar = {
   id: "h-1",
   nome: "Casa Panini",
   pessoas: [
-    { id: "u-1", nome: "Thiago", email: "thiago@casapanini.lar", hue: 211, inicial: "T" },
-    { id: "u-2", nome: "Jakeline", email: "jakeline@casapanini.lar", hue: 14, inicial: "J" },
+    {
+      id: "u-1",
+      nome: "Thiago",
+      email: "thiago@casapanini.lar",
+      hue: 211,
+      inicial: "T",
+      avatarKey: null,
+    },
+    {
+      id: "u-2",
+      nome: "Jakeline",
+      email: "jakeline@casapanini.lar",
+      hue: 14,
+      inicial: "J",
+      avatarKey: null,
+    },
   ],
 }
 
