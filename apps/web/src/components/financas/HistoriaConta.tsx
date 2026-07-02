@@ -3,7 +3,7 @@
 import { Group } from "@visx/group"
 import { scaleBand, scaleLinear } from "@visx/scale"
 import { useState } from "react"
-import { mesCurto } from "@/core/domain/bill"
+import { mesAno, mesCurto } from "@/core/domain/bill"
 import { formatBRL } from "@/core/domain/money"
 import type { GridCelula, GridEstado } from "@/core/use-cases/derive-bill-card"
 import { GRID } from "./BillCard"
@@ -29,14 +29,9 @@ const CAP_OPACITY: Partial<Record<GridEstado, number>> = {
   "atraso-leve": 0.6,
 }
 
-function mesAnoCurto(competencia: string) {
-  const ano = competencia.split("-")[0]
-  return `${mesCurto(competencia)}/${ano.slice(2)}`
-}
-
 function rotuloAcessivel(celula: GridCelula): string {
   const valorTexto = celula.valor == null ? "sem Lançamento" : formatBRL(celula.valor)
-  return `${mesAnoCurto(celula.competencia)} · ${valorTexto} · ${GRID[celula.estado].label}`
+  return `${mesAno(celula.competencia)} · ${valorTexto} · ${GRID[celula.estado].label}`
 }
 
 /**
@@ -48,7 +43,12 @@ function rotuloAcessivel(celula: GridCelula): string {
  * recalculado aqui.
  */
 export function HistoriaConta({ grid }: { grid: GridCelula[] }) {
-  const [ativo, setAtivo] = useState<string | null>(null)
+  // Foco e hover são rastreados à parte: passar o mouse por OUTRA barra não
+  // pode apagar o tooltip de quem está com foco de teclado (o foco só sai no
+  // próprio blur da barra focada).
+  const [focado, setFocado] = useState<string | null>(null)
+  const [emHover, setEmHover] = useState<string | null>(null)
+  const ativo = focado ?? emHover
 
   if (grid.length === 0) {
     return (
@@ -100,11 +100,11 @@ export function HistoriaConta({ grid }: { grid: GridCelula[] }) {
                 tabIndex: 0,
                 role: "graphics-symbol",
                 "aria-label": rotuloAcessivel(celula),
-                onMouseEnter: () => setAtivo(celula.competencia),
+                onMouseEnter: () => setEmHover(celula.competencia),
                 onMouseLeave: () =>
-                  setAtivo((atual) => (atual === celula.competencia ? null : atual)),
-                onFocus: () => setAtivo(celula.competencia),
-                onBlur: () => setAtivo((atual) => (atual === celula.competencia ? null : atual)),
+                  setEmHover((atual) => (atual === celula.competencia ? null : atual)),
+                onFocus: () => setFocado(celula.competencia),
+                onBlur: () => setFocado((atual) => (atual === celula.competencia ? null : atual)),
                 className:
                   "cursor-pointer outline-none motion-safe:transition-opacity motion-safe:duration-150 hover:opacity-75 focus-visible:opacity-75",
               }

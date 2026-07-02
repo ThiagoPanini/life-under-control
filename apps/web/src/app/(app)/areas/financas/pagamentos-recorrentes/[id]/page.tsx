@@ -22,8 +22,9 @@ import type { Attachment } from "@/core/domain/attachment"
 import { descreverRecorrencia, descreverVencimento, formatarDataBr } from "@/core/domain/bill"
 import { centavosParaCampo, formatBRL } from "@/core/domain/money"
 import { descreverCompetencia, ehCompetenciaValida } from "@/core/domain/payment"
-import { derivarCardConta } from "@/core/use-cases/derive-bill-card"
+import { derivarCardConta, resumoPagamentos } from "@/core/use-cases/derive-bill-card"
 import {
+  farolDaOcorrencia,
   fraseDaOcorrencia,
   leituraLongaDaOcorrencia,
   type Ocorrencia,
@@ -75,22 +76,31 @@ export default async function ContaDetailPage({
     : hoje.slice(0, 7)
   const ultimo = lancamentos[0]
 
-  // Card derivado (#21/#59): farol, grid de 12 ocorrências, média e pontualidade
-  // só fazem sentido pra uma Conta ativa — encerrada não projeta vencimento vigente.
-  const card =
+  // Card derivado (#21/#59): a leitura (Instrumentos/História) vale pra Conta
+  // encerrada também — é histórico, não muda com o fim da Conta. Só o "vigente"
+  // (pílula/leitura longa, que projetam o "quando" do PRÓXIMO vencimento) é
+  // exclusivo de Conta ativa; encerrada não tem um vencimento por vir.
+  const card = derivarCardConta(systemClock(), nationalBankCalendar(), bill, lancamentos)
+  // Encerrada não projeta ocorrência além do próprio fechamento — recorta o grid
+  // no `encerradaEm` pra não fingir "em aberto" competência depois que a Conta
+  // parou de existir (a mesma lógica de `competenciasEsperadas` em #48/#55).
+  const gridRelevante =
+    bill.estado === "encerrada" && bill.encerradaEm
+      ? card.grid.filter((celula) => celula.vencimento <= (bill.encerradaEm as string))
+      : card.grid
+  const { media: mediaRelevante } = resumoPagamentos(gridRelevante)
+  const pontualidade = calcularPontualidadeDaConta(gridRelevante)
+
+  const celulaVigente = card.grid[card.grid.length - 1]
+  const ocorrenciaVigente: Ocorrencia | null =
     bill.estado === "ativa"
-      ? derivarCardConta(systemClock(), nationalBankCalendar(), bill, lancamentos)
+      ? {
+          vencimento: celulaVigente.vencimento,
+          competencia: celulaVigente.competencia,
+          recurrence: bill.recurrence,
+          quitada: celulaVigente.valor != null,
+        }
       : null
-  const celulaVigente = card?.grid[card.grid.length - 1]
-  const ocorrenciaVigente: Ocorrencia | null = celulaVigente
-    ? {
-        vencimento: celulaVigente.vencimento,
-        competencia: celulaVigente.competencia,
-        recurrence: bill.recurrence,
-        quitada: celulaVigente.valor != null,
-      }
-    : null
-  const pontualidade = card ? calcularPontualidadeDaConta(card.grid) : null
   // "Quem pagou" default = a Pessoa logada, casada por e-mail (case-insensitive,
   // resiliente à normalização do OAuth). Sem casar (atribuição completa depende
   // do auth, #7), cai na 1ª Pessoa — e o campo é editável antes de gravar.
@@ -137,15 +147,19 @@ export default async function ContaDetailPage({
                 {bill.estado === "encerrada" && bill.encerradaEm && (
                   <Pill tone="muted">Encerrada · {formatarDataBr(bill.encerradaEm)}</Pill>
                 )}
-                {card && ocorrenciaVigente && (
-                  <Pill tone={FAROL[card.farol].tone}>
-                    <span aria-hidden className={`h-2 w-2 rounded-full ${FAROL[card.farol].dot}`} />
-                    {fraseDaOcorrencia(ocorrenciaVigente, hoje)}
-                  </Pill>
-                )}
+                {ocorrenciaVigente &&
+                  (() => {
+                    const farol = FAROL[farolDaOcorrencia(ocorrenciaVigente, hoje)]
+                    return (
+                      <Pill tone={farol.tone}>
+                        <span aria-hidden className={`h-2 w-2 rounded-full ${farol.dot}`} />
+                        {fraseDaOcorrencia(ocorrenciaVigente, hoje)}
+                      </Pill>
+                    )
+                  })()}
               </div>
               {bill.descricao && <p className="text-luc-text-3 leading-snug">{bill.descricao}</p>}
-              {card && ocorrenciaVigente && (
+              {ocorrenciaVigente && (
                 <p className="text-[12.5px] text-luc-text-2">
                   {leituraLongaDaOcorrencia(ocorrenciaVigente, hoje)}
                 </p>
@@ -166,48 +180,42 @@ export default async function ContaDetailPage({
           </Button>
         </header>
 
-        {card && pontualidade && (
-          <section aria-labelledby="instrumentos-heading" className="flex flex-col gap-3">
-            <h2 id="instrumentos-heading" className="text-sm font-bold text-luc-text-strong">
-              Instrumentos
-            </h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <MetricCard
-                label="Último Lançamento"
-                value={ultimo ? formatBRL(ultimo.valor) : "—"}
-                support={
-                  ultimo
-                    ? descreverCompetencia(ultimo.competencia, bill.recurrence)
-                    : "sem Lançamento ainda"
-                }
-              />
-              <MetricCard
-                label="Média 12m"
-                value={card.media == null ? "—" : formatBRL(card.media)}
-              />
-              <MetricCard
-                label="Pontualidade 12m"
-                value={
-                  pontualidade.estado === "sem-historico" ? "—" : `${pontualidade.percentual}%`
-                }
-                support={
-                  pontualidade.estado === "calculada"
-                    ? `${pontualidade.percentual}% dos vencimentos no prazo`
-                    : undefined
-                }
-              />
-            </div>
-          </section>
-        )}
+        <section aria-labelledby="instrumentos-heading" className="flex flex-col gap-3">
+          <h2 id="instrumentos-heading" className="text-sm font-bold text-luc-text-strong">
+            Instrumentos
+          </h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <MetricCard
+              label="Último Lançamento"
+              value={ultimo ? formatBRL(ultimo.valor) : "—"}
+              support={
+                ultimo
+                  ? descreverCompetencia(ultimo.competencia, bill.recurrence)
+                  : "sem Lançamento ainda"
+              }
+            />
+            <MetricCard
+              label="Média 12m"
+              value={mediaRelevante == null ? "—" : formatBRL(mediaRelevante)}
+            />
+            <MetricCard
+              label="Pontualidade 12m"
+              value={pontualidade.estado === "sem-historico" ? "—" : `${pontualidade.percentual}%`}
+              support={
+                pontualidade.estado === "calculada"
+                  ? `${pontualidade.percentual}% dos vencimentos no prazo`
+                  : undefined
+              }
+            />
+          </div>
+        </section>
 
-        {card && (
-          <section className="flex flex-col gap-5">
-            <h2 className="text-sm font-bold text-luc-text-strong">
-              História <span className="text-luc-faint">· {card.grid.length} competências</span>
-            </h2>
-            <HistoriaConta grid={card.grid} />
-          </section>
-        )}
+        <section className="flex flex-col gap-5">
+          <h2 className="text-sm font-bold text-luc-text-strong">
+            História <span className="text-luc-faint">· {gridRelevante.length} competências</span>
+          </h2>
+          <HistoriaConta grid={gridRelevante} />
+        </section>
 
         <Surface id="dar-baixa" className="flex scroll-mt-6 flex-col gap-5 p-5 sm:p-6">
           <h2 className="text-sm font-bold text-luc-text-strong">Dar baixa</h2>

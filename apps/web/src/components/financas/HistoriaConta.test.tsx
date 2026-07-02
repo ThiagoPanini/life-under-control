@@ -106,6 +106,25 @@ describe("HistoriaConta (Seam 2)", () => {
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument()
   })
 
+  it("test_hover_em_outra_barra_nao_apaga_tooltip_de_quem_tem_foco", () => {
+    render(<HistoriaConta grid={grid} />)
+    const barras = screen.getAllByTestId("historia-conta-barra")
+
+    fireEvent.focus(barras[1])
+    expect(screen.getByRole("tooltip")).toHaveTextContent("fev/26 · R$ 105,00 · atraso leve")
+
+    // O mouse passa por cima de outra barra sem tirar o foco de teclado da
+    // barra[1] — o tooltip de foco não pode sumir por causa disso.
+    fireEvent.mouseEnter(barras[0])
+    expect(screen.getByRole("tooltip")).toHaveTextContent("fev/26 · R$ 105,00 · atraso leve")
+
+    fireEvent.mouseLeave(barras[0])
+    expect(screen.getByRole("tooltip")).toHaveTextContent("fev/26 · R$ 105,00 · atraso leve")
+
+    fireEvent.blur(barras[1])
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument()
+  })
+
   it("test_sem_celulas_mostra_mensagem_em_vez_de_grafico_vazio", () => {
     render(<HistoriaConta grid={[]} />)
     expect(screen.getByText(/sem histórico/i)).toBeInTheDocument()
