@@ -24,22 +24,69 @@ export const JANELA_GASTO_MESES = 12
 /** Recorrência mensal pura — usada só para enumerar a janela de meses do gasto médio. */
 const MENSAL = { intervalMonths: 1, anchorMonth: null } as const
 
-export type PontoSerieMensal = { competencia: string; valor: number }
+/** Um mês da série: `emCurso` marca o mês corrente (CONTEXT.md, "mês em curso × mês fechado"). */
+export type PontoSerieMensal = { competencia: string; valor: number; emCurso: boolean }
 
-/** Série mensal exata do total pago, com lacunas representadas por zero. */
+/**
+ * Série mensal exata do total pago, com lacunas representadas por zero. Shape
+ * explícito quando o Lar não tem nenhuma Conta ativa — "vazia" não é seis meses
+ * de zero disfarçando a ausência de Conta.
+ */
+export type SerieTotalPago =
+  | { estado: "vazia" }
+  | { estado: "com-dados"; pontos: PontoSerieMensal[] }
+
 export function serieTotalPago(
   bills: Bill[],
   payments: Payment[],
   hoje: string,
   tamanho = 6,
-): PontoSerieMensal[] {
-  const ativas = new Set(contasAtivas(bills).map((bill) => bill.id))
-  return ocorrenciasRecentes(MENSAL, mesDe(hoje), tamanho).map((competencia) => ({
+): SerieTotalPago {
+  const contas = contasAtivas(bills)
+  if (contas.length === 0) return { estado: "vazia" }
+
+  const ativas = new Set(contas.map((bill) => bill.id))
+  const mesCorrente = mesDe(hoje)
+  const pontos = ocorrenciasRecentes(MENSAL, mesCorrente, tamanho).map((competencia) => ({
     competencia,
     valor: payments
       .filter((payment) => ativas.has(payment.billId) && payment.competencia === competencia)
       .reduce((total, payment) => total + payment.valor, 0),
+    emCurso: competencia === mesCorrente,
   }))
+  return { estado: "com-dados", pontos }
+}
+
+/** Os pontos da série, ou lista vazia quando o Lar não tem Conta ativa — o unwrap comum aos consumidores. */
+export function pontosDe(serie: SerieTotalPago): PontoSerieMensal[] {
+  return serie.estado === "com-dados" ? serie.pontos : []
+}
+
+/**
+ * O comparativo honesto (issue #48): o mês corrente nunca compara — é sempre
+ * "em curso" (CONTEXT.md, "mês em curso × mês fechado") — e a variação só
+ * nasce entre o último mês **fechado** e o anterior. Substitui o cálculo antes
+ * duplicado inline em `CockpitFinancas` e no Painel, que comparava o mês
+ * corrente contra o anterior e gerava "−100%" num mês recém-começado.
+ */
+export type Comparativo =
+  | { estado: "em-curso" }
+  | { estado: "sem-base-anterior" }
+  | { estado: "fechado"; deltaPercentual: number }
+
+export function compararMesFechado(serie: SerieTotalPago): Comparativo {
+  if (serie.estado === "vazia") return { estado: "em-curso" }
+
+  const fechados = serie.pontos.filter((ponto) => !ponto.emCurso)
+  if (fechados.length < 2) return { estado: "em-curso" }
+
+  const [anterior, atual] = fechados.slice(-2)
+  if (anterior.valor === 0) return { estado: "sem-base-anterior" }
+
+  return {
+    estado: "fechado",
+    deltaPercentual: ((atual.valor - anterior.valor) / anterior.valor) * 100,
+  }
 }
 
 /** Os quatro agregados do mês exibidos no cockpit. Dinheiro em centavos (invariante #6). */

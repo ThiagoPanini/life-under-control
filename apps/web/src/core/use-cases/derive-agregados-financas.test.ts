@@ -4,6 +4,7 @@ import type { Payment } from "@/core/domain/payment"
 import type { Clock } from "@/core/ports/clock"
 import { fakeCalendar } from "./calendar.fake"
 import {
+  compararMesFechado,
   contarContasEmAberto,
   derivarAgregadosFinancas,
   estimarFaltaPagar,
@@ -86,14 +87,75 @@ describe("serieTotalPago (Seam 1)", () => {
       pagamento({ id: "fora", billId: "encerrada", competencia: "2026-05", valor: 99999 }),
     ]
 
-    expect(serieTotalPago(bills, pagos, "2026-06-15", 6)).toEqual([
-      { competencia: "2026-01", valor: 0 },
-      { competencia: "2026-02", valor: 0 },
-      { competencia: "2026-03", valor: 0 },
-      { competencia: "2026-04", valor: 4000 },
-      { competencia: "2026-05", valor: 0 },
-      { competencia: "2026-06", valor: 6000 },
-    ])
+    expect(serieTotalPago(bills, pagos, "2026-06-15", 6)).toEqual({
+      estado: "com-dados",
+      pontos: [
+        { competencia: "2026-01", valor: 0, emCurso: false },
+        { competencia: "2026-02", valor: 0, emCurso: false },
+        { competencia: "2026-03", valor: 0, emCurso: false },
+        { competencia: "2026-04", valor: 4000, emCurso: false },
+        { competencia: "2026-05", valor: 0, emCurso: false },
+        { competencia: "2026-06", valor: 6000, emCurso: true },
+      ],
+    })
+  })
+
+  it("test_serie_marca_mes_corrente_em_curso", () => {
+    const pagos = [pagamento({ competencia: "2026-06", valor: 6000 })]
+    const serie = serieTotalPago([billBase()], pagos, "2026-06-15", 2)
+    expect(serie).toEqual({
+      estado: "com-dados",
+      pontos: [
+        { competencia: "2026-05", valor: 0, emCurso: false },
+        { competencia: "2026-06", valor: 6000, emCurso: true },
+      ],
+    })
+  })
+
+  it("test_serie_vazia_shape_explicito", () => {
+    // Lar sem nenhuma Conta ativa: shape explícito, não seis meses de zero disfarçando "sem Conta".
+    expect(serieTotalPago([], [], "2026-06-15")).toEqual({ estado: "vazia" })
+  })
+})
+
+describe("compararMesFechado (Seam 1)", () => {
+  it("test_mes_corrente_sem_delta_em_curso", () => {
+    // só o mês corrente tem ponto na série — nenhum mês fechado ainda pra comparar
+    const pagos = [pagamento({ competencia: "2026-06", valor: 5000 })]
+    const serie = serieTotalPago([billBase()], pagos, "2026-06-15", 1)
+    expect(compararMesFechado(serie)).toEqual({ estado: "em-curso" })
+  })
+
+  it("test_delta_so_entre_meses_fechados", () => {
+    // junho (corrente) tem valor discrepante; o delta ignora e compara só maio vs abril
+    const pagos = [
+      pagamento({ id: "abr", competencia: "2026-04", valor: 4000 }),
+      pagamento({ id: "mai", competencia: "2026-05", valor: 5000 }),
+      pagamento({ id: "jun", competencia: "2026-06", valor: 999999 }),
+    ]
+    const serie = serieTotalPago([billBase()], pagos, "2026-06-15", 3)
+    expect(compararMesFechado(serie)).toEqual({ estado: "fechado", deltaPercentual: 25 })
+  })
+
+  it("test_mes_vazio_nao_gera_menos_100", () => {
+    // 1º de julho: julho (corrente) ainda não tem nenhum Lançamento — não é "queda de 100%"
+    const pagos = [
+      pagamento({ id: "mai", competencia: "2026-05", valor: 4000 }),
+      pagamento({ id: "jun", competencia: "2026-06", valor: 5000 }),
+    ]
+    const serie = serieTotalPago([billBase()], pagos, "2026-07-01", 3)
+    expect(compararMesFechado(serie)).toEqual({ estado: "fechado", deltaPercentual: 25 })
+  })
+
+  it("test_mes_fechado_sem_base_anterior_nao_gera_percentual", () => {
+    // mês anterior fechado sem nenhum Lançamento: sem base honesta pra divisão
+    const pagos = [pagamento({ id: "jun", competencia: "2026-06", valor: 5000 })]
+    const serie = serieTotalPago([billBase()], pagos, "2026-06-15", 3)
+    expect(compararMesFechado(serie)).toEqual({ estado: "sem-base-anterior" })
+  })
+
+  it("test_serie_vazia_fica_em_curso", () => {
+    expect(compararMesFechado(serieTotalPago([], [], "2026-06-15"))).toEqual({ estado: "em-curso" })
   })
 })
 

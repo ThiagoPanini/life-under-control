@@ -1,7 +1,13 @@
 import { MetricCard } from "@/components/ds/MetricCard"
 import { TrendCard } from "@/components/ds/TrendCard"
 import { formatBRL } from "@/core/domain/money"
-import type { AgregadosMes, PontoSerieMensal } from "@/core/use-cases/derive-agregados-financas"
+import {
+  type AgregadosMes,
+  compararMesFechado,
+  pontosDe,
+  type SerieTotalPago,
+} from "@/core/use-cases/derive-agregados-financas"
+import { textoComparativo, tonalidadeComparativo } from "./comparativo-mensal"
 
 const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
 
@@ -14,12 +20,12 @@ export function CockpitFinancas({
   serie,
 }: {
   agregados: AgregadosMes
-  serie: PontoSerieMensal[]
+  serie: SerieTotalPago
 }) {
   const { totalPagoMes, contasEmAberto, gastoMensalMedio, estimativaFaltaPagar } = agregados
-  const current = serie.at(-1)?.valor ?? totalPagoMes
-  const previous = serie.at(-2)?.valor ?? 0
-  const delta = previous > 0 ? ((current - previous) / previous) * 100 : null
+  const pontos = pontosDe(serie)
+  const current = pontos.at(-1)?.valor ?? totalPagoMes
+  const comparativo = compararMesFechado(serie)
 
   return (
     <section aria-labelledby="finance-readings" className="flex flex-col gap-3.5">
@@ -53,19 +59,15 @@ export function CockpitFinancas({
       <TrendCard
         label="Total pago por mês"
         period={
-          serie.length > 0
-            ? `${monthShort(serie[0].competencia)} — ${monthShort(serie.at(-1)?.competencia ?? serie[0].competencia)}`
+          pontos.length > 0
+            ? `${monthShort(pontos[0].competencia)} — ${monthShort(pontos.at(-1)?.competencia ?? pontos[0].competencia)}`
             : "sem histórico"
         }
         value={formatBRL(current)}
-        delta={
-          delta == null
-            ? "sem base anterior"
-            : `${delta >= 0 ? "+" : "−"}${Math.abs(delta).toFixed(1).replace(".", ",")}% vs. mês anterior`
-        }
-        deltaTone={delta == null ? "muted" : delta >= 0 ? "warn" : "success"}
-        values={serie.map((point) => point.valor)}
-        labels={serie.map((point) => monthShort(point.competencia))}
+        delta={textoComparativo(comparativo)}
+        deltaTone={tonalidadeComparativo(comparativo)}
+        values={pontos.map((ponto) => ponto.valor)}
+        labels={pontos.map((ponto) => monthShort(ponto.competencia))}
       />
 
       <p className="px-1 text-xs leading-snug text-luc-text-3">

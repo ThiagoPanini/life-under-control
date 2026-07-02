@@ -8,10 +8,13 @@ import { MetricCard } from "@/components/ds/MetricCard"
 import { PageHeader } from "@/components/ds/PageHeader"
 import { PersonChip } from "@/components/ds/PersonChip"
 import { TrendCard } from "@/components/ds/TrendCard"
+import { textoComparativo, tonalidadeComparativo } from "@/components/financas/comparativo-mensal"
 import { AREAS } from "@/core/domain/areas"
 import { formatBRL } from "@/core/domain/money"
 import {
+  compararMesFechado,
   derivarAgregadosFinancas,
+  pontosDe,
   serieTotalPago,
 } from "@/core/use-cases/derive-agregados-financas"
 import { getPainel } from "@/core/use-cases/get-painel"
@@ -61,9 +64,9 @@ export default async function PainelPage() {
   )
   const hoje = systemClock().hoje()
   const serie = serieTotalPago(ativas, pagamentos, hoje)
-  const ultimo = serie.at(-1)?.valor ?? 0
-  const anterior = serie.at(-2)?.valor ?? 0
-  const delta = anterior > 0 ? ((ultimo - anterior) / anterior) * 100 : null
+  const pontos = pontosDe(serie)
+  const ultimo = pontos.at(-1)?.valor ?? 0
+  const comparativo = compararMesFechado(serie)
 
   // Contagem das Áreas por estado — derivada do catálogo (o estado vem dos Assuntos, ADR-0009).
   const areasAtivas = AREAS.filter((area) => area.estado === "ativa").length
@@ -112,16 +115,16 @@ export default async function PainelPage() {
 
         <TrendCard
           label="Total pago por mês"
-          period={`${mesCurto(serie[0].competencia)} — ${mesCurto(serie.at(-1)?.competencia ?? serie[0].competencia)}`}
-          value={formatBRL(ultimo)}
-          delta={
-            delta == null
-              ? "sem base anterior"
-              : `${delta >= 0 ? "+" : "−"}${Math.abs(delta).toFixed(1).replace(".", ",")}% vs. mês anterior`
+          period={
+            pontos.length > 0
+              ? `${mesCurto(pontos[0].competencia)} — ${mesCurto(pontos.at(-1)?.competencia ?? pontos[0].competencia)}`
+              : "sem histórico"
           }
-          deltaTone={delta == null ? "muted" : delta >= 0 ? "warn" : "success"}
-          values={serie.map((ponto) => ponto.valor)}
-          labels={serie.map((ponto) => mesCurto(ponto.competencia))}
+          value={formatBRL(ultimo)}
+          delta={textoComparativo(comparativo)}
+          deltaTone={tonalidadeComparativo(comparativo)}
+          values={pontos.map((ponto) => ponto.valor)}
+          labels={pontos.map((ponto) => mesCurto(ponto.competencia))}
           className="mb-3"
         />
 

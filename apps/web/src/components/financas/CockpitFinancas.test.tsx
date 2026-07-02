@@ -2,7 +2,7 @@
 import "@testing-library/jest-dom/vitest"
 import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
-import type { AgregadosMes } from "@/core/use-cases/derive-agregados-financas"
+import type { AgregadosMes, SerieTotalPago } from "@/core/use-cases/derive-agregados-financas"
 import { CockpitFinancas } from "./CockpitFinancas"
 
 /**
@@ -19,13 +19,16 @@ const base: AgregadosMes = {
   estimativaFaltaPagar: 6000,
 }
 
-const serie = [
-  { competencia: "2026-02", valor: 8000 },
-  { competencia: "2026-03", valor: 9000 },
-  { competencia: "2026-04", valor: 11000 },
-  { competencia: "2026-05", valor: 12000 },
-  { competencia: "2026-06", valor: 10000 },
-]
+const serie: SerieTotalPago = {
+  estado: "com-dados",
+  pontos: [
+    { competencia: "2026-02", valor: 8000, emCurso: false },
+    { competencia: "2026-03", valor: 9000, emCurso: false },
+    { competencia: "2026-04", valor: 11000, emCurso: false },
+    { competencia: "2026-05", valor: 12000, emCurso: false },
+    { competencia: "2026-06", valor: 10000, emCurso: true },
+  ],
+}
 
 describe("CockpitFinancas (Seam 2)", () => {
   it("test_formata_os_quatro_agregados_em_brl", () => {
