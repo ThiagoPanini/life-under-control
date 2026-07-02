@@ -10,7 +10,7 @@ import { auth } from "@/auth"
 import { Button } from "@/components/ds/Button"
 import { Pill } from "@/components/ds/Pill"
 import { Surface } from "@/components/ds/Surface"
-import { BillIcon } from "@/components/financas/BillIcon"
+import { BillLogoTile } from "@/components/financas/BillLogoTile"
 import { ConnectedPaymentForm } from "@/components/financas/ConnectedPaymentForm"
 import { LancamentosLista } from "@/components/financas/LancamentosLista"
 import type { PaymentFormInicial } from "@/components/financas/payment-form-inicial"
@@ -19,6 +19,7 @@ import { descreverRecorrencia, descreverVencimento, formatarDataBr } from "@/cor
 import { centavosParaCampo } from "@/core/domain/money"
 import { ehCompetenciaValida } from "@/core/domain/payment"
 import { getBill } from "@/core/use-cases/get-bill"
+import { getLogoUrl } from "@/core/use-cases/get-logo-url"
 import { getPainel } from "@/core/use-cases/get-painel"
 import { listAttachmentsDeLancamentos } from "@/core/use-cases/list-attachments"
 import { listPayments } from "@/core/use-cases/list-payments"
@@ -51,6 +52,9 @@ export default async function ContaDetailPage({
     resolveAvatares(lar.pessoas, r2AttachmentStore()),
   ])
   if (!bill) notFound()
+
+  // Logo da Conta (#50): a URL assinada é presign local (sem rede).
+  const logoUrl = await getLogoUrl(r2AttachmentStore(), bill.logoKey)
 
   // Defaults da baixa: hoje (via Clock), a competência pedida (Agenda, #23) ou o
   // mês corrente, o valor do último Lançamento e a Pessoa logada como autor.
@@ -96,9 +100,7 @@ export default async function ContaDetailPage({
             ← Pagamentos Recorrentes
           </Button>
           <div className="flex items-start gap-4">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[11px] bg-luc-accent-12 text-luc-accent-bright">
-              <BillIcon name={bill.icon} size={24} />
-            </span>
+            <BillLogoTile icon={bill.icon} logoUrl={logoUrl} size={48} iconSize={24} />
             <div className="flex min-w-0 flex-col gap-1.5">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-extrabold text-2xl text-luc-text tracking-[-0.03em] sm:text-3xl">

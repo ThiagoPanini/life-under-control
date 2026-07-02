@@ -68,6 +68,15 @@ export function ehTipoComprovanteAceito(tipoMime: string): boolean {
  * ou PDF) e tamanho inteiro positivo dentro do teto. Erros saem por campo (no
  * campo único `arquivo`), no mesmo formato da baixa.
  */
+/** Tamanho inteiro positivo dentro do teto — a regra que todo upload comparte. */
+function validarTamanhoArquivo(tamanhoBytes: number): ErroCampo[] {
+  if (typeof tamanhoBytes !== "number" || !Number.isInteger(tamanhoBytes) || tamanhoBytes <= 0)
+    return [{ campo: "arquivo", mensagem: "Arquivo vazio ou inválido." }]
+  if (tamanhoBytes > TAMANHO_MAX_BYTES)
+    return [{ campo: "arquivo", mensagem: "Arquivo maior que 25 MB." }]
+  return []
+}
+
 export function validarDadosAttachment(bruto: AttachmentBruto): ValidacaoAttachment {
   const erros: ErroCampo[] = []
 
@@ -78,14 +87,36 @@ export function validarDadosAttachment(bruto: AttachmentBruto): ValidacaoAttachm
   if (!ehTipoComprovanteAceito(tipoMime))
     erros.push({ campo: "arquivo", mensagem: "Tipo não suportado — envie uma imagem ou um PDF." })
 
-  const tamanhoBytes = bruto.tamanhoBytes
-  if (typeof tamanhoBytes !== "number" || !Number.isInteger(tamanhoBytes) || tamanhoBytes <= 0)
-    erros.push({ campo: "arquivo", mensagem: "Arquivo vazio ou inválido." })
-  else if (tamanhoBytes > TAMANHO_MAX_BYTES)
-    erros.push({ campo: "arquivo", mensagem: "Arquivo maior que 25 MB." })
+  erros.push(...validarTamanhoArquivo(bruto.tamanhoBytes))
 
   if (erros.length > 0) return { ok: false, erros }
-  return { ok: true, value: { nomeOriginal, tipoMime, tamanhoBytes } }
+  return { ok: true, value: { nomeOriginal, tipoMime, tamanhoBytes: bruto.tamanhoBytes } }
+}
+
+/**
+ * É um tipo de imagem aceito pro logo de uma Conta — mais estrito que o
+ * comprovante (que também aceita PDF): aqui só imagem de verdade, sem SVG (o
+ * mesmo risco de conteúdo ativo do comprovante).
+ */
+export function ehImagemAceita(tipoMime: string): boolean {
+  if (tipoMime === "image/svg+xml") return false
+  return tipoMime.startsWith("image/")
+}
+
+/**
+ * Valida um logo de Conta: reusa o teto de tamanho do comprovante
+ * (`TAMANHO_MAX_BYTES`), mas só aceita imagem — sem PDF. Sem nome: o logo é
+ * decorativo, não um documento a rotular (diferente do comprovante).
+ */
+export function validarLogo(tipoMime: string, tamanhoBytes: number): ErroCampo[] {
+  const erros: ErroCampo[] = []
+
+  const tipoMimeTrim = (tipoMime ?? "").trim()
+  if (!ehImagemAceita(tipoMimeTrim)) erros.push({ campo: "arquivo", mensagem: "Envie uma imagem." })
+
+  erros.push(...validarTamanhoArquivo(tamanhoBytes))
+
+  return erros
 }
 
 /**

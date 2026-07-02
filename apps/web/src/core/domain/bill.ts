@@ -53,6 +53,8 @@ export type Bill = DadosBill & {
   estado: BillEstado
   /** Data civil (YYYY-MM-DD) em que a Conta foi encerrada; `null` enquanto `ativa`. */
   encerradaEm: string | null
+  /** Chave do logo no bucket R2 (ADR-0008); `null` sem logo — o `icon` é o fallback. */
+  logoKey: string | null
 }
 
 /** Entrada crua do cadastro (strings/números possivelmente inválidos da borda). */
@@ -254,4 +256,18 @@ export function ehDataIsoValida(s: string): boolean {
 export function formatarDataBr(iso: string): string {
   const [ano, mes, dia] = iso.split("-")
   return `${dia}/${mes}/${ano}`
+}
+
+const PREFIXO_LOGO = "finance/bills"
+
+/**
+ * Deriva a chave de um logo de Conta no bucket R2:
+ * `finance/bills/{lar}/{conta}/{upload}`. Chave **por upload** (como
+ * `chaveComprovante`), não fixa por Conta: trocar assina um objeto novo, então
+ * o logo anterior segue intacto até a confirmação suceder — só então é
+ * limpo. Uma chave fixa reescreveria o logo em uso antes da confirmação
+ * validar o upload, destruindo-o se a confirmação falhasse no meio do caminho.
+ */
+export function chaveLogoBill(householdId: string, billId: string, uploadId: string): string {
+  return `${PREFIXO_LOGO}/${householdId}/${billId}/${uploadId}`
 }

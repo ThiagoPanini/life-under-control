@@ -34,6 +34,7 @@ const bill: Bill = {
   dueMonthOffset: 0,
   estado: "ativa",
   encerradaEm: null,
+  logoKey: null,
 }
 
 const estados: GridEstado[] = [

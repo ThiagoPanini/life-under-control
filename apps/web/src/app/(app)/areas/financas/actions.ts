@@ -15,6 +15,7 @@ import type { BillBruto, ErroCampo } from "@/core/domain/bill"
 import type { Pessoa } from "@/core/domain/household"
 import { parseCentavos } from "@/core/domain/money"
 import type { PaymentBruto } from "@/core/domain/payment"
+import { confirmLogoUpload } from "@/core/use-cases/confirm-logo-upload"
 import { BillInvalidaError, createBill } from "@/core/use-cases/create-bill"
 import { deleteBill } from "@/core/use-cases/delete-bill"
 import { deletePayment } from "@/core/use-cases/delete-payment"
@@ -27,9 +28,11 @@ import {
   AttachmentInvalidoError,
   prepareAttachmentUpload,
 } from "@/core/use-cases/prepare-attachment-upload"
+import { prepareLogoUpload } from "@/core/use-cases/prepare-logo-upload"
 import { PaymentInvalidoError, recordPayment } from "@/core/use-cases/record-payment"
 import { registerAttachment } from "@/core/use-cases/register-attachment"
 import { removeAttachment } from "@/core/use-cases/remove-attachment"
+import { removeLogo } from "@/core/use-cases/remove-logo"
 
 /** Estado do formulário de Conta entre submissões — só os erros por campo (vazio = ok). */
 export type ContaFormState = { erros: ErroCampo[] }
@@ -153,7 +156,7 @@ export async function deletarConta(billId: string): Promise<void> {
   const { lar } = await getPainel(drizzleHouseholdRepo())
 
   try {
-    await deleteBill(drizzleBillRepo(), lar.id, billId)
+    await deleteBill(drizzleBillRepo(), r2AttachmentStore(), lar.id, billId)
   } catch (e) {
     if (e instanceof BillNaoEncontradaError) redirect(ROTA_FINANCAS)
     throw e
@@ -364,5 +367,90 @@ export async function removerComprovante(
   const { lar } = await getPainel(drizzleHouseholdRepo())
   await removeAttachment(r2AttachmentStore(), drizzleAttachmentRepo(), lar.id, attachmentId)
   revalidatePath(rotaDaConta(billId))
+  return { ok: true }
+}
+
+// ── Logo de uma Conta (upload R2 + ícone fallback — ADR-0008, #50) ────────────
+
+/** Resultado de preparar o upload do logo — a URL assinada + o id a confirmar, ou um erro. */
+export type PrepararLogoResult =
+  | { ok: true; uploadId: string; uploadUrl: string }
+  | { ok: false; erro: string }
+
+/** Revalida a lista e o detalhe da Conta: o logo aparece nos dois (card e header). */
+function revalidarLogoDaConta(billId: string): void {
+  revalidatePath(rotaDaConta(billId))
+  revalidatePath(ROTA_FINANCAS)
+}
+
+/**
+ * Server action (1ª etapa do upload do logo por URL assinada — ADR-0008): valida
+ * (só imagem, teto de 25 MB) e assina uma chave **por upload** — o logo em uso
+ * segue intacto até a confirmação suceder. Nada é persistido; a confirmação é
+ * quem grava `bills.logoKey`.
+ */
+export async function prepararLogoConta(
+  billId: string,
+  tipoMime: string,
+  tamanhoBytes: number,
+): Promise<PrepararLogoResult> {
+  const { lar } = await getPainel(drizzleHouseholdRepo())
+  const uploadId = randomUUID()
+
+  try {
+    const prep = await prepareLogoUpload(
+      r2AttachmentStore(),
+      lar.id,
+      billId,
+      uploadId,
+      tipoMime,
+      tamanhoBytes,
+    )
+    return { ok: true, uploadId, uploadUrl: prep.uploadUrl }
+  } catch (e) {
+    if (e instanceof AttachmentInvalidoError) return { ok: false, erro: mensagemDeAnexoInvalido(e) }
+    throw e
+  }
+}
+
+/**
+ * Server action (2ª etapa): depois que o navegador subiu o logo pro R2, persiste
+ * `bills.logoKey` e revalida lista + detalhe. O tamanho e o tipo são lidos do
+ * objeto real no R2 (não se confia no cliente); o logo anterior é limpo só
+ * depois do novo confirmado.
+ */
+export async function confirmarLogoConta(
+  billId: string,
+  uploadId: string,
+): Promise<ComprovanteResult> {
+  const { lar } = await getPainel(drizzleHouseholdRepo())
+
+  try {
+    await confirmLogoUpload(drizzleBillRepo(), r2AttachmentStore(), lar.id, billId, uploadId)
+  } catch (e) {
+    if (e instanceof AttachmentInvalidoError) return { ok: false, erro: mensagemDeAnexoInvalido(e) }
+    if (e instanceof BillNaoEncontradaError) redirect(ROTA_FINANCAS)
+    throw e
+  }
+
+  revalidarLogoDaConta(billId)
+  return { ok: true }
+}
+
+/**
+ * Server action: remove o logo de uma Conta — apaga `bills.logoKey` e o objeto
+ * no R2, e revalida lista + detalhe. A exibição cai de volta no ícone Lucide.
+ */
+export async function removerLogoConta(billId: string): Promise<ComprovanteResult> {
+  const { lar } = await getPainel(drizzleHouseholdRepo())
+
+  try {
+    await removeLogo(drizzleBillRepo(), r2AttachmentStore(), lar.id, billId)
+  } catch (e) {
+    if (e instanceof BillNaoEncontradaError) redirect(ROTA_FINANCAS)
+    throw e
+  }
+
+  revalidarLogoDaConta(billId)
   return { ok: true }
 }

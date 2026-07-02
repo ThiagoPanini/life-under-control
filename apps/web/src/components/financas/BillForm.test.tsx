@@ -99,6 +99,7 @@ describe("BillForm — modo edição (Seam 3)", () => {
     dueMonthOffset: 1,
     estado: "ativa",
     encerradaEm: null,
+    logoKey: null,
   }
 
   it("test_billParaInicial_projeta_a_conta_em_strings", () => {

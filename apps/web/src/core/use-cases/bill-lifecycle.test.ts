@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Bill, DadosBill } from "../domain/bill"
 import type { BillRepo, DependentesBill, NovaBill } from "../ports/bill-repo"
+import { fakeAttachmentStore } from "./attachment-store.fake"
 import { BillInvalidaError } from "./create-bill"
 import { deleteBill, resumoDeExclusao } from "./delete-bill"
 import { BillNaoEncontradaError, editBill } from "./edit-bill"
@@ -25,6 +26,7 @@ function fakeBillRepo(opts: { dependentes?: DependentesBill } = {}): BillRepo & 
         id: `bill-${bills.length + 1}`,
         estado: "ativa",
         encerradaEm: null,
+        logoKey: null,
         ...nova,
       }
       bills.push(bill)
@@ -59,6 +61,12 @@ function fakeBillRepo(opts: { dependentes?: DependentesBill } = {}): BillRepo & 
       if (i < 0) return null
       bills.splice(i, 1)
       return dependentes
+    },
+    async definirLogo(householdId, billId, logoKey) {
+      const bill = achar(householdId, billId)
+      if (!bill) return null
+      bill.logoKey = logoKey
+      return bill
     },
   }
 }
@@ -186,8 +194,9 @@ describe("deleteBill + resumoDeExclusao (Seam 1)", () => {
 
   it("test_delete_remove_a_conta_e_devolve_a_contagem", async () => {
     const { repo, bill } = await comUmaConta({ dependentes: { lancamentos: 2, anexos: 1 } })
+    const store = fakeAttachmentStore()
 
-    const removidos = await deleteBill(repo, "h-1", bill.id)
+    const removidos = await deleteBill(repo, store, "h-1", bill.id)
 
     expect(removidos).toEqual({ lancamentos: 2, anexos: 1 })
     expect(repo.bills).toHaveLength(0)
@@ -195,7 +204,32 @@ describe("deleteBill + resumoDeExclusao (Seam 1)", () => {
 
   it("test_deletar_conta_inexistente_lanca_e_nao_remove_nada", async () => {
     const { repo } = await comUmaConta()
-    await expect(deleteBill(repo, "h-1", "sumida")).rejects.toBeInstanceOf(BillNaoEncontradaError)
+    const store = fakeAttachmentStore()
+    await expect(deleteBill(repo, store, "h-1", "sumida")).rejects.toBeInstanceOf(
+      BillNaoEncontradaError,
+    )
     expect(repo.bills).toHaveLength(1)
+  })
+
+  it("test_deletar_conta_com_logo_apaga_o_objeto_no_r2", async () => {
+    const { repo, bill } = await comUmaConta()
+    const chave = `finance/bills/h-1/${bill.id}/up-1`
+    await repo.definirLogo("h-1", bill.id, chave)
+    const store = fakeAttachmentStore([{ chave, tamanhoBytes: 20_000, tipoMime: "image/png" }])
+
+    await deleteBill(repo, store, "h-1", bill.id)
+
+    expect(store.chaves()).toHaveLength(0)
+  })
+
+  it("test_deletar_conta_sem_logo_nao_toca_o_bucket", async () => {
+    const { repo, bill } = await comUmaConta()
+    const store = fakeAttachmentStore([
+      { chave: "finance/bills/h-1/outra-conta/up-1", tamanhoBytes: 1, tipoMime: "image/png" },
+    ])
+
+    await deleteBill(repo, store, "h-1", bill.id)
+
+    expect(store.chaves()).toEqual(["finance/bills/h-1/outra-conta/up-1"])
   })
 })

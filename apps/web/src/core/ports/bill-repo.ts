@@ -31,4 +31,6 @@ export type BillRepo = {
   contarDependentes(householdId: string, billId: string): Promise<DependentesBill>
   /** Apaga a Conta e seus dependentes; devolve quantos foram, ou `null` se não achou. */
   deletarBill(householdId: string, billId: string): Promise<DependentesBill | null>
+  /** Define (`chave`) ou limpa (`null`) o logo da Conta; `null` se não achou no Lar. */
+  definirLogo(householdId: string, billId: string, logoKey: string | null): Promise<Bill | null>
 }

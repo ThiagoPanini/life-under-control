@@ -48,6 +48,7 @@ const bill: Bill = {
   dueMonthOffset: 0,
   estado: "encerrada",
   encerradaEm: "2026-05-20",
+  logoKey: null,
 }
 
 describe("EncerradasSection (Seam #49)", () => {

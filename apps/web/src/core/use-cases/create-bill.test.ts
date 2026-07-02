@@ -15,6 +15,7 @@ function fakeBillRepo(): BillRepo & { gravadas: NovaBill[] } {
         id: `bill-${gravadas.length}`,
         estado: "ativa",
         encerradaEm: null,
+        logoKey: null,
         ...nova,
       }
       return bill
@@ -26,6 +27,7 @@ function fakeBillRepo(): BillRepo & { gravadas: NovaBill[] } {
           id: `bill-${i + 1}`,
           estado: "ativa" as const,
           encerradaEm: null,
+          logoKey: null,
           ...nova,
         }))
     },
@@ -35,6 +37,7 @@ function fakeBillRepo(): BillRepo & { gravadas: NovaBill[] } {
     encerrarBill: () => Promise.reject(new Error("não usado")),
     contarDependentes: () => Promise.reject(new Error("não usado")),
     deletarBill: () => Promise.reject(new Error("não usado")),
+    definirLogo: () => Promise.reject(new Error("não usado")),
   }
 }
 

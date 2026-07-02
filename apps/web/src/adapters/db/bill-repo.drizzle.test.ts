@@ -211,4 +211,31 @@ suite("drizzleBillRepo (Seam 2 — Postgres real)", () => {
     const repo = drizzleBillRepo(db)
     expect(await repo.deletarBill(larId, "00000000-0000-0000-0000-000000000000")).toBeNull()
   })
+
+  it("test_criar_nasce_sem_logo", async () => {
+    const repo = drizzleBillRepo(db)
+    const criada = await repo.criarBill(nova(larId, { nome: "Água", icon: "droplet" }))
+    expect(criada.logoKey).toBeNull()
+  })
+
+  it("test_definir_logo_persiste_e_limpar_volta_a_null", async () => {
+    const repo = drizzleBillRepo(db)
+    const criada = await repo.criarBill(nova(larId, { nome: "Gás", icon: "flame" }))
+    const chave = `finance/bills/${larId}/${criada.id}/logo`
+
+    const comLogo = await repo.definirLogo(larId, criada.id, chave)
+    expect(comLogo?.logoKey).toBe(chave)
+    const relida = await repo.obterBill(larId, criada.id)
+    expect(relida?.logoKey).toBe(chave)
+
+    const semLogo = await repo.definirLogo(larId, criada.id, null)
+    expect(semLogo?.logoKey).toBeNull()
+  })
+
+  it("test_definir_logo_de_outro_lar_devolve_null", async () => {
+    const repo = drizzleBillRepo(db)
+    const criada = await repo.criarBill(nova(larId, { nome: "Condomínio 2", icon: "building-2" }))
+    const r = await repo.definirLogo("00000000-0000-0000-0000-000000000000", criada.id, "chave")
+    expect(r).toBeNull()
+  })
 })

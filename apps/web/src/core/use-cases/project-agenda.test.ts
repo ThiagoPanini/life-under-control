@@ -20,6 +20,7 @@ function billBase(over: Partial<Bill> = {}): Bill {
     dueMonthOffset: 0,
     estado: "ativa",
     encerradaEm: null,
+    logoKey: null,
     ...over,
   }
 }

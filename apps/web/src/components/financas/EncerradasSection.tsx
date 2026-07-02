@@ -11,7 +11,13 @@ import type { Bill } from "@/core/domain/bill"
  * Estado do toggle mora na URL (`?encerradas=1`) — sobrevive a reload/voltar e é
  * compartilhável entre as duas Pessoas do Lar; só o BillCard some do DOM quando oculto.
  */
-export function EncerradasSection({ bills }: { bills: Bill[] }) {
+export function EncerradasSection({
+  bills,
+  logoUrls,
+}: {
+  bills: Bill[]
+  logoUrls?: Map<string, string | null>
+}) {
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const router = useRouter()
@@ -52,7 +58,10 @@ export function EncerradasSection({ bills }: { bills: Bill[] }) {
       />
 
       <div id={listId} hidden={!expandida} className="flex flex-col gap-3">
-        {expandida && bills.map((bill) => <BillCard key={bill.id} bill={bill} />)}
+        {expandida &&
+          bills.map((bill) => (
+            <BillCard key={bill.id} bill={bill} logoUrl={logoUrls?.get(bill.id)} />
+          ))}
       </div>
     </section>
   )

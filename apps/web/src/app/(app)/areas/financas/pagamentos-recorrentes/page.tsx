@@ -3,6 +3,7 @@ import { systemClock } from "@/adapters/clock/system-clock"
 import { drizzleBillRepo } from "@/adapters/db/bill-repo.drizzle"
 import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
 import { drizzlePaymentRepo } from "@/adapters/db/payment-repo.drizzle"
+import { r2AttachmentStore } from "@/adapters/r2/r2-attachment-store"
 import { Button } from "@/components/ds/Button"
 import { PageHeader } from "@/components/ds/PageHeader"
 import { SectionHeading } from "@/components/ds/SectionHeading"
@@ -14,6 +15,7 @@ import {
   serieTotalPago,
 } from "@/core/use-cases/derive-agregados-financas"
 import { derivarCardConta } from "@/core/use-cases/derive-bill-card"
+import { getLogoUrl } from "@/core/use-cases/get-logo-url"
 import { getPainel } from "@/core/use-cases/get-painel"
 import { listAllPayments } from "@/core/use-cases/list-all-payments"
 import { listBills } from "@/core/use-cases/list-bills"
@@ -44,6 +46,18 @@ export default async function FinancasPage() {
     pagamentos,
   )
   const serie = serieTotalPago(ativas, pagamentos, systemClock().hoje())
+
+  // Logo das Contas que têm (#50): a URL assinada é presign local (sem rede),
+  // então resolver todas de uma vez é barato — sem N+1 real.
+  const store = r2AttachmentStore()
+  const logoUrls = new Map(
+    await Promise.all(
+      bills
+        .filter((bill) => bill.logoKey)
+        .map(async (bill) => [bill.id, await getLogoUrl(store, bill.logoKey)] as const),
+    ),
+  )
+
   const cards = new Map(
     ativas.map((bill) => [
       bill.id,
@@ -101,13 +115,18 @@ export default async function FinancasPage() {
           ) : (
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
               {ativas.map((bill) => (
-                <BillCard key={bill.id} bill={bill} card={cards.get(bill.id)} />
+                <BillCard
+                  key={bill.id}
+                  bill={bill}
+                  card={cards.get(bill.id)}
+                  logoUrl={logoUrls.get(bill.id)}
+                />
               ))}
             </div>
           )}
         </section>
 
-        <EncerradasSection bills={encerradas} />
+        <EncerradasSection bills={encerradas} logoUrls={logoUrls} />
       </div>
     </div>
   )

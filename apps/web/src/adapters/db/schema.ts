@@ -43,6 +43,8 @@ export const bills = pgTable(
     nome: text("nome").notNull(),
     descricao: text("descricao"),
     icon: text("icon").notNull(),
+    // Chave do logo no bucket R2 (ADR-0008); nula sem logo — `icon` é o fallback.
+    logoKey: text("logo_key"),
     intervalMonths: integer("interval_months").notNull(),
     anchorMonth: integer("anchor_month"),
     dueRuleKind: text("due_rule_kind").notNull(),

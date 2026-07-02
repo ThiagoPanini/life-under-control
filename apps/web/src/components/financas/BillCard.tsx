@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Pill, type PillTone } from "@/components/ds/Pill"
-import { BillIcon } from "@/components/financas/BillIcon"
+import { BillLogoTile } from "@/components/financas/BillLogoTile"
 import {
   type Bill,
   descreverRecorrencia,
@@ -68,7 +68,15 @@ function sparkPath(values: (number | null)[]) {
     .join(" ")
 }
 
-export function BillCard({ bill, card }: { bill: Bill; card?: CardConta }) {
+export function BillCard({
+  bill,
+  card,
+  logoUrl = null,
+}: {
+  bill: Bill
+  card?: CardConta
+  logoUrl?: string | null
+}) {
   const encerrada = bill.estado === "encerrada"
   const farol = card ? FAROL[card.farol] : null
 
@@ -80,9 +88,7 @@ export function BillCard({ bill, card }: { bill: Bill; card?: CardConta }) {
       }`}
     >
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-luc-accent-12 text-luc-accent-bright">
-          <BillIcon name={bill.icon} />
-        </span>
+        <BillLogoTile icon={bill.icon} logoUrl={logoUrl} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="truncate text-[14.5px] font-bold text-luc-text">{bill.nome}</h3>

@@ -64,6 +64,7 @@ function paraDominio(row: BillRow): Bill {
     dueMonthOffset: row.dueMonthOffset,
     estado: row.estado as BillEstado,
     encerradaEm: row.encerradaEm,
+    logoKey: row.logoKey,
   }
 }
 
@@ -166,6 +167,19 @@ export function drizzleBillRepo(db: Db = getDb()): BillRepo {
         .returning({ id: bills.id })
       if (removidas.length === 0) return null
       return dependentes
+    },
+
+    async definirLogo(
+      householdId: string,
+      billId: string,
+      logoKey: string | null,
+    ): Promise<Bill | null> {
+      const [row] = await db
+        .update(bills)
+        .set({ logoKey })
+        .where(and(eq(bills.householdId, householdId), eq(bills.id, billId)))
+        .returning()
+      return row ? paraDominio(row) : null
     },
   }
 }
