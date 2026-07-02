@@ -10,7 +10,10 @@ import {
 import { formatBRL } from "@/core/domain/money"
 import type { CardConta, FarolEstado, GridEstado } from "@/core/use-cases/derive-bill-card"
 
-export const FAROL: Record<FarolEstado, { label: string; tone: PillTone; dot: string; aria: string }> = {
+export const FAROL: Record<
+  FarolEstado,
+  { label: string; tone: PillTone; dot: string; aria: string }
+> = {
   verde: {
     label: "quitada",
     tone: "success",

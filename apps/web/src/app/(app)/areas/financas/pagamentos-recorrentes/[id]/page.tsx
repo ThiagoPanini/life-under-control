@@ -12,8 +12,8 @@ import { Button } from "@/components/ds/Button"
 import { MetricCard } from "@/components/ds/MetricCard"
 import { Pill } from "@/components/ds/Pill"
 import { Surface } from "@/components/ds/Surface"
-import { BillLogoTile } from "@/components/financas/BillLogoTile"
 import { FAROL } from "@/components/financas/BillCard"
+import { BillLogoTile } from "@/components/financas/BillLogoTile"
 import { ConnectedPaymentForm } from "@/components/financas/ConnectedPaymentForm"
 import { HistoriaConta } from "@/components/financas/HistoriaConta"
 import { LancamentosLista } from "@/components/financas/LancamentosLista"
@@ -187,7 +187,9 @@ export default async function ContaDetailPage({
               />
               <MetricCard
                 label="Pontualidade 12m"
-                value={pontualidade.estado === "sem-historico" ? "—" : `${pontualidade.percentual}%`}
+                value={
+                  pontualidade.estado === "sem-historico" ? "—" : `${pontualidade.percentual}%`
+                }
                 support={
                   pontualidade.estado === "calculada"
                     ? `${pontualidade.percentual}% dos vencimentos no prazo`

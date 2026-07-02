@@ -71,7 +71,8 @@ export function leituraLongaDaOcorrencia(ocorrencia: Ocorrencia, hoje: string): 
   if (ocorrencia.quitada) return `competência de ${mes} quitada`
 
   const dias = diasAteVencimento(hoje, ocorrencia.vencimento)
-  if (dias < 0) return `competência de ${mes} sem Lançamento — venceu ${formatarDataBr(ocorrencia.vencimento)}`
+  if (dias < 0)
+    return `competência de ${mes} sem Lançamento — venceu ${formatarDataBr(ocorrencia.vencimento)}`
   if (dias === 0) return `competência de ${mes} sem Lançamento — vence hoje`
   return `competência de ${mes} sem Lançamento — vence ${formatarDataBr(ocorrencia.vencimento)}`
 }
