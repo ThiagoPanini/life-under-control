@@ -78,6 +78,18 @@ describe("mirrorAvatar (Seam 1)", () => {
     expect(atualizada?.avatarKey).toBeNull()
   })
 
+  it("test_erro_ao_definir_avatarkey_nao_derruba_login", async () => {
+    const repo = fakeUserRepo([pessoa()])
+    const store = fakeAttachmentStore()
+    repo.definirAvatarKey = async () => {
+      throw new Error("Postgres fora do ar")
+    }
+
+    await expect(
+      mirrorAvatar(repo, store, baixaOk, "thiago@casapanini.lar", "https://google/foto.jpg"),
+    ).resolves.toBeUndefined()
+  })
+
   it("test_email_desconhecido_nao_falha", async () => {
     const repo = fakeUserRepo([])
     const store = fakeAttachmentStore()

@@ -28,9 +28,8 @@ export async function mirrorAvatar(
   const chave = chaveAvatar(pessoa.id)
   try {
     await attachmentStore.enviar(chave, baixada.bytes, baixada.tipoMime)
+    await userRepo.definirAvatarKey(pessoa.id, chave)
   } catch {
-    return // erro no R2 não derruba o login — Pessoa fica sem foto até o próximo
+    return // erro no R2 ou ao gravar avatarKey não derruba o login — Pessoa fica sem foto até o próximo
   }
-
-  await userRepo.definirAvatarKey(pessoa.id, chave)
 }

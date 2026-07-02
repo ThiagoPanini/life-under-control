@@ -4,8 +4,13 @@ import { PersonAvatar } from "./PersonAvatar"
 
 export type PersonKey = "thiago" | "jakeline"
 
-export function personKey(pessoa: Pessoa): PersonKey {
-  return pessoa.nome.toLocaleLowerCase("pt-BR") === "jakeline" ? "jakeline" : "thiago"
+/**
+ * Chave de cor por Pessoa (o Lar tem exatamente 2 — invariante #2); qualquer
+ * 3ª cai em "thiago". Pede só `nome` (não `Pessoa` inteira) pra servir também
+ * `ShellPessoa`, a forma mais enxuta que a casca usa (`AppShell.tsx`).
+ */
+export function personKey({ nome }: { nome: string }): PersonKey {
+  return nome.toLocaleLowerCase("pt-BR") === "jakeline" ? "jakeline" : "thiago"
 }
 
 /**
@@ -55,6 +60,7 @@ export function PersonChip({
         size={28}
         colors={colors}
         className="rounded-luc-sm"
+        decorative={showName}
       />
       {showName && <span className="truncate text-sm text-luc-text">{pessoa.nome}</span>}
     </span>
