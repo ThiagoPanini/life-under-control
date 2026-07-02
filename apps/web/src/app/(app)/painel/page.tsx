@@ -1,48 +1,24 @@
+import Link from "next/link"
 import { nationalBankCalendar } from "@/adapters/calendar/national-bank-calendar"
 import { systemClock } from "@/adapters/clock/system-clock"
 import { drizzleBillRepo } from "@/adapters/db/bill-repo.drizzle"
 import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
 import { drizzlePaymentRepo } from "@/adapters/db/payment-repo.drizzle"
 import { r2AttachmentStore } from "@/adapters/r2/r2-attachment-store"
-import { AreaCard } from "@/components/ds/AreaCard"
-import { MetricCard } from "@/components/ds/MetricCard"
+import { AreaIcon } from "@/components/areas/AreaIcon"
 import { PageHeader } from "@/components/ds/PageHeader"
 import { PersonChip } from "@/components/ds/PersonChip"
-import { TrendCard } from "@/components/ds/TrendCard"
-import { textoComparativo, tonalidadeComparativo } from "@/components/financas/comparativo-mensal"
+import { AtencaoTira } from "@/components/painel/AtencaoTira"
+import { HeroAreaAtivaCard } from "@/components/painel/HeroAreaAtivaCard"
 import { AREAS } from "@/core/domain/areas"
-import { formatBRL } from "@/core/domain/money"
-import {
-  compararMesFechado,
-  derivarAgregadosFinancas,
-  pontosDe,
-  serieTotalPago,
-} from "@/core/use-cases/derive-agregados-financas"
+import { assuntosDaArea } from "@/core/domain/subjects"
+import { derivarAtencaoDoPainel } from "@/core/use-cases/derive-atencao"
 import { getPainel } from "@/core/use-cases/get-painel"
 import { listAllPayments } from "@/core/use-cases/list-all-payments"
 import { listBills } from "@/core/use-cases/list-bills"
 import { resolveAvatares } from "@/core/use-cases/resolve-avatares"
 
 export const dynamic = "force-dynamic"
-
-const MESES_CURTOS = [
-  "jan",
-  "fev",
-  "mar",
-  "abr",
-  "mai",
-  "jun",
-  "jul",
-  "ago",
-  "set",
-  "out",
-  "nov",
-  "dez",
-]
-
-function mesCurto(competencia: string) {
-  return MESES_CURTOS[Number(competencia.slice(5, 7)) - 1]
-}
 
 function dataLonga(iso: string) {
   return new Intl.DateTimeFormat("pt-BR", {
@@ -58,22 +34,20 @@ export default async function PainelPage() {
     listAllPayments(drizzlePaymentRepo(), lar.id),
     resolveAvatares(lar.pessoas, r2AttachmentStore()),
   ])
-  const ativas = bills.filter((bill) => bill.estado === "ativa")
-  const agregados = derivarAgregadosFinancas(
-    systemClock(),
-    nationalBankCalendar(),
-    ativas,
-    pagamentos,
-  )
-  const hoje = systemClock().hoje()
-  const serie = serieTotalPago(ativas, pagamentos, hoje)
-  const pontos = pontosDe(serie)
-  const ultimo = pontos.at(-1)?.valor ?? 0
-  const comparativo = compararMesFechado(serie)
 
-  // Contagem das Áreas por estado — derivada do catálogo (o estado vem dos Assuntos, ADR-0009).
-  const areasAtivas = AREAS.filter((area) => area.estado === "ativa").length
-  const areasEmBreve = AREAS.length - areasAtivas
+  const hoje = systemClock().hoje()
+  const atencao = derivarAtencaoDoPainel(systemClock(), nationalBankCalendar(), bills, pagamentos)
+
+  const areaFinancas = AREAS.find((area) => area.slug === "financas")
+  const areasEmBreve = AREAS.filter((area) => area.estado === "em-breve")
+  const assuntosFinancas = assuntosDaArea("financas")
+  const assuntoAtivo = assuntosFinancas.find((assunto) => assunto.estado === "ativa")
+  const assuntosEmBreve = assuntosFinancas.filter((assunto) => assunto.estado === "em-breve")
+  const contasAtivas = bills.filter((bill) => bill.estado === "ativa").length
+
+  const hrefConta = (contaId: string) => `/areas/financas/pagamentos-recorrentes/${contaId}`
+  const hrefBaixa = (contaId: string, competencia: string) =>
+    `/areas/financas/pagamentos-recorrentes/${contaId}?competencia=${competencia}`
 
   return (
     <div className="luc-page-gutter py-7 lg:py-7">
@@ -81,75 +55,50 @@ export default async function PainelPage() {
         <PageHeader
           eyebrow={dataLonga(hoje)}
           title="Painel do Lar"
-          description={`${lar.nome} em números — métricas no topo, tendência ao lado.`}
-          actions={pessoas.map((pessoa) => <PersonChip key={pessoa.id} pessoa={pessoa} compact />)}
+          description="O que pede ação e o estado das Áreas — o retrospecto vive em cada Assunto."
+          actions={[
+            <span key="lar" className="text-[13px] font-semibold text-luc-text-2">
+              {lar.nome}
+            </span>,
+            ...pessoas.map((pessoa) => <PersonChip key={pessoa.id} pessoa={pessoa} compact />),
+          ]}
           className="mb-1.5"
         />
 
-        <section aria-label="Leituras do Lar" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <MetricCard
-            label="Total do mês"
-            value={formatBRL(agregados.totalPagoMes)}
-            support="Lançamentos"
-          />
-          <MetricCard
-            label="Contas em aberto"
-            value={String(agregados.contasEmAberto)}
-            support={agregados.contasEmAberto === 1 ? "Conta pede atenção" : "Contas pedem atenção"}
-            tone={agregados.contasEmAberto > 0 ? "warn" : "success"}
-          />
-          <MetricCard
-            label="Gasto médio · 12m"
-            value={agregados.gastoMensalMedio == null ? "—" : formatBRL(agregados.gastoMensalMedio)}
-            support="meses completos"
-          />
-          <MetricCard
-            label="Falta pagar"
-            value={
-              agregados.estimativaFaltaPagar == null
-                ? "—"
-                : formatBRL(agregados.estimativaFaltaPagar)
+        <AtencaoTira tira={atencao.tira} hrefConta={hrefConta} hrefBaixa={hrefBaixa} />
+
+        {areaFinancas && assuntoAtivo && (
+          <HeroAreaAtivaCard
+            area={areaFinancas}
+            assuntoNome={assuntoAtivo.nome}
+            contasAtivas={contasAtivas}
+            emBreveResumo={
+              assuntosEmBreve.length > 0
+                ? `${assuntosEmBreve.map((assunto) => assunto.nome).join(", ")} em breve`
+                : "Mais Assuntos em breve"
             }
-            support="estimativa do histórico"
+            hero={atencao.hero}
+            href={`/areas/${areaFinancas.slug}`}
           />
-        </section>
+        )}
 
-        <TrendCard
-          label="Total pago por mês"
-          period={
-            pontos.length > 0
-              ? `${mesCurto(pontos[0].competencia)} — ${mesCurto(pontos.at(-1)?.competencia ?? pontos[0].competencia)}`
-              : "sem histórico"
-          }
-          value={formatBRL(ultimo)}
-          delta={textoComparativo(comparativo)}
-          deltaTone={tonalidadeComparativo(comparativo)}
-          values={pontos.map((ponto) => ponto.valor)}
-          labels={pontos.map((ponto) => mesCurto(ponto.competencia))}
-          className="mb-3"
-        />
-
-        <section>
-          <div className="mb-3 flex items-baseline justify-between">
-            <h2 className="text-[13px] font-bold text-luc-text-strong">Áreas</h2>
-            <span className="text-[11.5px] text-luc-muted">
-              {areasAtivas} ativa{areasAtivas === 1 ? "" : "s"} · {areasEmBreve} em breve
-            </span>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {AREAS.map((area) => (
-              <AreaCard
+        {areasEmBreve.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {areasEmBreve.map((area) => (
+              <Link
                 key={area.slug}
-                area={area}
-                metric={
-                  area.slug === "financas"
-                    ? `${formatBRL(agregados.totalPagoMes)} · este mês`
-                    : undefined
-                }
-              />
+                href={`/areas/${area.slug}`}
+                className="flex items-center gap-2 rounded-full border border-luc-border bg-luc-surface-2 px-3 py-1.5 text-xs text-luc-text-2 transition-colors hover:border-luc-border-strong hover:text-luc-text"
+              >
+                <span className="text-luc-text-3">
+                  <AreaIcon name={area.icon} size={14} />
+                </span>
+                {area.nome}
+                <span className="text-luc-faint">· em breve</span>
+              </Link>
             ))}
           </div>
-        </section>
+        )}
       </div>
     </div>
   )

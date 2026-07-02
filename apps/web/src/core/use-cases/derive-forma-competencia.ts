@@ -96,7 +96,11 @@ function somaNaCompetencia(payments: Payment[], competencia: string): number | n
  * entra como zero) e soma baixas partidas da mesma competência; `null` sem
  * nenhum Lançamento na janela.
  */
-function mediaHistoricaAte(bill: Bill, payments: Payment[], competencia: string): number | null {
+export function mediaHistoricaAte(
+  bill: Bill,
+  payments: Payment[],
+  competencia: string,
+): number | null {
   const mesAnterior = addMeses(competencia, -1)
   const janela = ocorrenciasRecentes(bill.recurrence, mesAnterior, OCORRENCIAS_NA_JANELA)
   const seus = payments.filter((p) => p.billId === bill.id)
