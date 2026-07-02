@@ -134,6 +134,11 @@ export function mesCurto(competencia: string): string {
   return MESES_CURTOS[Number(competencia.slice(5, 7)) - 1]
 }
 
+/** Mês curto + ano de 2 dígitos ("2026-06" → "jun/26") — eixo de gráfico por competência. */
+export function mesAno(competencia: string): string {
+  return `${mesCurto(competencia)}/${competencia.slice(2, 4)}`
+}
+
 /** Nome pt-BR de cada periodicidade conhecida (intervalo em meses → rótulo). */
 export const RECORRENCIA_NOMES: Record<number, string> = {
   1: "Mensal",

@@ -3,6 +3,7 @@ import type { Recurrence } from "@/core/domain/bill"
 import {
   farolDaOcorrencia,
   fraseDaOcorrencia,
+  leituraLongaDaOcorrencia,
   type Ocorrencia,
   ordenarPorUrgencia,
 } from "./derive-estado-ocorrencia"
@@ -82,6 +83,44 @@ describe("fraseDaOcorrencia (Seam 1)", () => {
         "2026-07-10",
       ),
     ).toBe("quitada · 2026")
+  })
+})
+
+describe("leituraLongaDaOcorrencia (Seam 1)", () => {
+  it("test_leitura_longa_vencida_com_data", () => {
+    expect(
+      leituraLongaDaOcorrencia(
+        ocorrenciaBase({ competencia: "2026-06", vencimento: "2026-06-28" }),
+        "2026-07-01",
+      ),
+    ).toBe("competência de junho sem Lançamento — venceu 28/06/2026")
+  })
+
+  it("test_leitura_longa_vence_hoje", () => {
+    expect(
+      leituraLongaDaOcorrencia(
+        ocorrenciaBase({ competencia: "2026-07", vencimento: "2026-07-10" }),
+        "2026-07-10",
+      ),
+    ).toBe("competência de julho sem Lançamento — vence hoje")
+  })
+
+  it("test_leitura_longa_vence_no_futuro", () => {
+    expect(
+      leituraLongaDaOcorrencia(
+        ocorrenciaBase({ competencia: "2026-07", vencimento: "2026-07-20" }),
+        "2026-07-10",
+      ),
+    ).toBe("competência de julho sem Lançamento — vence 20/07/2026")
+  })
+
+  it("test_leitura_longa_quitada_nao_menciona_vencimento", () => {
+    expect(
+      leituraLongaDaOcorrencia(
+        ocorrenciaBase({ competencia: "2026-06", vencimento: "2026-06-28", quitada: true }),
+        "2026-07-01",
+      ),
+    ).toBe("competência de junho quitada")
   })
 })
 

@@ -4,7 +4,7 @@ import { Group } from "@visx/group"
 import { scaleBand, scaleLinear } from "@visx/scale"
 import { Bar } from "@visx/shape"
 import { useState } from "react"
-import { mesCurto } from "@/core/domain/bill"
+import { mesAno, mesCurto } from "@/core/domain/bill"
 import { formatBRL } from "@/core/domain/money"
 import type { PontoBarraCompetencia } from "@/core/use-cases/derive-barras-competencia"
 
@@ -14,13 +14,8 @@ const PAD_TOP = 22
 const PAD_BOTTOM = 28
 const PAD_X = 8
 
-function mesLongo(competencia: string) {
-  const ano = competencia.split("-")[0]
-  return `${mesCurto(competencia)}/${ano.slice(2)}`
-}
-
 function textoBarra(ponto: PontoBarraCompetencia): string {
-  const mes = mesLongo(ponto.competencia)
+  const mes = mesAno(ponto.competencia)
   if (ponto.estado === "lacuna") return `${mes} · sem dado`
   const valor = formatBRL(ponto.valor)
   return ponto.estado === "em-curso" ? `${mes} · ${valor} · em curso` : `${mes} · ${valor}`
@@ -243,7 +238,7 @@ export function BarrasCompetencia({
         <tbody>
           {pontos.map((ponto) => (
             <tr key={ponto.competencia}>
-              <td>{mesLongo(ponto.competencia)}</td>
+              <td>{mesAno(ponto.competencia)}</td>
               <td>{ponto.estado === "lacuna" ? "sem dado" : formatBRL(ponto.valor)}</td>
               <td>{ponto.estado}</td>
             </tr>
