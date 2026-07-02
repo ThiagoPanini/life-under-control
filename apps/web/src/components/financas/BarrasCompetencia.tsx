@@ -39,12 +39,14 @@ const CAP: Record<"neutro" | "success" | "warn", string> = {
 }
 
 /**
- * "Total pago por competência" em barras (issue #55): forma honesta pra unidade
- * discreta, substitui a linha com gradiente/crosshair do `TrendCard`. Mês em
- * curso nasce oco/tracejado (nunca compara — CONTEXT.md "mês em curso × mês
- * fechado"); lacuna vira marcador distinto, nunca uma barra de zero disfarçada
- * (invariante #3). `estado` pinta o cap (borda superior) pra reuso na História
- * de 12 competências (#59); default `"neutro"` serve ao cockpit.
+ * Barras por competência (issue #55): forma honesta pra unidade discreta —
+ * o que a linha com gradiente/crosshair do antigo `TrendCard` mentia num mês
+ * parcial. Mês em curso nasce oco/tracejado (nunca compara — CONTEXT.md "mês
+ * em curso × mês fechado"); lacuna vira marcador distinto, nunca uma barra de
+ * zero disfarçada (invariante #3). `estado` pinta o cap (borda superior) pra
+ * a "História · 12 competências" do detalhe da Conta (#59) — o consumidor
+ * real deste componente, já que o cockpit (#58) passou a usar os
+ * Instrumentos herói+3 no lugar do gráfico de tendência.
  */
 export function BarrasCompetencia({
   titulo,
