@@ -57,6 +57,11 @@ export function serieTotalPago(
   return { estado: "com-dados", pontos }
 }
 
+/** Os pontos da série, ou lista vazia quando o Lar não tem Conta ativa — o unwrap comum aos consumidores. */
+export function pontosDe(serie: SerieTotalPago): PontoSerieMensal[] {
+  return serie.estado === "com-dados" ? serie.pontos : []
+}
+
 /**
  * O comparativo honesto (issue #48): o mês corrente nunca compara — é sempre
  * "em curso" (CONTEXT.md, "mês em curso × mês fechado") — e a variação só

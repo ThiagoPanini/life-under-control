@@ -14,6 +14,7 @@ import { formatBRL } from "@/core/domain/money"
 import {
   compararMesFechado,
   derivarAgregadosFinancas,
+  pontosDe,
   serieTotalPago,
 } from "@/core/use-cases/derive-agregados-financas"
 import { getPainel } from "@/core/use-cases/get-painel"
@@ -63,7 +64,7 @@ export default async function PainelPage() {
   )
   const hoje = systemClock().hoje()
   const serie = serieTotalPago(ativas, pagamentos, hoje)
-  const pontos = serie.estado === "com-dados" ? serie.pontos : []
+  const pontos = pontosDe(serie)
   const ultimo = pontos.at(-1)?.valor ?? 0
   const comparativo = compararMesFechado(serie)
 

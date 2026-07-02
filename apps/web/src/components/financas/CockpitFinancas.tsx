@@ -4,6 +4,7 @@ import { formatBRL } from "@/core/domain/money"
 import {
   type AgregadosMes,
   compararMesFechado,
+  pontosDe,
   type SerieTotalPago,
 } from "@/core/use-cases/derive-agregados-financas"
 import { textoComparativo, tonalidadeComparativo } from "./comparativo-mensal"
@@ -22,7 +23,7 @@ export function CockpitFinancas({
   serie: SerieTotalPago
 }) {
   const { totalPagoMes, contasEmAberto, gastoMensalMedio, estimativaFaltaPagar } = agregados
-  const pontos = serie.estado === "com-dados" ? serie.pontos : []
+  const pontos = pontosDe(serie)
   const current = pontos.at(-1)?.valor ?? totalPagoMes
   const comparativo = compararMesFechado(serie)
 
