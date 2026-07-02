@@ -1,6 +1,8 @@
+import { redirect } from "next/navigation"
 import { AreaCard } from "@/components/ds/AreaCard"
 import { PageHeader } from "@/components/ds/PageHeader"
 import { AREAS } from "@/core/domain/areas"
+import { assuntoUnicoAtivo } from "@/core/domain/nav-model"
 import { assuntosDaArea } from "@/core/domain/subjects"
 
 const financas = AREAS.find((area) => area.slug === "financas")
@@ -9,8 +11,16 @@ const financas = AREAS.find((area) => area.slug === "financas")
  * Raiz da Área Finanças: o mini-Painel de Assuntos (ADR-0009). A Área reúne seus
  * Assuntos como o Painel reúne as Áreas — reusa o card de Área. Config pura, sem
  * banco: o cockpit de Pagamentos Recorrentes vive um nível abaixo.
+ *
+ * Redirect condicional (emenda D1, 01/07/2026): com exatamente 1 Assunto ativo,
+ * o mini-Painel de um item só é um hop vazio — a raiz pula direto a ele.
  */
 export default function FinancasPage() {
+  const unico = assuntoUnicoAtivo("financas")
+  if (unico) {
+    redirect(`/areas/financas/${unico.slug}`)
+  }
+
   const assuntos = assuntosDaArea("financas")
 
   return (

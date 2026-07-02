@@ -6,7 +6,8 @@ import type { ComponentProps, ReactNode } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 // next/navigation e next/link não têm router montado nos testes — mockamos o mínimo.
-vi.mock("next/navigation", () => ({ usePathname: () => "/painel" }))
+const { usePathnameMock } = vi.hoisted(() => ({ usePathnameMock: vi.fn(() => "/painel") }))
+vi.mock("next/navigation", () => ({ usePathname: usePathnameMock }))
 // Evita puxar @/auth (next-auth) pelo server action de logout no ambiente de teste.
 vi.mock("@/app/actions", () => ({ logout: async () => {} }))
 vi.mock("next/link", () => ({
@@ -27,6 +28,7 @@ import { AppShell } from "./AppShell"
 afterEach(() => {
   cleanup()
   localStorage.clear()
+  usePathnameMock.mockReturnValue("/painel")
 })
 
 describe("AreaCard (Seam 3)", () => {
@@ -97,17 +99,119 @@ describe("AppShell sidebar (Seam 3)", () => {
     expect(container.querySelector("aside")).toHaveAttribute("data-collapsed", "true")
   })
 
-  it("test_navegacao_principal_destaca_financas", () => {
+  it("test_navegacao_principal_nao_lista_mais_financas", () => {
     render(<AppShell>conteúdo</AppShell>)
     const principal = screen.getByRole("navigation", { name: "Principal" })
 
-    expect(within(principal).getByRole("link", { name: "Finanças" })).toHaveAttribute(
+    expect(within(principal).queryByRole("link", { name: "Finanças" })).toBeNull()
+    expect(within(principal).getAllByRole("link")).toHaveLength(2)
+  })
+
+  it("test_area_com_assuntos_e_toggle_que_expande_e_colapsa_sem_navegar", async () => {
+    const user = userEvent.setup()
+    render(<AppShell>conteúdo</AppShell>)
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+    const toggle = within(areas).getByRole("button", { name: "Finanças" })
+
+    expect(toggle).toHaveAttribute("aria-expanded", "false")
+    expect(within(areas).queryByRole("link", { name: "Pagamentos Recorrentes" })).toBeNull()
+
+    await user.click(toggle)
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true")
+    expect(within(areas).getByRole("link", { name: "Pagamentos Recorrentes" })).toHaveAttribute(
       "href",
-      "/areas/financas",
+      "/areas/financas/pagamentos-recorrentes",
+    )
+
+    await user.click(toggle)
+
+    expect(toggle).toHaveAttribute("aria-expanded", "false")
+  })
+
+  it("test_area_da_rota_atual_vem_auto_expandida", () => {
+    usePathnameMock.mockReturnValue("/areas/financas/pagamentos-recorrentes")
+    render(<AppShell>conteúdo</AppShell>)
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+
+    expect(within(areas).getByRole("button", { name: "Finanças" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    )
+    expect(within(areas).getByRole("link", { name: "Pagamentos Recorrentes" })).toHaveAttribute(
+      "aria-current",
+      "page",
     )
   })
 
-  it("test_command_palette_abre_pelo_atalho_e_lista_destinos_reais", async () => {
+  it("test_toggle_manual_da_area_grava_preferencia_local", async () => {
+    const user = userEvent.setup()
+    render(<AppShell>conteúdo</AppShell>)
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+
+    await user.click(within(areas).getByRole("button", { name: "Finanças" }))
+
+    expect(JSON.parse(localStorage.getItem("luc:sidebar-expanded") ?? "[]")).toContain("financas")
+  })
+
+  it("test_colapso_manual_da_area_ativa_sobrevive_a_recarga", async () => {
+    const user = userEvent.setup()
+    usePathnameMock.mockReturnValue("/areas/financas/pagamentos-recorrentes")
+    const { unmount } = render(<AppShell>conteúdo</AppShell>)
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+    const toggle = within(areas).getByRole("button", { name: "Finanças" })
+    expect(toggle).toHaveAttribute("aria-expanded", "true")
+
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute("aria-expanded", "false")
+    unmount()
+
+    render(<AppShell>conteúdo</AppShell>)
+    const areasDepoisDoReload = screen.getByRole("navigation", { name: "Áreas" })
+    expect(within(areasDepoisDoReload).getByRole("button", { name: "Finanças" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    )
+  })
+
+  it("test_preferencia_local_corrompida_nao_quebra_a_sidebar", () => {
+    localStorage.setItem("luc:sidebar-expanded", "{ isso não é json")
+
+    expect(() => render(<AppShell>conteúdo</AppShell>)).not.toThrow()
+  })
+
+  it("test_area_em_breve_ativa_ganha_destaque_visual_na_rota_atual", () => {
+    usePathnameMock.mockReturnValue("/areas/saude")
+    render(<AppShell>conteúdo</AppShell>)
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+    const saude = within(areas).getByText("Saúde").closest("[aria-disabled]")
+
+    expect(saude).toHaveAttribute("aria-current", "page")
+  })
+
+  it("test_area_em_breve_sem_assuntos_fica_inerte", () => {
+    render(<AppShell>conteúdo</AppShell>)
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+    const saude = within(areas).getByText("Saúde").closest("[aria-disabled]")
+
+    expect(saude).toHaveAttribute("aria-disabled", "true")
+    expect(within(areas).queryByRole("button", { name: "Saúde" })).toBeNull()
+    expect(within(areas).queryByRole("link", { name: "Saúde" })).toBeNull()
+  })
+
+  it("test_assunto_em_breve_listado_mas_inerte", async () => {
+    const user = userEvent.setup()
+    render(<AppShell>conteúdo</AppShell>)
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+
+    await user.click(within(areas).getByRole("button", { name: "Finanças" }))
+
+    const investimentos = within(areas).getByText("Investimentos").closest("[aria-disabled]")
+    expect(investimentos).toHaveAttribute("aria-disabled", "true")
+    expect(within(areas).queryByRole("link", { name: "Investimentos" })).toBeNull()
+  })
+
+  it("test_command_palette_abre_pelo_atalho_e_lista_apenas_assuntos_ativos", async () => {
     const user = userEvent.setup()
     render(<AppShell>conteúdo</AppShell>)
 
@@ -115,11 +219,12 @@ describe("AppShell sidebar (Seam 3)", () => {
 
     const dialog = screen.getByRole("dialog", { name: "Ir para…" })
     expect(within(dialog).getByRole("link", { name: /Painel/ })).toHaveAttribute("href", "/painel")
-    expect(within(dialog).getByRole("link", { name: /Finanças/ })).toHaveAttribute(
+    expect(within(dialog).getByRole("link", { name: /Pagamentos Recorrentes/ })).toHaveAttribute(
       "href",
       "/areas/financas/pagamentos-recorrentes",
     )
     expect(within(dialog).getByRole("link", { name: /Agenda/ })).toHaveAttribute("href", "/agenda")
+    expect(within(dialog).queryByRole("link", { name: /Saúde/ })).toBeNull()
   })
 })
 

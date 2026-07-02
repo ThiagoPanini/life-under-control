@@ -2,6 +2,7 @@
 
 import {
   Calendar,
+  ChevronRight,
   Grid2X2,
   LayoutDashboard,
   LogOut,
@@ -16,14 +17,13 @@ import { type ReactNode, useEffect, useRef, useState } from "react"
 import { logout } from "@/app/actions"
 import { AreaIcon } from "@/components/areas/AreaIcon"
 import { Logo } from "@/components/brand/Logo"
+import { Pill } from "@/components/ds/Pill"
 import { AREAS, type Area } from "@/core/domain/areas"
+import { buildNavModel, type NavArea, naArea } from "@/core/domain/nav-model"
+import { SUBJECTS } from "@/core/domain/subjects"
 
 export const SIDEBAR_STORAGE_KEY = "luc:sidebar-collapsed"
-
-/** A rota está dentro de uma Área (a própria ou uma sub-rota como /nova)? */
-function naArea(pathname: string, slug: string): boolean {
-  return pathname === `/areas/${slug}` || pathname.startsWith(`/areas/${slug}/`)
-}
+export const SIDEBAR_EXPANDED_STORAGE_KEY = "luc:sidebar-expanded"
 
 const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-luc-bg"
@@ -248,7 +248,52 @@ function DesktopHeader({
   )
 }
 
+/** Lê o array de slugs persistido; qualquer formato inesperado vira conjunto vazio, nunca exceção. */
+function parseSlugSet(raw: string): Set<string> {
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return new Set()
+    return new Set(parsed.filter((item): item is string => typeof item === "string"))
+  } catch {
+    return new Set()
+  }
+}
+
 function DesktopSidebar({ pathname, collapsed }: { pathname: string; collapsed: boolean }) {
+  const navModel = buildNavModel(pathname)
+  const rotaAtivaSlug = navModel.find((area) => area.ativa)?.slug
+  const [expandedAreas, setExpandedAreas] = useState<Set<string>>(() => new Set())
+  const primeiraRotaRef = useRef(true)
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: hidratação de montagem — só usa rotaAtivaSlug se não houver preferência persistida
+  useEffect(() => {
+    const persisted = localStorage.getItem(SIDEBAR_EXPANDED_STORAGE_KEY)
+    const inicial = persisted ? parseSlugSet(persisted) : new Set<string>()
+    if (!persisted && rotaAtivaSlug) inicial.add(rotaAtivaSlug)
+    setExpandedAreas(inicial)
+  }, [])
+
+  useEffect(() => {
+    if (primeiraRotaRef.current) {
+      primeiraRotaRef.current = false
+      return
+    }
+    if (!rotaAtivaSlug) return
+    setExpandedAreas((current) =>
+      current.has(rotaAtivaSlug) ? current : new Set(current).add(rotaAtivaSlug),
+    )
+  }, [rotaAtivaSlug])
+
+  function toggleArea(slug: string) {
+    setExpandedAreas((current) => {
+      const next = new Set(current)
+      if (next.has(slug)) next.delete(slug)
+      else next.add(slug)
+      localStorage.setItem(SIDEBAR_EXPANDED_STORAGE_KEY, JSON.stringify([...next]))
+      return next
+    })
+  }
+
   return (
     <aside
       data-collapsed={collapsed}
@@ -278,14 +323,6 @@ function DesktopSidebar({ pathname, collapsed }: { pathname: string; collapsed: 
           <LayoutDashboard size={18} strokeWidth={1.7} aria-hidden />
         </NavItem>
         <NavItem
-          href="/areas/financas"
-          label="Finanças"
-          active={naArea(pathname, "financas")}
-          collapsed={collapsed}
-        >
-          <AreaIcon name="wallet" size={18} />
-        </NavItem>
-        <NavItem
           href="/agenda"
           label="Agenda"
           active={pathname === "/agenda"}
@@ -302,18 +339,27 @@ function DesktopSidebar({ pathname, collapsed }: { pathname: string; collapsed: 
           </p>
         )}
         <nav aria-label="Áreas" className="flex flex-col gap-1">
-          {AREAS.map((area) => (
-            <NavItem
-              key={area.slug}
-              href={`/areas/${area.slug}`}
-              label={area.nome}
-              active={naArea(pathname, area.slug)}
-              collapsed={collapsed}
-              areaState={area.estado}
-            >
-              <AreaIcon name={area.icon} size={18} />
-            </NavItem>
-          ))}
+          {collapsed
+            ? AREAS.map((area) => (
+                <NavItem
+                  key={area.slug}
+                  href={`/areas/${area.slug}`}
+                  label={area.nome}
+                  active={naArea(pathname, area.slug)}
+                  collapsed={collapsed}
+                  areaState={area.estado}
+                >
+                  <AreaIcon name={area.icon} size={18} />
+                </NavItem>
+              ))
+            : navModel.map((area) => (
+                <AreaNavGroup
+                  key={area.slug}
+                  area={area}
+                  expanded={expandedAreas.has(area.slug)}
+                  onToggle={() => toggleArea(area.slug)}
+                />
+              ))}
         </nav>
       </div>
 
@@ -342,6 +388,117 @@ function DesktopSidebar({ pathname, collapsed }: { pathname: string; collapsed: 
         </form>
       </div>
     </aside>
+  )
+}
+
+/**
+ * Linha de Área na sidebar expandida (issue #46, ADR-0009): Área com Assuntos é
+ * um toggle puro (nunca navega); Área em-breve sem Assuntos fica inerte.
+ */
+function AreaNavGroup({
+  area,
+  expanded,
+  onToggle,
+}: {
+  area: NavArea
+  expanded: boolean
+  onToggle: () => void
+}) {
+  const assuntosId = `area-assuntos-${area.slug}`
+
+  if (!area.expandivel) {
+    return (
+      <div
+        aria-disabled="true"
+        aria-current={area.ativa ? "page" : undefined}
+        className={`relative flex min-h-10 items-center gap-3 rounded-luc-md px-3 text-[13.5px] font-semibold ${
+          area.ativa ? "bg-luc-accent-12 text-luc-text" : "text-luc-disabled"
+        }`}
+      >
+        {area.ativa && (
+          <span
+            aria-hidden
+            className="absolute top-2 bottom-2 -left-3 w-[2.5px] rounded-full bg-luc-accent"
+          />
+        )}
+        <span className="shrink-0">
+          <AreaIcon name={area.icon} size={18} />
+        </span>
+        <span className="min-w-0 flex-1 truncate">{area.nome}</span>
+        <span className="shrink-0 rounded-[5px] border border-luc-border px-1.5 py-px text-[9.5px] font-medium text-luc-faint">
+          em breve
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={assuntosId}
+        onClick={onToggle}
+        className={`relative flex min-h-10 w-full items-center gap-3 rounded-luc-md px-3 text-[13.5px] font-semibold transition-colors ${FOCUS} ${
+          area.ativa
+            ? "bg-luc-accent-12 text-luc-text"
+            : "text-luc-text-2 hover:bg-luc-surface-2 hover:text-luc-text"
+        }`}
+      >
+        <ChevronRight
+          size={14}
+          strokeWidth={2}
+          aria-hidden
+          className={`shrink-0 text-luc-text-3 transition-transform [transition-duration:160ms] ${expanded ? "rotate-90" : ""}`}
+        />
+        <span className="shrink-0">
+          <AreaIcon name={area.icon} size={18} />
+        </span>
+        <span className="min-w-0 flex-1 truncate text-left">{area.nome}</span>
+        {area.estado === "ativa" && (
+          <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-luc-success" />
+        )}
+      </button>
+      {expanded && (
+        <nav
+          id={assuntosId}
+          aria-label={`Assuntos de ${area.nome}`}
+          className="mt-0.5 ml-[27px] flex flex-col gap-0.5 border-luc-border border-l pl-2.5"
+        >
+          {area.assuntos.map((subject) =>
+            subject.inerte ? (
+              <div
+                key={subject.slug}
+                aria-disabled="true"
+                className="flex min-h-8 items-center gap-2 rounded-luc-md px-2.5 text-[13px] text-luc-disabled"
+              >
+                <span className="min-w-0 flex-1 truncate">{subject.nome}</span>
+                <Pill tone="warn">em breve</Pill>
+              </div>
+            ) : (
+              <Link
+                key={subject.slug}
+                href={subject.href}
+                aria-current={subject.ativa ? "page" : undefined}
+                className={`relative flex min-h-8 items-center rounded-luc-md px-2.5 text-[13px] font-medium transition-colors ${FOCUS} ${
+                  subject.ativa
+                    ? "bg-luc-accent-12 text-luc-text"
+                    : "text-luc-text-2 hover:bg-luc-surface-2 hover:text-luc-text"
+                }`}
+              >
+                {subject.ativa && (
+                  <span
+                    aria-hidden
+                    className="absolute top-1.5 bottom-1.5 -left-[13px] w-[2px] rounded-full bg-luc-accent"
+                  />
+                )}
+                <span className="min-w-0 flex-1 truncate">{subject.nome}</span>
+              </Link>
+            ),
+          )}
+        </nav>
+      )}
+    </div>
   )
 }
 
@@ -610,19 +767,13 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
 
   const destinations = [
     { href: "/painel", label: "Painel", hint: "visão do Lar", icon: <LayoutDashboard /> },
-    {
-      href: "/areas/financas/pagamentos-recorrentes",
-      label: "Finanças · Pagamentos",
-      hint: "métricas e Contas",
-      icon: <AreaIcon name="wallet" />,
-    },
-    { href: "/agenda", label: "Agenda", hint: "o que vence", icon: <Calendar /> },
-    ...AREAS.filter((area) => area.slug !== "financas").map((area) => ({
-      href: `/areas/${area.slug}`,
-      label: area.nome,
-      hint: "em breve",
-      icon: <AreaIcon name={area.icon} />,
+    ...SUBJECTS.filter((subject) => subject.estado === "ativa").map((subject) => ({
+      href: `/areas/${subject.areaSlug}/${subject.slug}`,
+      label: subject.nome,
+      hint: subject.resumo ?? "",
+      icon: <AreaIcon name={subject.icon} />,
     })),
+    { href: "/agenda", label: "Agenda", hint: "o que vence", icon: <Calendar /> },
   ]
 
   return (
