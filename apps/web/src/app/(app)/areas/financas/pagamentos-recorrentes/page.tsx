@@ -10,11 +10,10 @@ import { SectionHeading } from "@/components/ds/SectionHeading"
 import { BillCard } from "@/components/financas/BillCard"
 import { CockpitFinancas } from "@/components/financas/CockpitFinancas"
 import { EncerradasSection } from "@/components/financas/EncerradasSection"
-import {
-  derivarAgregadosFinancas,
-  serieTotalPago,
-} from "@/core/use-cases/derive-agregados-financas"
-import { derivarCardConta } from "@/core/use-cases/derive-bill-card"
+import { gastoMensalMedio } from "@/core/use-cases/derive-agregados-financas"
+import { derivarCardConta, mesDe } from "@/core/use-cases/derive-bill-card"
+import { derivarFormaCompetencia } from "@/core/use-cases/derive-forma-competencia"
+import { calcularPontualidade12m } from "@/core/use-cases/derive-pontualidade"
 import { getLogoUrl } from "@/core/use-cases/get-logo-url"
 import { getPainel } from "@/core/use-cases/get-painel"
 import { listAllPayments } from "@/core/use-cases/list-all-payments"
@@ -36,16 +35,20 @@ export default async function FinancasPage() {
   const ativas = bills.filter((b) => b.estado === "ativa")
   const encerradas = bills.filter((b) => b.estado === "encerrada")
 
-  // Agregados do mês (cockpit, #22): somam o Lar inteiro — uma só leitura de
-  // todos os Lançamentos das Contas ativas (sem N+1 por Conta).
+  // A lente de competência (cockpit, #58): soma o Lar inteiro — uma só leitura
+  // de todos os Lançamentos das Contas ativas (sem N+1 por Conta).
   const pagamentos = await listAllPayments(drizzlePaymentRepo(), lar.id)
-  const agregados = derivarAgregadosFinancas(
+  const hoje = systemClock().hoje()
+  const competencia = mesDe(hoje)
+  const forma = derivarFormaCompetencia(
     systemClock(),
     nationalBankCalendar(),
     ativas,
     pagamentos,
+    competencia,
   )
-  const serie = serieTotalPago(ativas, pagamentos, systemClock().hoje())
+  const pontualidade = calcularPontualidade12m(ativas, pagamentos, hoje, nationalBankCalendar())
+  const gastoMedio = gastoMensalMedio(ativas, pagamentos, hoje)
 
   // Logo das Contas que têm (#50): a URL assinada é presign local (sem rede),
   // então resolver todas de uma vez é barato — sem N+1 real.
@@ -90,7 +93,13 @@ export default async function FinancasPage() {
               title="Panorama"
               subtitle="Métricas do mês e a tendência dos pagamentos"
             />
-            <CockpitFinancas agregados={agregados} serie={serie} />
+            <CockpitFinancas
+              competencia={competencia}
+              hoje={hoje}
+              forma={forma}
+              gastoMensalMedio={gastoMedio}
+              pontualidade={pontualidade}
+            />
           </section>
         )}
 

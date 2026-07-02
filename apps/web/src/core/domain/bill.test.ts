@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   type BillBruto,
+  descreverMesPorExtenso,
   descreverRecorrencia,
   descreverVencimento,
   ehDataIsoValida,
@@ -163,6 +164,15 @@ describe("descreverRecorrencia (Seam 1)", () => {
     expect(descreverRecorrencia({ intervalMonths: 4, anchorMonth: 3 })).toBe(
       "A cada 4 meses · Março",
     )
+  })
+})
+
+describe("descreverMesPorExtenso (Seam 1)", () => {
+  it("test_mes_por_extenso_minusculo", () => {
+    expect(descreverMesPorExtenso("2026-07")).toBe("julho de 2026")
+  })
+  it("test_janeiro_por_extenso", () => {
+    expect(descreverMesPorExtenso("2026-01")).toBe("janeiro de 2026")
   })
 })
 
