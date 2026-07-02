@@ -1,30 +1,28 @@
 import { MetricCard } from "@/components/ds/MetricCard"
-import { TrendCard } from "@/components/ds/TrendCard"
+import { BarrasCompetencia } from "@/components/financas/BarrasCompetencia"
+import type { Bill } from "@/core/domain/bill"
 import { formatBRL } from "@/core/domain/money"
 import {
   type AgregadosMes,
   compararMesFechado,
-  pontosDe,
   type SerieTotalPago,
 } from "@/core/use-cases/derive-agregados-financas"
+import { pontosBarraCompetencia } from "@/core/use-cases/derive-barras-competencia"
 import { textoComparativo, tonalidadeComparativo } from "./comparativo-mensal"
-
-const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
-
-function monthShort(competencia: string) {
-  return MONTHS[Number(competencia.slice(5, 7)) - 1]
-}
 
 export function CockpitFinancas({
   agregados,
   serie,
+  bills,
+  hoje,
 }: {
   agregados: AgregadosMes
   serie: SerieTotalPago
+  bills: Bill[]
+  hoje: string
 }) {
   const { totalPagoMes, contasEmAberto, gastoMensalMedio, estimativaFaltaPagar } = agregados
-  const pontos = pontosDe(serie)
-  const current = pontos.at(-1)?.valor ?? totalPagoMes
+  const pontos = pontosBarraCompetencia(serie, bills, hoje)
   const comparativo = compararMesFechado(serie)
 
   return (
@@ -53,18 +51,12 @@ export function CockpitFinancas({
         />
       </div>
 
-      <TrendCard
-        label="Total pago por mês"
-        period={
-          pontos.length > 0
-            ? `${monthShort(pontos[0].competencia)} — ${monthShort(pontos.at(-1)?.competencia ?? pontos[0].competencia)}`
-            : "sem histórico"
-        }
-        value={formatBRL(current)}
-        delta={textoComparativo(comparativo)}
+      <BarrasCompetencia
+        titulo="Total pago por competência"
+        pontos={pontos}
+        mediaMensal={gastoMensalMedio}
+        deltaTexto={textoComparativo(comparativo)}
         deltaTone={tonalidadeComparativo(comparativo)}
-        values={pontos.map((ponto) => ponto.valor)}
-        labels={pontos.map((ponto) => monthShort(ponto.competencia))}
       />
 
       <p className="px-1 text-xs leading-snug text-luc-text-3">

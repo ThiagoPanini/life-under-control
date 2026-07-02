@@ -39,13 +39,14 @@ export default async function FinancasPage() {
   // Agregados do mês (cockpit, #22): somam o Lar inteiro — uma só leitura de
   // todos os Lançamentos das Contas ativas (sem N+1 por Conta).
   const pagamentos = await listAllPayments(drizzlePaymentRepo(), lar.id)
+  const hoje = systemClock().hoje()
   const agregados = derivarAgregadosFinancas(
     systemClock(),
     nationalBankCalendar(),
     ativas,
     pagamentos,
   )
-  const serie = serieTotalPago(ativas, pagamentos, systemClock().hoje())
+  const serie = serieTotalPago(ativas, pagamentos, hoje)
 
   // Logo das Contas que têm (#50): a URL assinada é presign local (sem rede),
   // então resolver todas de uma vez é barato — sem N+1 real.
@@ -90,7 +91,7 @@ export default async function FinancasPage() {
               title="Panorama"
               subtitle="Métricas do mês e a tendência dos pagamentos"
             />
-            <CockpitFinancas agregados={agregados} serie={serie} />
+            <CockpitFinancas agregados={agregados} serie={serie} bills={ativas} hoje={hoje} />
           </section>
         )}
 

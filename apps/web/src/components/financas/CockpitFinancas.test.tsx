@@ -32,16 +32,16 @@ const serie: SerieTotalPago = {
 
 describe("CockpitFinancas (Seam 2)", () => {
   it("test_formata_os_quatro_agregados_em_brl", () => {
-    render(<CockpitFinancas agregados={base} serie={serie} />)
+    render(<CockpitFinancas agregados={base} serie={serie} bills={[]} hoje="2026-06-15" />)
     expect(screen.getByText("Pago no mês")).toBeInTheDocument()
-    expect(screen.getAllByText("R$ 100,00").length).toBeGreaterThanOrEqual(1) // pago + tendência
-    expect(screen.getByText("R$ 120,00")).toBeInTheDocument() // gasto médio
+    expect(screen.getAllByText("R$ 100,00").length).toBeGreaterThanOrEqual(1) // pago + barra jun
+    expect(screen.getAllByText("R$ 120,00").length).toBeGreaterThanOrEqual(1) // gasto médio + barra mai
     expect(screen.getByText("R$ 60,00")).toBeInTheDocument() // falta pagar
     expect(screen.getByText("2")).toBeInTheDocument() // em aberto
   })
 
   it("test_falta_pagar_vem_rotulada_como_estimativa", () => {
-    render(<CockpitFinancas agregados={base} serie={serie} />)
+    render(<CockpitFinancas agregados={base} serie={serie} bills={[]} hoje="2026-06-15" />)
     // marcada como estimativa: a tag junto do rótulo + a nota explicativa
     expect(screen.getAllByText("estimativa").length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText("Falta pagar").length).toBeGreaterThanOrEqual(1)
@@ -51,6 +51,8 @@ describe("CockpitFinancas (Seam 2)", () => {
     render(
       <CockpitFinancas
         serie={serie}
+        bills={[]}
+        hoje="2026-06-15"
         agregados={{
           totalPagoMes: 0,
           contasEmAberto: 0,
