@@ -28,10 +28,7 @@ export function CockpitFinancas({
   const comparativo = compararMesFechado(serie)
 
   return (
-    <section aria-labelledby="finance-readings" className="flex flex-col gap-3.5">
-      <h2 id="finance-readings" className="sr-only">
-        Leituras de Finanças
-      </h2>
+    <div className="flex flex-col gap-3.5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <MetricCard
           label="Pago no mês"
@@ -74,6 +71,6 @@ export function CockpitFinancas({
         <span className="font-medium text-luc-text-2">Falta pagar</span> é uma <em>estimativa</em>{" "}
         derivada do histórico de cada Conta. O valor exato só nasce no Lançamento.
       </p>
-    </section>
+    </div>
   )
 }
