@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server"
-import { auth } from "@/auth"
+import NextAuth from "next-auth"
+import { authConfig } from "@/auth.config"
 import { gateRedirect } from "@/core/use-cases/gate"
+
+// Usa SÓ a config edge-safe (`auth.config`): o `auth.ts` completo arrastaria os
+// adapters Node (R2/aws-sdk→crypto, Drizzle/pg) pro bundle edge e quebraria o
+// middleware em runtime ("edge runtime does not support Node.js 'crypto'").
+const { auth } = NextAuth(authConfig)
 
 // A porta (ADR-0004): sem sessão → login; logado mirando a porta/landing → Painel.
 export default auth((req) => {
