@@ -60,4 +60,30 @@ describe("httpImageFetcher (Seam 2 — fetch mockado)", () => {
 
     await expect(httpImageFetcher("https://google/foto.jpg")).resolves.toBeNull()
   })
+
+  it("test_passa_signal_com_teto_de_tempo_nunca_trava_o_login_indefinidamente", async () => {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({
+      ok: true,
+      headers: new Headers({ "content-type": "image/jpeg" }),
+      arrayBuffer: async () => new Uint8Array([1]).buffer,
+    }))
+    vi.stubGlobal("fetch", fetchMock)
+
+    await httpImageFetcher("https://google/foto.jpg")
+
+    const [, init] = fetchMock.mock.calls[0]
+    expect(init?.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it("test_timeout_estoura_o_signal_devolve_nulo_nunca_lanca", async () => {
+    // É o que `fetch` lança quando o `AbortSignal.timeout(...)` passado dispara.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new DOMException("The operation timed out.", "TimeoutError")
+      }),
+    )
+
+    await expect(httpImageFetcher("https://google/foto.jpg")).resolves.toBeNull()
+  })
 })

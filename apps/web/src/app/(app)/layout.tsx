@@ -3,7 +3,7 @@ import type { ReactNode } from "react"
 import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
 import { r2AttachmentStore } from "@/adapters/r2/r2-attachment-store"
 import { auth } from "@/auth"
-import { AppShell } from "@/components/shell/AppShell"
+import { AppShell, type ShellPessoa } from "@/components/shell/AppShell"
 import { resolveAvatares } from "@/core/use-cases/resolve-avatares"
 
 /**
@@ -17,8 +17,23 @@ import { resolveAvatares } from "@/core/use-cases/resolve-avatares"
 export default async function AppLayout({ children }: { children: ReactNode }) {
   if (!(await auth())) redirect("/login")
 
-  const lar = await drizzleHouseholdRepo().carregarLar()
-  const pessoas = lar ? await resolveAvatares(lar.pessoas, r2AttachmentStore()) : undefined
+  const pessoas = await carregarPessoasComAvatar()
 
   return <AppShell pessoas={pessoas}>{children}</AppShell>
+}
+
+/**
+ * Carrega as Pessoas com avatar pra casca — nunca deixa uma falha aqui (R2 mal
+ * configurado, banco fora do ar) derrubar TODA rota autenticada com um 500; a
+ * casca cai no fallback padrão de `AppShell` (2 badges sem foto) e o resto da
+ * página renderiza normal.
+ */
+async function carregarPessoasComAvatar(): Promise<ShellPessoa[] | undefined> {
+  try {
+    const lar = await drizzleHouseholdRepo().carregarLar()
+    return lar ? await resolveAvatares(lar.pessoas, r2AttachmentStore()) : undefined
+  } catch (err) {
+    console.error("[layout] falha ao carregar Pessoas com avatar — casca cai no fallback:", err)
+    return undefined
+  }
 }

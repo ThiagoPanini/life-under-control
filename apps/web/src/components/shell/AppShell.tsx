@@ -18,6 +18,7 @@ import { logout } from "@/app/actions"
 import { AreaIcon } from "@/components/areas/AreaIcon"
 import { Logo } from "@/components/brand/Logo"
 import { PersonAvatar } from "@/components/ds/PersonAvatar"
+import { personKey } from "@/components/ds/PersonChip"
 import { Pill } from "@/components/ds/Pill"
 import { AREAS, type Area } from "@/core/domain/areas"
 import { buildNavModel, type NavArea, naArea } from "@/core/domain/nav-model"
@@ -764,13 +765,8 @@ function NavItem({
   )
 }
 
-/** Chave de cor por Pessoa (o Lar tem exatamente 2 — invariante #2); qualquer 3ª cai em "thiago". */
-function shellPersonKey(nome: string): "thiago" | "jakeline" {
-  return nome.toLocaleLowerCase("pt-BR") === "jakeline" ? "jakeline" : "thiago"
-}
-
 function ShellPersonBadge({ pessoa }: { pessoa: ShellPessoa }) {
-  const key = shellPersonKey(pessoa.nome)
+  const key = personKey(pessoa)
   const colors = {
     color: `var(--luc-${key}-fg)`,
     backgroundColor: `var(--luc-${key}-bg)`,

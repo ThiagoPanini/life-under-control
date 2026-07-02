@@ -51,6 +51,45 @@ describe("PersonAvatar (Seam 3)", () => {
     expect(container.querySelector("[aria-hidden].animate-pulse")).not.toBeInTheDocument()
   })
 
+  it("test_com_avatarurl_erro_de_carga_cai_no_fallback_em_vez_de_travar_no_skeleton", () => {
+    const { container } = render(
+      <PersonAvatar
+        avatarUrl="https://conta.r2.cloudflarestorage.com/quebrada.jpg"
+        inicial="T"
+        nome="Thiago"
+        size={26}
+        colors={colors}
+      />,
+    )
+
+    fireEvent.error(screen.getByAltText("Thiago"))
+
+    expect(container.querySelector("[aria-hidden].animate-pulse")).not.toBeInTheDocument()
+    expect(screen.getByLabelText("Thiago")).toHaveTextContent("T")
+  })
+
+  it("test_decorative_nao_duplica_o_nome_pro_leitor_de_tela", () => {
+    render(<PersonAvatar decorative inicial="T" nome="Thiago" size={28} colors={colors} />)
+
+    expect(screen.queryByLabelText("Thiago")).toBeNull()
+    expect(screen.queryByRole("img")).toBeNull()
+  })
+
+  it("test_decorative_com_foto_usa_alt_vazio", () => {
+    render(
+      <PersonAvatar
+        decorative
+        avatarUrl="https://conta.r2.cloudflarestorage.com/foto.jpg"
+        inicial="T"
+        nome="Thiago"
+        size={28}
+        colors={colors}
+      />,
+    )
+
+    expect(screen.queryByAltText("Thiago")).toBeNull()
+  })
+
   it("test_geometria_quadrado_arredondado_via_classname_nunca_circulo", () => {
     render(
       <PersonAvatar
