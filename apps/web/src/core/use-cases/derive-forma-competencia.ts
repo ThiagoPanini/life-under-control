@@ -74,7 +74,7 @@ function temOcorrenciaNoMes(bill: Bill, competencia: string): boolean {
 }
 
 /** Contas ativas com ocorrência na Competência — o denominador M de quitadas e o universo do projetado/marcadores. */
-function contasDoMes(bills: Bill[], competencia: string): Bill[] {
+export function contasDoMes(bills: Bill[], competencia: string): Bill[] {
   return contasAtivas(bills).filter((bill) => temOcorrenciaNoMes(bill, competencia))
 }
 

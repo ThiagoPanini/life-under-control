@@ -7,22 +7,16 @@ import { r2AttachmentStore } from "@/adapters/r2/r2-attachment-store"
 import { Button } from "@/components/ds/Button"
 import { PageHeader } from "@/components/ds/PageHeader"
 import { SectionHeading } from "@/components/ds/SectionHeading"
-import { CockpitFinancas } from "@/components/financas/CockpitFinancas"
-import {
-  CompetenciaSelector,
-  type OpcaoCompetencia,
-} from "@/components/financas/CompetenciaSelector"
+import { CenarioPagamentosMes } from "@/components/financas/CenarioPagamentosMes"
 import { EncerradasSection } from "@/components/financas/EncerradasSection"
 import { LinhaConta } from "@/components/financas/LinhaConta"
 import { NovaContaModal } from "@/components/financas/NovaContaModal"
-import { descreverMesPorExtenso } from "@/core/domain/bill"
-import { ehCompetenciaValida } from "@/core/domain/payment"
-import { gastoMensalMedio } from "@/core/use-cases/derive-agregados-financas"
-import { mesDe, ocorrenciasRecentes } from "@/core/use-cases/derive-bill-card"
-import { derivarFormaCompetencia } from "@/core/use-cases/derive-forma-competencia"
-import { derivarInsightsCompetencia } from "@/core/use-cases/derive-insights-competencia"
-import { derivarLinhasContas } from "@/core/use-cases/derive-linha-conta"
-import { calcularPontualidade12m } from "@/core/use-cases/derive-pontualidade"
+import { type BlocoPanorama, PanoramaContas } from "@/components/financas/PanoramaContas"
+import { PendenciasAnterioresChip } from "@/components/financas/PendenciasAnterioresChip"
+import { formatarDataBr } from "@/core/domain/bill"
+import { derivarCenarioMes } from "@/core/use-cases/derive-cenario-mes"
+import { listarPendenciasAnteriores } from "@/core/use-cases/derive-forma-competencia"
+import { derivarLinhasContas, type LinhaConta as Linha } from "@/core/use-cases/derive-linha-conta"
 import { getLogoUrl } from "@/core/use-cases/get-logo-url"
 import { getPainel } from "@/core/use-cases/get-painel"
 import { listAllPayments } from "@/core/use-cases/list-all-payments"
@@ -38,58 +32,35 @@ const EYEBROW = (
   </span>
 )
 
-/** Cockpit do Assunto Pagamentos Recorrentes: agregados do mês no topo (#22) + lista de Contas e cadastro. */
+/** "pago em dd/mm" quando quitada (fato do Lançamento); frase de urgência (#62) quando em aberto. */
+function fraseDoBloco(linha: Linha, dataPagamento: string | null | undefined): string {
+  if (linha.farol !== "verde") return linha.frase
+  return dataPagamento ? `pago em ${formatarDataBr(dataPagamento).slice(0, 5)}` : "pago · sem data"
+}
+
+/** Cockpit do Assunto Pagamentos Recorrentes: a Análise do mês vigente no topo + lista de Contas e cadastro. */
 export default async function FinancasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ competencia?: string; nova?: string }>
+  searchParams: Promise<{ nova?: string }>
 }) {
-  const { competencia: competenciaParam, nova } = await searchParams
+  const { nova } = await searchParams
   const { lar } = await getPainel(drizzleHouseholdRepo())
   const bills = await listBills(drizzleBillRepo(), lar.id)
   const ativas = bills.filter((b) => b.estado === "ativa")
   const encerradas = bills.filter((b) => b.estado === "encerrada")
 
-  // A lente de competência (cockpit, #58): soma o Lar inteiro — uma só leitura
-  // de todos os Lançamentos das Contas ativas (sem N+1 por Conta).
+  // A Análise soma o Lar inteiro — uma só leitura de todos os Lançamentos das
+  // Contas ativas (sem N+1 por Conta).
   const pagamentos = await listAllPayments(drizzlePaymentRepo(), lar.id)
   const hoje = systemClock().hoje()
-  const competenciaCorrente = mesDe(hoje)
-  const competenciasDisponiveis = ocorrenciasRecentes(
-    { intervalMonths: 1, anchorMonth: null },
-    competenciaCorrente,
-    12,
-  )
-  const competencia =
-    ehCompetenciaValida(competenciaParam ?? "") &&
-    competenciasDisponiveis.includes(competenciaParam as string)
-      ? (competenciaParam as string)
-      : competenciaCorrente
-  const insights = derivarInsightsCompetencia(systemClock(), ativas, pagamentos, competencia)
-  const forma = derivarFormaCompetencia(
-    systemClock(),
+  const cenario = derivarCenarioMes(systemClock(), ativas, pagamentos)
+  const pendenciasAnteriores = listarPendenciasAnteriores(
     nationalBankCalendar(),
     ativas,
     pagamentos,
-    competencia,
+    cenario.competencia,
   )
-  const pontualidade = calcularPontualidade12m(
-    ativas,
-    pagamentos,
-    insights.dataReferencia,
-    nationalBankCalendar(),
-  )
-  const gastoMedio = gastoMensalMedio(ativas, pagamentos, insights.dataReferencia)
-  const opcoesCompetencia: OpcaoCompetencia[] = competenciasDisponiveis.map((value) => ({
-    value,
-    label: descreverMesPorExtenso(value).replace(/^./, (letra) => letra.toUpperCase()),
-    emCurso: value === competenciaCorrente,
-  }))
-  const queryCompetencia = competencia === competenciaCorrente ? "" : `competencia=${competencia}`
-  const closeNovaHref = queryCompetencia
-    ? `/areas/financas/pagamentos-recorrentes?${queryCompetencia}`
-    : "/areas/financas/pagamentos-recorrentes"
-  const novaHref = `${closeNovaHref}${queryCompetencia ? "&" : "?"}nova=1`
 
   // Logo das Contas que têm (#50): a URL assinada é presign local (sem rede),
   // então resolver todas de uma vez é barato — sem N+1 real.
@@ -107,41 +78,63 @@ export default async function FinancasPage({
   const pessoasComAvatar = await resolveAvatares(lar.pessoas, store)
   const billsPorId = new Map(ativas.map((bill) => [bill.id, bill]))
 
+  // Panorama (Final): só as ocorrências do mês vigente — o mesmo universo do
+  // Cenário. Conta fora de fase segue visível em "Contas ativas" e, se em
+  // aberto, no chip de pendências anteriores.
+  const blocos: BlocoPanorama[] = linhas
+    .filter((linha) => linha.competenciaVigente === cenario.competencia)
+    .map((linha) => {
+      const bill = billsPorId.get(linha.billId)
+      if (!bill) return null
+      const vigente = pagamentos.find(
+        (p) => p.billId === linha.billId && p.competencia === linha.competenciaVigente,
+      )
+      return {
+        billId: linha.billId,
+        nome: bill.nome,
+        icon: bill.icon,
+        logoUrl: logoUrls.get(bill.id) ?? null,
+        farol: linha.farol,
+        frase: fraseDoBloco(linha, vigente?.dataPagamento),
+        valor: linha.valor,
+        registrarHref:
+          linha.farol === "verde"
+            ? null
+            : `/areas/financas/pagamentos-recorrentes/${bill.id}?registrar=1&competencia=${linha.competenciaVigente}`,
+      }
+    })
+    .filter((bloco): bloco is BlocoPanorama => bloco != null)
+
   return (
     <div className="luc-page-gutter py-7 sm:py-9 lg:py-10">
       <div className="mx-auto flex max-w-[1120px] flex-col gap-6">
         <PageHeader
           eyebrow={EYEBROW}
           title="Pagamentos Recorrentes"
+          description="Gerenciamento de Contas e pagamentos recorrentes (normalmente mensais) relevantes para o casal."
           actions={
-            <Button href={novaHref} variant="primary">
+            <Button href="/areas/financas/pagamentos-recorrentes?nova=1" variant="primary">
               Nova Conta
             </Button>
           }
         />
 
         {ativas.length > 0 && (
-          <section aria-labelledby="panorama-heading" className="flex flex-col gap-3.5">
+          <section aria-labelledby="analise-heading" className="flex flex-col gap-[18px]">
             <SectionHeading
-              id="panorama-heading"
-              title="Panorama"
-              subtitle="Métricas do mês e a tendência dos pagamentos"
+              id="analise-heading"
+              title="Análise do mês vigente"
               actions={
-                <CompetenciaSelector
-                  competencia={competencia}
-                  competenciaCorrente={competenciaCorrente}
-                  opcoes={opcoesCompetencia}
-                />
+                <span className="font-mono text-[11px] text-luc-muted">
+                  hoje é {formatarDataBr(hoje)}
+                </span>
               }
             />
-            <CockpitFinancas
-              competencia={competencia}
-              hoje={hoje}
-              forma={forma}
-              gastoMensalMedio={gastoMedio}
-              pontualidade={pontualidade}
-              insights={insights}
-            />
+            <PanoramaContas blocos={blocos} />
+            <div className="flex flex-col gap-2.5">
+              <CenarioPagamentosMes cenario={cenario} />
+              <PendenciasAnterioresChip pendencias={pendenciasAnteriores} />
+            </div>
           </section>
         )}
 
@@ -185,7 +178,7 @@ export default async function FinancasPage({
 
         <EncerradasSection bills={encerradas} logoUrls={logoUrls} />
       </div>
-      {nova === "1" && <NovaContaModal closeHref={closeNovaHref} />}
+      {nova === "1" && <NovaContaModal closeHref="/areas/financas/pagamentos-recorrentes" />}
     </div>
   )
 }

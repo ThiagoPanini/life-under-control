@@ -40,6 +40,8 @@ export type LinhaConta = {
   frase: string
   /** A Competência da ocorrência vigente (`YYYY-MM`) — usada pra abrir a baixa já preenchida. */
   competenciaVigente: string
+  /** Vencimento esperado da ocorrência vigente (`YYYY-MM-DD`) — derivado, nunca coluna. */
+  vencimento: string
   grid: GridCelula[]
   valor: ValorLinha
   /** Quem pagou a ocorrência vigente; `null` enquanto não quitada. */
@@ -81,6 +83,7 @@ function montarLinha(
     farol: farolDaOcorrencia(ocorrencia, hoje),
     frase: fraseDaOcorrencia(ocorrencia, hoje),
     competenciaVigente: ocorrencia.competencia,
+    vencimento: ocorrencia.vencimento,
     grid,
     valor,
     autoria: pagamentoVigente?.paidBy ?? null,
