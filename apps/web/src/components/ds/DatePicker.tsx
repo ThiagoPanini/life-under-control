@@ -2,18 +2,17 @@
 
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react"
 import { type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { systemClock } from "@/adapters/clock/system-clock"
 import { inputClass } from "@/components/ds/FormField"
 import { descreverMesPorExtenso, formatarDataBr } from "@/core/domain/bill"
 
 const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
+/** Altura aproximada do painel (cabeçalho + semana + 6 linhas + "Hoje") — o
+ *  bastante pra decidir se abre pra baixo ou vira pra cima perto do rodapé. */
+const ALTURA_ESTIMADA_POPOVER = 320
 
 function pad(n: number): string {
   return String(n).padStart(2, "0")
-}
-
-function hojeIsoLocal(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 function somarDias(iso: string, dias: number): string {
@@ -22,28 +21,44 @@ function somarDias(iso: string, dias: number): string {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`
 }
 
-function anoMes(iso: string): { year: number; month: number } {
+type Cursor = { year: number; month: number; focoIso: string }
+
+function cursorDe(iso: string): Cursor {
   const [ano, mes] = iso.split("-").map(Number)
-  return { year: ano, month: mes - 1 }
+  return { year: ano, month: mes - 1, focoIso: iso }
 }
 
-function tituloMes(view: { year: number; month: number }): string {
-  const desc = descreverMesPorExtenso(`${view.year}-${pad(view.month + 1)}`)
+function tituloMes(cursor: Cursor): string {
+  const desc = descreverMesPorExtenso(`${cursor.year}-${pad(cursor.month + 1)}`)
   return desc.charAt(0).toUpperCase() + desc.slice(1)
 }
 
 /** Dias do mês em grade (com folgas antes do 1º dia da semana). `null` = folga. */
-function celulasDoMes(view: {
-  year: number
-  month: number
-}): Array<{ dia: number; iso: string } | null> {
-  const primeiroDiaSemana = new Date(Date.UTC(view.year, view.month, 1)).getUTCDay()
-  const totalDias = new Date(Date.UTC(view.year, view.month + 1, 0)).getUTCDate()
+function celulasDoMes(cursor: Cursor): Array<{ dia: number; iso: string } | null> {
+  const primeiroDiaSemana = new Date(Date.UTC(cursor.year, cursor.month, 1)).getUTCDay()
+  const totalDias = new Date(Date.UTC(cursor.year, cursor.month + 1, 0)).getUTCDate()
   const celulas: Array<{ dia: number; iso: string } | null> = Array(primeiroDiaSemana).fill(null)
   for (let dia = 1; dia <= totalDias; dia++) {
-    celulas.push({ dia, iso: `${view.year}-${pad(view.month + 1)}-${pad(dia)}` })
+    celulas.push({ dia, iso: `${cursor.year}-${pad(cursor.month + 1)}-${pad(dia)}` })
   }
   return celulas
+}
+
+/** Muda de mês mantendo um dia focável na grade nova (clampa no último dia se o mês for mais curto). */
+function cursorNoMes(cursor: Cursor, deltaMeses: number): Cursor {
+  let { year, month } = cursor
+  month += deltaMeses
+  if (month < 0) {
+    month = 11
+    year -= 1
+  } else if (month > 11) {
+    month = 0
+    year += 1
+  }
+  const diaAtual = Number(cursor.focoIso.split("-")[2])
+  const totalDias = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
+  const dia = Math.min(diaAtual, totalDias)
+  return { year, month, focoIso: `${year}-${pad(month + 1)}-${pad(dia)}` }
 }
 
 /**
@@ -53,8 +68,11 @@ function celulasDoMes(view: {
  * (`YYYY-MM-DD`) via input hidden, como o form já espera (CONTEXT.md #3).
  *
  * Ancoragem por `position: fixed` medido do gatilho (sem lib, sem portal) —
- * mesmo padrão do `AreaFlyoutTrigger` (`AppShell.tsx`) para escapar do
- * `overflow` do container do modal sem ser cortado.
+ * mesmo padrão do `AreaFlyoutTrigger` (`AppShell.tsx`), incluindo fechar em
+ * scroll/resize (o popover não se realinha, então some em vez de descolar do
+ * campo). Escape usa capture + `stopPropagation`: o modal "Registrar
+ * pagamento" (`ds/Modal.tsx`) tem seu próprio Escape no document, e sem isso
+ * um Escape pro calendário também fecharia o modal e descartaria o formulário.
  */
 export function DatePicker({
   id,
@@ -63,7 +81,7 @@ export function DatePicker({
   onChange,
   invalid = false,
   describedBy,
-  hoje = hojeIsoLocal(),
+  hoje = systemClock().hoje(),
 }: {
   id: string
   name: string
@@ -74,8 +92,7 @@ export function DatePicker({
   hoje?: string
 }) {
   const [open, setOpen] = useState(false)
-  const [view, setView] = useState(() => anoMes(value || hoje))
-  const [focoIso, setFocoIso] = useState<string | null>(null)
+  const [cursor, setCursor] = useState<Cursor | null>(null)
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -84,43 +101,47 @@ export function DatePicker({
   useLayoutEffect(() => {
     if (!open) return
     const rect = triggerRef.current?.getBoundingClientRect()
-    if (rect) setPosition({ top: rect.bottom + 6, left: rect.left })
+    if (!rect) return
+    const cabeAbaixo = rect.bottom + 6 + ALTURA_ESTIMADA_POPOVER <= window.innerHeight
+    const top = cabeAbaixo ? rect.bottom + 6 : Math.max(8, rect.top - ALTURA_ESTIMADA_POPOVER - 6)
+    setPosition({ top, left: rect.left })
   }, [open])
 
   useEffect(() => {
     if (!open) return
-    setView(anoMes(value || hoje))
-    setFocoIso(value || hoje)
+    setCursor(cursorDe(value || hoje))
   }, [open, value, hoje])
 
   useEffect(() => {
-    if (!focoIso) return
-    setView((v) => {
-      const alvo = anoMes(focoIso)
-      return v.year === alvo.year && v.month === alvo.month ? v : alvo
-    })
-  }, [focoIso])
-
-  useEffect(() => {
-    if (!open || !focoIso) return
+    if (!open || !cursor) return
     focoRef.current?.focus()
-  }, [open, focoIso])
+  }, [open, cursor])
 
   useEffect(() => {
     if (!open) return
     function fecharNoEsc(event: globalThis.KeyboardEvent) {
       if (event.key !== "Escape") return
+      // Capture + stopPropagation: intercepta antes do Escape do Modal
+      // ancestral (document, bubble) rodar e navegar pra fora do formulário.
+      event.stopPropagation()
       setOpen(false)
       triggerRef.current?.focus()
     }
     function fecharForaDoClique(event: MouseEvent) {
       if (!wrapperRef.current?.contains(event.target as Node)) setOpen(false)
     }
-    document.addEventListener("keydown", fecharNoEsc)
+    function fecharAoRolarOuRedimensionar() {
+      setOpen(false)
+    }
+    document.addEventListener("keydown", fecharNoEsc, true)
     document.addEventListener("mousedown", fecharForaDoClique)
+    document.addEventListener("scroll", fecharAoRolarOuRedimensionar, true)
+    window.addEventListener("resize", fecharAoRolarOuRedimensionar)
     return () => {
-      document.removeEventListener("keydown", fecharNoEsc)
+      document.removeEventListener("keydown", fecharNoEsc, true)
       document.removeEventListener("mousedown", fecharForaDoClique)
+      document.removeEventListener("scroll", fecharAoRolarOuRedimensionar, true)
+      window.removeEventListener("resize", fecharAoRolarOuRedimensionar)
     }
   }, [open])
 
@@ -130,19 +151,26 @@ export function DatePicker({
     triggerRef.current?.focus()
   }
 
+  function fecharSeFocoSaiu() {
+    // setTimeout: no instante do blur o foco ainda não assentou no próximo
+    // elemento — reavalia depois, como o AreaFlyoutTrigger (AppShell.tsx).
+    window.setTimeout(() => {
+      if (!wrapperRef.current?.contains(document.activeElement)) setOpen(false)
+    }, 0)
+  }
+
   function mesAnterior() {
-    setView((v) =>
-      v.month === 0 ? { year: v.year - 1, month: 11 } : { year: v.year, month: v.month - 1 },
-    )
+    setCursor((c) => (c ? cursorNoMes(c, -1) : c))
   }
 
   function proximoMes() {
-    setView((v) =>
-      v.month === 11 ? { year: v.year + 1, month: 0 } : { year: v.year, month: v.month + 1 },
-    )
+    setCursor((c) => (c ? cursorNoMes(c, 1) : c))
   }
 
+  /** Só reage a setas originadas na grade de dias — nos botões de navegação/"Hoje" não desvia o foco. */
   function moverFoco(event: KeyboardEvent<HTMLDivElement>) {
+    const alvo = event.target as HTMLElement
+    if (alvo.dataset.diaCelula === undefined) return
     const deltas: Record<string, number> = {
       ArrowLeft: -1,
       ArrowRight: 1,
@@ -150,13 +178,14 @@ export function DatePicker({
       ArrowDown: 7,
     }
     const delta = deltas[event.key]
-    if (delta === undefined) return
+    if (delta === undefined || !cursor) return
     event.preventDefault()
-    setFocoIso((atual) => somarDias(atual ?? value ?? hoje, delta))
+    setCursor(cursorDe(somarDias(cursor.focoIso, delta)))
   }
 
   return (
-    <div ref={wrapperRef} className="relative">
+    // biome-ignore lint/a11y/noStaticElementInteractions: só detecta foco saindo do wrapper (gatilho/popover já carregam os papéis interativos); role aqui força <fieldset>, semântica errada.
+    <div ref={wrapperRef} className="relative" onBlur={fecharSeFocoSaiu}>
       <button
         ref={triggerRef}
         type="button"
@@ -174,7 +203,7 @@ export function DatePicker({
         </span>
       </button>
       <input type="hidden" name={name} value={value} />
-      {open && position && (
+      {open && position && cursor && (
         <div
           role="dialog"
           aria-label="Escolher data"
@@ -191,7 +220,7 @@ export function DatePicker({
             >
               <ChevronLeft aria-hidden size={16} />
             </button>
-            <span className="text-[12.5px] font-semibold text-luc-text">{tituloMes(view)}</span>
+            <span className="text-[12.5px] font-semibold text-luc-text">{tituloMes(cursor)}</span>
             <button
               type="button"
               aria-label="Próximo mês"
@@ -207,16 +236,17 @@ export function DatePicker({
             ))}
           </div>
           <div className="grid grid-cols-7 gap-1">
-            {celulasDoMes(view).map((cel, i) =>
+            {celulasDoMes(cursor).map((cel, i) =>
               cel === null ? (
                 // biome-ignore lint/suspicious/noArrayIndexKey: folgas não têm identidade própria
                 <span key={`folga-${i}`} />
               ) : (
                 <button
                   key={cel.iso}
-                  ref={cel.iso === focoIso ? focoRef : undefined}
+                  ref={cel.iso === cursor.focoIso ? focoRef : undefined}
                   type="button"
-                  tabIndex={cel.iso === focoIso ? 0 : -1}
+                  data-dia-celula=""
+                  tabIndex={cel.iso === cursor.focoIso ? 0 : -1}
                   aria-current={cel.iso === hoje ? "date" : undefined}
                   aria-pressed={cel.iso === value}
                   onClick={() => selecionar(cel.iso)}
