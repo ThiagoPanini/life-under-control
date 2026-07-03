@@ -97,22 +97,12 @@ function BlocoConta({ bloco }: { bloco: BlocoPanorama }) {
  * (CONTEXT.md: o valor exato só nasce no Lançamento — nunca zero disfarçado).
  */
 export function PanoramaContas({ blocos }: { blocos: BlocoPanorama[] }) {
-  const quitadas = blocos.filter((bloco) => bloco.farol === "verde").length
-
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex flex-col gap-[3px]">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3.5 gap-y-2">
-          <h3 className="text-[11px] font-bold uppercase tracking-[.13em] text-luc-text-3">
-            Panorama de Contas
-          </h3>
-          {blocos.length > 0 && (
-            <span className="font-mono text-[11px] text-luc-muted">
-              {quitadas} de {blocos.length} Conta{blocos.length === 1 ? "" : "s"} quitada
-              {blocos.length === 1 ? "" : "s"}
-            </span>
-          )}
-        </div>
+        <h3 className="text-[11px] font-bold uppercase tracking-[.13em] text-luc-text-3">
+          Panorama de Contas
+        </h3>
         <p className="text-[12px] text-luc-muted">Cenário real das Contas cadastradas.</p>
       </div>
 

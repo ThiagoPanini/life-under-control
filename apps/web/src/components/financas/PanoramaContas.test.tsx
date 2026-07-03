@@ -22,7 +22,7 @@ function bloco(over: Partial<BlocoPanorama> = {}): BlocoPanorama {
 }
 
 describe("PanoramaContas (Seam 2)", () => {
-  it("test_contagem_quitadas_e_bloco_quitado_sem_botao", () => {
+  it("test_sem_contador_de_quitadas_e_bloco_quitado_sem_botao", () => {
     render(
       <PanoramaContas
         blocos={[
@@ -38,7 +38,7 @@ describe("PanoramaContas (Seam 2)", () => {
         ]}
       />,
     )
-    expect(screen.getByText("1 de 2 Contas quitadas")).toBeInTheDocument()
+    expect(screen.queryByText(/de 2 Contas quitada/)).not.toBeInTheDocument()
     expect(screen.getByText("R$ 123,45")).toBeInTheDocument()
     expect(screen.getByText("pago em 02/07")).toBeInTheDocument()
     // quitada não tem o que registrar: um único CTA, o do bloco em aberto

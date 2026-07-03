@@ -28,4 +28,17 @@ describe("SectionHeading (Seam #49)", () => {
     render(<SectionHeading title="Encerradas" actions={<button type="button">Mostrar</button>} />)
     expect(screen.getByRole("button", { name: "Mostrar" })).toBeInTheDocument()
   })
+
+  it("test_variante_destaque_com_icone_amplia_titulo_e_renderiza_icone", () => {
+    render(
+      <SectionHeading
+        title="Análise do mês vigente"
+        variant="destaque"
+        icon={<span data-testid="chip-icone">📅</span>}
+      />,
+    )
+    const heading = screen.getByRole("heading", { level: 2, name: "Análise do mês vigente" })
+    expect(heading).toHaveClass("text-[17px]", "font-extrabold")
+    expect(screen.getByTestId("chip-icone")).toBeInTheDocument()
+  })
 })

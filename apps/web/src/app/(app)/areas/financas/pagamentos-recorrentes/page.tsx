@@ -1,3 +1,4 @@
+import { Calendar } from "lucide-react"
 import { nationalBankCalendar } from "@/adapters/calendar/national-bank-calendar"
 import { systemClock } from "@/adapters/clock/system-clock"
 import { drizzleBillRepo } from "@/adapters/db/bill-repo.drizzle"
@@ -37,6 +38,11 @@ const EYEBROW = (
     Finanças · Assunto
   </span>
 )
+
+// Ocultos por #86 — componentes preservados no código para reprototipagem futura.
+const MOSTRAR_PENDENCIAS_ANTERIORES = false
+const MOSTRAR_CONTAS_ATIVAS = false
+const MOSTRAR_ENCERRADAS = false
 
 /** "pago em dd/mm" quando quitada (fato do Lançamento); frase de urgência (#62) quando em aberto. */
 function fraseDoBloco(linha: Linha, dataPagamento: string | null | undefined): string {
@@ -152,11 +158,6 @@ export default async function FinancasPage({
           eyebrow={EYEBROW}
           title="Pagamentos Recorrentes"
           description="Gerenciamento de Contas e pagamentos recorrentes (normalmente mensais) relevantes para o casal."
-          actions={
-            <Button href="/areas/financas/pagamentos-recorrentes?nova=1" variant="primary">
-              Nova Conta
-            </Button>
-          }
         />
 
         {ativas.length > 0 && (
@@ -164,59 +165,64 @@ export default async function FinancasPage({
             <SectionHeading
               id="analise-heading"
               title="Análise do mês vigente"
-              actions={
-                <span className="font-mono text-[11px] text-luc-muted">
-                  hoje é {formatarDataBr(hoje)}
+              variant="destaque"
+              icon={
+                <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-luc-md bg-luc-accent-12 text-luc-accent-bright">
+                  <Calendar aria-hidden size={15} />
                 </span>
               }
             />
             <PanoramaContas blocos={blocos} />
             <div className="flex flex-col gap-2.5">
               <CenarioPagamentosMes cenario={cenario} />
-              <PendenciasAnterioresChip pendencias={pendenciasAnteriores} />
+              {MOSTRAR_PENDENCIAS_ANTERIORES && (
+                <PendenciasAnterioresChip pendencias={pendenciasAnteriores} />
+              )}
             </div>
           </section>
         )}
 
-        <section aria-labelledby="contas-ativas-heading" className="flex flex-col gap-5">
-          <SectionHeading
-            id="contas-ativas-heading"
-            title="Contas ativas"
-            suffix={ativas.length > 0 ? `· ${ativas.length}` : undefined}
-            subtitle="Estado de cada Conta neste mês · o valor real nasce na quitação"
-          />
+        {MOSTRAR_CONTAS_ATIVAS && (
+          <section aria-labelledby="contas-ativas-heading" className="flex flex-col gap-5">
+            <SectionHeading
+              id="contas-ativas-heading"
+              title="Contas ativas"
+              suffix={ativas.length > 0 ? `· ${ativas.length}` : undefined}
+              subtitle="Estado de cada Conta neste mês · o valor real nasce na quitação"
+            />
 
-          {ativas.length === 0 ? (
-            <div className="flex flex-col items-start gap-4 rounded-luc-lg border border-luc-border border-dashed bg-luc-surface-1 p-8">
-              <p className="text-luc-text-2 leading-relaxed">
-                Nenhuma Conta ativa. Cadastre a primeira regra de pagamento recorrente — a Conta
-                guarda o <em>quando</em>, nunca o <em>quanto</em>.
-              </p>
-              <Button href="/areas/financas/pagamentos-recorrentes/nova" variant="secondary">
-                Cadastrar Conta
-              </Button>
-            </div>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {linhas.map((linha) => {
-                const bill = billsPorId.get(linha.billId)
-                if (!bill) return null
-                return (
-                  <LinhaConta
-                    key={linha.billId}
-                    bill={bill}
-                    linha={linha}
-                    logoUrl={logoUrls.get(bill.id)}
-                    pessoas={pessoasComAvatar}
-                    lancamentos={pagamentos.filter((payment) => payment.billId === bill.id)}
-                  />
-                )
-              })}
-            </ul>
-          )}
-        </section>
+            {ativas.length === 0 ? (
+              <div className="flex flex-col items-start gap-4 rounded-luc-lg border border-luc-border border-dashed bg-luc-surface-1 p-8">
+                <p className="text-luc-text-2 leading-relaxed">
+                  Nenhuma Conta ativa. Cadastre a primeira regra de pagamento recorrente — a Conta
+                  guarda o <em>quando</em>, nunca o <em>quanto</em>.
+                </p>
+                <Button href="/areas/financas/pagamentos-recorrentes/nova" variant="secondary">
+                  Cadastrar Conta
+                </Button>
+              </div>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {linhas.map((linha) => {
+                  const bill = billsPorId.get(linha.billId)
+                  if (!bill) return null
+                  return (
+                    <LinhaConta
+                      key={linha.billId}
+                      bill={bill}
+                      linha={linha}
+                      logoUrl={logoUrls.get(bill.id)}
+                      pessoas={pessoasComAvatar}
+                      lancamentos={pagamentos.filter((payment) => payment.billId === bill.id)}
+                    />
+                  )
+                })}
+              </ul>
+            )}
+          </section>
+        )}
 
-        <EncerradasSection bills={encerradas} logoUrls={logoUrls} />
+        {MOSTRAR_ENCERRADAS && <EncerradasSection bills={encerradas} logoUrls={logoUrls} />}
       </div>
       {nova === "1" && <NovaContaModal closeHref="/areas/financas/pagamentos-recorrentes" />}
       {billRegistrar && linhaRegistrar && (
