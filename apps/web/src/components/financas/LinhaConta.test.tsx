@@ -56,6 +56,7 @@ function linhaBase(over: Partial<LinhaContaModel> = {}): LinhaContaModel {
     farol: "amarelo",
     frase: "vence em 2 dias",
     competenciaVigente: "2026-07",
+    vencimento: "2026-07-10",
     grid: Array.from({ length: 12 }, (_, index) => ({
       competencia: `2025-${String(index + 1).padStart(2, "0")}`,
       vencimento: `2025-${String(index + 1).padStart(2, "0")}-10`,
@@ -156,13 +157,13 @@ describe("LinhaConta", () => {
     )
 
     fireEvent.click(screen.getByRole("button"))
-    const darBaixa = screen.getByRole("link", { name: "Dar baixa" })
-    expect(darBaixa).toHaveAttribute(
+    const registrar = screen.getByRole("link", { name: "Registrar pagamento" })
+    expect(registrar).toHaveAttribute(
       "href",
-      "/areas/financas/pagamentos-recorrentes/bill-1?competencia=2026-07#dar-baixa",
+      "/areas/financas/pagamentos-recorrentes/bill-1?registrar=1&competencia=2026-07",
     )
 
-    fireEvent.click(darBaixa)
+    fireEvent.click(registrar)
     expect(screen.getByRole("button")).toHaveAttribute("aria-expanded", "true")
   })
 

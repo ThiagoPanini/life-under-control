@@ -1,6 +1,11 @@
 /** Prefixos públicos: a porta (login) e as rotas do Auth.js. */
 const PUBLIC_PREFIXES = ["/login", "/api/auth"]
 
+/** Opt-in local para validar a UI sem transportar credenciais/allowlist de produção. */
+export function localAuthBypass(nodeEnv: string | undefined, flag: string | undefined): boolean {
+  return nodeEnv === "development" && flag === "true"
+}
+
 function isPublic(pathname: string): boolean {
   return PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
 }

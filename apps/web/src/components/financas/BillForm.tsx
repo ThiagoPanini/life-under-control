@@ -1,5 +1,6 @@
 "use client"
 
+import { Check, ImagePlus, Pencil } from "lucide-react"
 import { useEffect, useId, useState } from "react"
 import { Button } from "@/components/ds/Button"
 import { Field, FieldError, getFieldError, inputClass } from "@/components/ds/FormField"
@@ -7,10 +8,13 @@ import { BillIcon } from "@/components/financas/BillIcon"
 import { type BillFormInicial, INICIAL_PADRAO } from "@/components/financas/bill-form-inicial"
 import {
   BILL_ICONS,
+  descreverRecorrencia,
+  descreverVencimento,
   type ErroCampo,
   MESES,
   PERIODICIDADES_PADRAO,
   RECORRENCIA_NOMES,
+  validarDadosBill,
 } from "@/core/domain/bill"
 
 /**
@@ -43,7 +47,13 @@ const OFFSETS = [
   { value: "3", label: "+3 meses" },
 ]
 
-const PASSOS = ["Identidade", "Recorrência", "Vencimento"]
+const PASSOS = ["Identidade", "Recorrência", "Vencimento", "Resumo"]
+const PASSO_COPY = [
+  ["Como reconhecer esta Conta?", "Nome, símbolo e contexto para encontrá-la num relance."],
+  ["Com que frequência ela acontece?", "Defina a cadência e, quando necessário, o mês-âncora."],
+  ["Quando se espera o pagamento?", "A Conta projeta o vencimento — ela nunca guarda um valor."],
+  ["Tudo certo para criar a Conta?", "Revise a regra inteira. Você pode voltar a qualquer trecho."],
+] as const
 
 /** Em que passo (0–2) cada campo aparece — para saltar ao 1º erro após submeter. */
 const PASSO_DO_CAMPO: Record<string, number> = {
@@ -65,6 +75,9 @@ export function BillForm({
   inicial = INICIAL_PADRAO,
   submitLabel = "Cadastrar Conta",
   submittingLabel = "Cadastrando…",
+  logoFile,
+  onLogoFileChange,
+  mode = "create",
 }: {
   formAction: (formData: FormData) => void
   erros?: ErroCampo[]
@@ -72,6 +85,9 @@ export function BillForm({
   inicial?: BillFormInicial
   submitLabel?: string
   submittingLabel?: string
+  logoFile?: File | null
+  onLogoFileChange?: (file: File | null) => void
+  mode?: "create" | "edit"
 }) {
   const [passo, setPasso] = useState(0)
   const [nome, setNome] = useState(inicial.nome)
@@ -83,6 +99,7 @@ export function BillForm({
   const [dueRuleDay, setDueRuleDay] = useState(inicial.dueRuleDay)
   const [dueRuleNth, setDueRuleNth] = useState(inicial.dueRuleNth)
   const [dueMonthOffset, setDueMonthOffset] = useState(inicial.dueMonthOffset)
+  const [logoFileInterno, setLogoFileInterno] = useState<File | null>(null)
   const formId = useId()
 
   const precisaAncora = Number(intervalMonths) > 1
@@ -95,6 +112,31 @@ export function BillForm({
   }, [erros])
 
   const erroDe = (campo: string) => getFieldError(erros, campo)
+  const logoSelecionado = logoFile === undefined ? logoFileInterno : logoFile
+  const permiteSelecionarLogo = logoFile !== undefined || onLogoFileChange !== undefined
+  const passoCopy =
+    passo === 3 && mode === "edit"
+      ? ([
+          "Tudo certo para salvar?",
+          "Revise a regra inteira antes de aplicar as alterações.",
+        ] as const)
+      : PASSO_COPY[passo]
+  const resumo = validarDadosBill({
+    nome,
+    descricao,
+    icon,
+    intervalMonths: Number(intervalMonths),
+    anchorMonth: anchorMonth ? Number(anchorMonth) : null,
+    dueRuleKind,
+    dueRuleDay: dueRuleDay ? Number(dueRuleDay) : null,
+    dueRuleNth: dueRuleNth ? Number(dueRuleNth) : null,
+    dueMonthOffset: dueMonthOffset ? Number(dueMonthOffset) : 0,
+  })
+
+  function selecionarLogo(file: File | null) {
+    setLogoFileInterno(file)
+    onLogoFileChange?.(file)
+  }
 
   return (
     <form action={formAction} className="flex flex-col gap-8" aria-busy={pending}>
@@ -123,6 +165,17 @@ export function BillForm({
           </li>
         ))}
       </ol>
+
+      <div className="-mt-3">
+        <p className="text-[15px] font-bold text-luc-text">{passoCopy[0]}</p>
+        <p className="mt-1 text-[11.5px] leading-relaxed text-luc-muted">{passoCopy[1]}</p>
+        <p className="mt-2 font-mono text-[9.5px] uppercase tracking-[0.14em] text-luc-faint">
+          passo {passo + 1} de {PASSOS.length} ·{" "}
+          {PASSOS.length - passo - 1 === 0
+            ? "última etapa"
+            : `${PASSOS.length - passo - 1} restantes`}
+        </p>
+      </div>
 
       {/* Passo 1 — Identidade */}
       <fieldset hidden={passo !== 0} className="flex flex-col gap-5 border-0 p-0">
@@ -189,6 +242,47 @@ export function BillForm({
           </div>
           {erroDe("icon") && <FieldError>{erroDe("icon")}</FieldError>}
         </fieldset>
+
+        {permiteSelecionarLogo && (
+          <fieldset className="flex flex-col gap-2 border-0 p-0">
+            <legend className="mb-1 text-[11.5px] font-semibold text-luc-text-3">
+              Logo <span className="font-normal text-luc-faint">(opcional)</span>
+            </legend>
+            <label className="group flex cursor-pointer items-center gap-3 rounded-luc-md border border-luc-border border-dashed bg-luc-surface-2 px-4 py-3 transition-colors hover:border-luc-border-strong focus-within:ring-2 focus-within:ring-luc-accent">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-luc-md bg-luc-accent-12 text-luc-accent-bright">
+                <ImagePlus aria-hidden size={18} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[12.5px] font-semibold text-luc-text-2">
+                  {logoSelecionado?.name ?? "Escolher uma imagem"}
+                </span>
+                <span className="mt-0.5 block text-[10.5px] text-luc-muted">
+                  {logoSelecionado
+                    ? "O envio acontece depois da criação."
+                    : "Ícone continua como alternativa."}
+                </span>
+              </span>
+              {logoSelecionado && (
+                <Check aria-label="Logo selecionado" size={16} className="text-luc-success" />
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={(event) => selecionarLogo(event.target.files?.[0] ?? null)}
+              />
+            </label>
+            {logoSelecionado && (
+              <button
+                type="button"
+                onClick={() => selecionarLogo(null)}
+                className="self-start text-[10.5px] text-luc-text-3 hover:text-luc-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent"
+              >
+                Remover logo selecionado
+              </button>
+            )}
+          </fieldset>
+        )}
       </fieldset>
 
       {/* Passo 2 — Recorrência */}
@@ -237,6 +331,40 @@ export function BillForm({
             </select>
           </Field>
         )}
+      </fieldset>
+
+      {/* Passo 4 — Resumo */}
+      <fieldset hidden={passo !== 3} className="flex flex-col gap-3 border-0 p-0">
+        <legend className="sr-only">Resumo</legend>
+        <ResumoTrecho titulo="Identidade" onEditar={() => setPasso(0)}>
+          <strong className="text-[13.5px] text-luc-text">
+            {nome.trim() || "Nome não informado"}
+          </strong>
+          <span className="text-[11px] text-luc-muted">
+            {descricao.trim() || "Sem descrição"} ·{" "}
+            {permiteSelecionarLogo
+              ? logoSelecionado
+                ? "logo selecionado"
+                : "somente ícone"
+              : "ícone da Conta"}
+          </span>
+        </ResumoTrecho>
+        <ResumoTrecho titulo="Recorrência" onEditar={() => setPasso(1)}>
+          <strong className="text-[13.5px] text-luc-text">
+            {resumo.ok ? descreverRecorrencia(resumo.value.recurrence) : "Revise a Recorrência"}
+          </strong>
+          <span className="text-[11px] text-luc-muted">
+            A regra define quando a ocorrência volta.
+          </span>
+        </ResumoTrecho>
+        <ResumoTrecho titulo="Vencimento" onEditar={() => setPasso(2)}>
+          <strong className="text-[13.5px] text-luc-text">
+            {resumo.ok
+              ? descreverVencimento(resumo.value.dueRule, resumo.value.dueMonthOffset)
+              : "Revise o vencimento"}
+          </strong>
+          <span className="text-[11px] text-luc-muted">Nenhum valor será guardado na Conta.</span>
+        </ResumoTrecho>
       </fieldset>
 
       {/* Passo 3 — Vencimento */}
@@ -352,5 +480,33 @@ export function BillForm({
         )}
       </div>
     </form>
+  )
+}
+
+function ResumoTrecho({
+  titulo,
+  onEditar,
+  children,
+}: {
+  titulo: string
+  onEditar: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-luc-md border border-luc-border bg-luc-surface-2 p-4">
+      <div className="min-w-0 flex-1">
+        <span className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-luc-faint">
+          {titulo}
+        </span>
+        <div className="mt-1 flex flex-col gap-0.5">{children}</div>
+      </div>
+      <button
+        type="button"
+        onClick={onEditar}
+        className="flex h-8 items-center gap-1 rounded-luc-sm px-2 text-[10.5px] text-luc-accent transition-colors hover:bg-luc-accent-06 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent"
+      >
+        <Pencil aria-hidden size={12} /> Editar
+      </button>
+    </div>
   )
 }

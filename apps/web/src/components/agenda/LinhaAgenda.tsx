@@ -18,14 +18,14 @@ const FAROL_DOT: Record<FarolEstado, string> = {
 }
 
 export function LinhaAgenda({ item }: { item: ItemAgendaView }) {
-  const hrefBaixa = `/areas/financas/pagamentos-recorrentes/${item.geradorId}?competencia=${item.competencia}#dar-baixa`
+  const hrefRegistro = `/areas/financas/pagamentos-recorrentes/${item.geradorId}?registrar=1&competencia=${item.competencia}`
   const hrefConta = `/areas/financas/pagamentos-recorrentes/${item.geradorId}`
 
   return (
     <li className="border-luc-row-line border-t first:border-t-0">
       <div className="flex flex-col gap-2 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-3 sm:px-[18px]">
         <Link
-          href={hrefBaixa}
+          href={hrefRegistro}
           className="flex min-w-0 flex-1 flex-col gap-2 outline-none focus-visible:ring-2 focus-visible:ring-luc-accent sm:flex-row sm:items-center sm:gap-3"
         >
           <div className="w-[76px] shrink-0">

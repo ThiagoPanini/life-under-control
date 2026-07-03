@@ -153,7 +153,7 @@ describe("PaymentForm — aviso de competência repetida (Seam 3)", () => {
     )
     expect(screen.getByRole("status")).toBeInTheDocument()
 
-    await user.click(screen.getByRole("button", { name: "Dar baixa" }))
+    await user.click(screen.getByRole("button", { name: "Registrar pagamento" }))
     expect(formAction).not.toHaveBeenCalled()
 
     await user.click(screen.getByRole("button", { name: "Confirmar" }))
@@ -172,11 +172,11 @@ describe("PaymentForm — aviso de competência repetida (Seam 3)", () => {
       />,
     )
 
-    await user.click(screen.getByRole("button", { name: "Dar baixa" }))
+    await user.click(screen.getByRole("button", { name: "Registrar pagamento" }))
     await user.click(screen.getByRole("button", { name: "Voltar" }))
 
     expect(formAction).not.toHaveBeenCalled()
-    expect(screen.getByRole("button", { name: "Dar baixa" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Registrar pagamento" })).toBeInTheDocument()
   })
 
   it("test_edicao_com_aviso_nao_duplica_o_cancelar", async () => {
@@ -195,7 +195,7 @@ describe("PaymentForm — aviso de competência repetida (Seam 3)", () => {
       />,
     )
 
-    await user.click(screen.getByRole("button", { name: "Dar baixa" }))
+    await user.click(screen.getByRole("button", { name: "Registrar pagamento" }))
 
     expect(screen.getAllByRole("button", { name: "Cancelar" })).toHaveLength(1)
     expect(screen.getByRole("button", { name: "Voltar" })).toBeInTheDocument()
@@ -224,7 +224,7 @@ describe("PaymentForm — disparo e erros (Seam 3)", () => {
     const formAction = vi.fn()
     const user = userEvent.setup()
     render(<PaymentForm formAction={formAction} pessoas={PESSOAS} inicial={inicial()} />)
-    await user.click(screen.getByRole("button", { name: "Dar baixa" }))
+    await user.click(screen.getByRole("button", { name: "Registrar pagamento" }))
     expect(formAction).toHaveBeenCalledOnce()
   })
 
@@ -252,5 +252,64 @@ describe("PaymentForm — disparo e erros (Seam 3)", () => {
     )
     expect(screen.getByRole("button", { name: "Salvar" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Cancelar" })).toBeInTheDocument()
+  })
+})
+
+describe("PaymentForm — modo compacto do modal (Final)", () => {
+  it("test_competencia_oculta_submete_hidden_e_mantem_aviso", () => {
+    const { container } = render(
+      <PaymentForm
+        formAction={noop}
+        pessoas={PESSOAS}
+        inicial={inicial()}
+        competenciaOculta
+        competenciasComLancamento={["2026-06"]}
+      />,
+    )
+    expect(screen.queryByLabelText("Competência")).not.toBeInTheDocument()
+    const hidden = container.querySelector('input[name="competencia"]')
+    expect(hidden).toHaveAttribute("type", "hidden")
+    expect(hidden).toHaveValue("2026-06")
+    // a trava de duplicidade não depende do campo visível
+    expect(screen.getByRole("status")).toHaveTextContent("Já existe um Lançamento")
+  })
+
+  it("test_nota_de_estimativa_sob_o_valor", () => {
+    render(
+      <PaymentForm
+        formAction={noop}
+        pessoas={PESSOAS}
+        inicial={inicial()}
+        notaValor="estimativa pelo histórico: ~R$ 120,00 — o valor exato nasce agora, no Lançamento"
+      />,
+    )
+    expect(
+      screen.getByText(
+        "estimativa pelo histórico: ~R$ 120,00 — o valor exato nasce agora, no Lançamento",
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it("test_comprovantes_lista_e_remove", async () => {
+    const onArquivosChange = vi.fn()
+    const user = userEvent.setup()
+    const arquivo = new File(["conteudo"], "recibo.pdf", { type: "application/pdf" })
+    render(
+      <PaymentForm
+        formAction={noop}
+        pessoas={PESSOAS}
+        inicial={inicial()}
+        arquivos={[arquivo]}
+        onArquivosChange={onArquivosChange}
+      />,
+    )
+    expect(screen.getByText("recibo.pdf")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Remover" }))
+    expect(onArquivosChange).toHaveBeenCalledWith([])
+  })
+
+  it("test_sem_onArquivosChange_nao_ha_picker", () => {
+    render(<PaymentForm formAction={noop} pessoas={PESSOAS} inicial={inicial()} />)
+    expect(screen.queryByText("Comprovantes")).not.toBeInTheDocument()
   })
 })

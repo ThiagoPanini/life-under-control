@@ -5,7 +5,7 @@ import type { TiraAtencao } from "@/core/use-cases/derive-atencao"
 
 /**
  * Tira "pede atenção" do Painel (issue #47) — forward, cross-Área. CTAs honestas:
- * "Dar baixa" abre a baixa já na ocorrência certa (#63); "Ver Conta" só abre o
+ * "Registrar pagamento" abre o gesto já na ocorrência certa (#63); "Ver Conta" só abre o
  * detalhe. Nenhum CTA anuncia ação que não inicia.
  */
 
@@ -17,11 +17,11 @@ const FAROL_DOT: Record<"amarelo" | "vermelho", { dot: string; aria: string }> =
 export function AtencaoTira({
   tira,
   hrefConta,
-  hrefBaixa,
+  paymentHref,
 }: {
   tira: TiraAtencao
   hrefConta: (contaId: string) => string
-  hrefBaixa: (contaId: string, competencia: string) => string
+  paymentHref: (contaId: string, competencia: string) => string
 }) {
   if (tira.estado === "calma") {
     return (
@@ -75,10 +75,10 @@ export function AtencaoTira({
             )}
             <div className="flex shrink-0 items-center gap-3">
               <Link
-                href={hrefBaixa(item.contaId, item.competencia)}
+                href={paymentHref(item.contaId, item.competencia)}
                 className="text-[12.5px] font-semibold text-luc-accent hover:text-luc-accent-bright"
               >
-                Dar baixa →
+                Registrar pagamento →
               </Link>
               <Link
                 href={hrefConta(item.contaId)}

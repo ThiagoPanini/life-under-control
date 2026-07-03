@@ -59,13 +59,13 @@ describe("LinhaAgenda", () => {
     expect(screen.queryByText("estimativa")).not.toBeInTheDocument()
   })
 
-  it("test_cta_da_linha_abre_a_baixa_da_ocorrencia_com_competencia_pre_selecionada", () => {
+  it("test_cta_da_linha_abre_registro_com_competencia_pre_selecionada", () => {
     render(<LinhaAgenda item={itemBase({ geradorId: "netflix", competencia: "2026-07" })} />)
 
-    const baixa = screen.getByRole("link", { name: /Netflix/ })
-    expect(baixa).toHaveAttribute(
+    const registro = screen.getByRole("link", { name: /Netflix/ })
+    expect(registro).toHaveAttribute(
       "href",
-      "/areas/financas/pagamentos-recorrentes/netflix?competencia=2026-07#dar-baixa",
+      "/areas/financas/pagamentos-recorrentes/netflix?registrar=1&competencia=2026-07",
     )
   })
 

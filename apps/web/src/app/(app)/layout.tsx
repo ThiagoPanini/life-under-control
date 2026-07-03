@@ -4,6 +4,7 @@ import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
 import { r2AttachmentStore } from "@/adapters/r2/r2-attachment-store"
 import { auth } from "@/auth"
 import { AppShell, type ShellPessoa } from "@/components/shell/AppShell"
+import { localAuthBypass } from "@/core/use-cases/gate"
 import { resolveAvatares } from "@/core/use-cases/resolve-avatares"
 
 /**
@@ -15,7 +16,11 @@ import { resolveAvatares } from "@/core/use-cases/resolve-avatares"
  * no fallback padrão de `AppShell`.
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  if (!(await auth())) redirect("/login")
+  const bypass = localAuthBypass(
+    process.env.NODE_ENV ?? "development",
+    process.env.LUC_LOCAL_AUTH_BYPASS,
+  )
+  if (!bypass && !(await auth())) redirect("/login")
 
   const pessoas = await carregarPessoasComAvatar()
 

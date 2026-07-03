@@ -35,7 +35,7 @@ import { removeAttachment } from "@/core/use-cases/remove-attachment"
 import { removeLogo } from "@/core/use-cases/remove-logo"
 
 /** Estado do formulário de Conta entre submissões — só os erros por campo (vazio = ok). */
-export type ContaFormState = { erros: ErroCampo[] }
+export type ContaFormState = { erros: ErroCampo[]; createdBillId?: string }
 
 /** Estado do encerramento entre submissões — uma mensagem de erro (vazio = ok). */
 export type EncerrarContaState = { erro?: string }
@@ -89,13 +89,13 @@ export async function criarConta(
   const { lar } = await getPainel(drizzleHouseholdRepo())
 
   try {
-    await createBill(drizzleBillRepo(), lar.id, bruto)
+    const created = await createBill(drizzleBillRepo(), lar.id, bruto)
+    revalidatePath(ROTA_FINANCAS)
+    return { erros: [], createdBillId: created.id }
   } catch (e) {
     if (e instanceof BillInvalidaError) return { erros: e.erros }
     throw e
   }
-
-  voltarParaFinancas()
 }
 
 /**
@@ -168,7 +168,11 @@ export async function deletarConta(billId: string): Promise<void> {
 // ── Lançamentos (baixa de uma Conta) ──────────────────────────────────────────
 
 /** Estado do formulário de baixa entre submissões — só os erros por campo (vazio = ok). */
-export type PaymentFormState = { erros: ErroCampo[] }
+export type PaymentFormState = {
+  erros: ErroCampo[]
+  createdPaymentId?: string
+  competencia?: string
+}
 
 /** A rota do detalhe da Conta — destino e chave de revalidação das ações de baixa. */
 function rotaDaConta(billId: string): string {
@@ -207,15 +211,17 @@ export async function criarLancamento(
   const { lar } = await getPainel(drizzleHouseholdRepo())
 
   try {
-    await recordPayment(drizzlePaymentRepo(), systemClock(), lar.id, billId, bruto)
+    const created = await recordPayment(drizzlePaymentRepo(), systemClock(), lar.id, billId, bruto)
+    revalidatePath(rotaDaConta(billId))
+    return {
+      erros: [],
+      createdPaymentId: created.id,
+      competencia: created.competencia,
+    }
   } catch (e) {
     if (e instanceof PaymentInvalidoError) return { erros: e.erros }
     throw e
   }
-
-  // `lancado` avisa o cliente do sucesso pra ele mostrar o toast (#63) — o
-  // redirect é a única ponte entre a mutação no servidor e a UI depois dela.
-  voltarParaConta(billId, `lancado=${encodeURIComponent(bruto.competencia)}`)
 }
 
 /**

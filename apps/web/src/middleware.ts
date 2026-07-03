@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import NextAuth from "next-auth"
 import { authConfig } from "@/auth.config"
-import { gateRedirect } from "@/core/use-cases/gate"
+import { gateRedirect, localAuthBypass } from "@/core/use-cases/gate"
 
 // Usa SÓ a config edge-safe (`auth.config`): o `auth.ts` completo arrastaria os
 // adapters Node (R2/aws-sdk→crypto, Drizzle/pg) pro bundle edge e quebraria o
@@ -10,6 +10,9 @@ const { auth } = NextAuth(authConfig)
 
 // A porta (ADR-0004): sem sessão → login; logado mirando a porta/landing → Painel.
 export default auth((req) => {
+  if (localAuthBypass(process.env.NODE_ENV ?? "development", process.env.LUC_LOCAL_AUTH_BYPASS)) {
+    return NextResponse.next()
+  }
   const destino = gateRedirect({
     isLoggedIn: Boolean(req.auth),
     pathname: req.nextUrl.pathname,

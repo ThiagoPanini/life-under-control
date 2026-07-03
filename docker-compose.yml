@@ -1,0 +1,97 @@
+# Stack de desenvolvimento local do LUC.
+#
+# Camada 1 (loop diário) — sobe só as dependências com estado (Postgres + MinIO)
+# e você roda `next dev` NATIVO no host, com HMR e o bypass de auth
+# (LUC_LOCAL_AUTH_BYPASS=true). É onde os fluxos autenticados são validados.
+#
+# Camada 2 (smoke fiel à prod) — `docker compose --profile full up --build`
+# builda a MESMA imagem que vai pra produção (apps/web/Dockerfile: migração+seed
+# no boot, servidor standalone). NODE_ENV=production torna o bypass impossível
+# por design, então este alvo valida build/migração/superfície pública (/login),
+# não a navegação autenticada.
+#
+# As credenciais aqui são de DEV LOCAL — as mesmas do .env.example e do CI.
+# Nunca coloque segredo de produção neste arquivo (ele é versionado).
+
+name: luc
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: luc
+      POSTGRES_PASSWORD: luc
+      POSTGRES_DB: luc
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U luc -d luc"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: lucminio
+      MINIO_ROOT_PASSWORD: lucminio123
+    ports:
+      - "9000:9000" # API S3 — R2_ENDPOINT do .env.local
+      - "9001:9001" # console web (http://localhost:9001)
+    volumes:
+      - minio-data:/data
+
+  # Cria o bucket de comprovantes uma vez e sai. O laço `until` também serve de
+  # espera até o MinIO responder. Roda em toda subida (idempotente).
+  minio-setup:
+    image: minio/mc
+    depends_on:
+      - minio
+    restart: "no"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until mc alias set local http://minio:9000 lucminio lucminio123; do
+          echo "aguardando o MinIO..."; sleep 1
+        done
+        mc mb --ignore-existing local/luc-attachments
+        mc anonymous set download local/luc-attachments
+
+  # Camada 2: imagem de produção real. Só sobe com `--profile full`.
+  app:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+      minio-setup:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://luc:luc@db:5432/luc
+      AUTH_SECRET: local-smoke-secret-nao-use-em-producao
+      AUTH_TRUST_HOST: "true"
+      # Placeholders só para o provider Google inicializar; o login real não
+      # completa sem credenciais verdadeiras (esperado neste alvo).
+      GOOGLE_CLIENT_ID: local-smoke
+      GOOGLE_CLIENT_SECRET: local-smoke
+      LUC_ALLOWLIST: thiago@casapanini.lar,jakeline@casapanini.lar
+      # O container fala com o MinIO pelo nome de serviço; URLs assinadas geradas
+      # aqui apontam para `minio:9000` e NÃO abrem no navegador do host — teste
+      # anexos no loop nativo (Camada 1), onde o endpoint é 127.0.0.1:9000.
+      R2_ENDPOINT: http://minio:9000
+      R2_ACCOUNT_ID: local
+      R2_ACCESS_KEY_ID: lucminio
+      R2_SECRET_ACCESS_KEY: lucminio123
+      R2_BUCKET: luc-attachments
+    ports:
+      - "3000:3000"
+
+volumes:
+  db-data:
+  minio-data:

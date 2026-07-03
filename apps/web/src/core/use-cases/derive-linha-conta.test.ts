@@ -44,6 +44,7 @@ describe("derivarLinhaConta (Seam 1)", () => {
       pagamento({ competencia: "2026-07", valor: 5000, dataPagamento: "2026-07-10" }),
     ])
     expect(linha.valor).toEqual({ estado: "real", valor: 5000 })
+    expect(linha.vencimento).toBe("2026-07-10")
   })
 
   it("test_row_estimativa_media_quando_em_aberto", () => {
