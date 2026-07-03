@@ -4,6 +4,7 @@ import { cleanup, render, screen } from "@testing-library/react"
 import type { ComponentProps, ReactNode } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { FormaCompetencia } from "@/core/use-cases/derive-forma-competencia"
+import type { InsightsCompetencia } from "@/core/use-cases/derive-insights-competencia"
 import type { Pontualidade12m } from "@/core/use-cases/derive-pontualidade"
 
 vi.mock("next/link", () => ({
@@ -58,6 +59,14 @@ const forma: FormaCompetencia = {
 }
 
 const pontualidade: Pontualidade12m = { estado: "calculada", percentual: 87 }
+const insights: InsightsCompetencia = {
+  estadoCompetencia: "em-curso",
+  dataReferencia: "2026-07-12",
+  comparacao: { estado: "em-curso" },
+  maiorLancamento: { paymentId: "pay-1", contaId: "luz", titulo: "Luz", valor: 95000 },
+  semLancamento: { quantidade: 2, contas: [{ contaId: "agua", titulo: "Água" }] },
+  concentracaoTresMaiores: 82,
+}
 
 describe("CockpitFinancas (Seam 2)", () => {
   it("test_compoe_bloco_competencia_pista_pendencias_e_instrumentos", () => {
@@ -68,6 +77,7 @@ describe("CockpitFinancas (Seam 2)", () => {
         forma={forma}
         gastoMensalMedio={80000}
         pontualidade={pontualidade}
+        insights={insights}
       />,
     )
 
@@ -82,7 +92,7 @@ describe("CockpitFinancas (Seam 2)", () => {
     expect(screen.getByText("Falta pagar · julho")).toBeInTheDocument()
     expect(screen.getByText("R$ 250,00")).toBeInTheDocument()
     expect(screen.getByText("~R$ 90,00 pedem atenção agora")).toBeInTheDocument()
-    expect(screen.getByText("R$ 950,00")).toBeInTheDocument() // total pago · mês = forma.pago
+    expect(screen.getAllByText("R$ 950,00").length).toBeGreaterThanOrEqual(1) // total pago + maior Lançamento
     expect(screen.getByText("R$ 800,00")).toBeInTheDocument() // gasto médio · 12m
     expect(screen.getByText("87%")).toBeInTheDocument() // pontualidade · 12m
   })

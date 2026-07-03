@@ -156,13 +156,13 @@ describe("LinhaConta", () => {
     )
 
     fireEvent.click(screen.getByRole("button"))
-    const darBaixa = screen.getByRole("link", { name: "Dar baixa" })
-    expect(darBaixa).toHaveAttribute(
+    const registrar = screen.getByRole("link", { name: "Registrar pagamento" })
+    expect(registrar).toHaveAttribute(
       "href",
-      "/areas/financas/pagamentos-recorrentes/bill-1?competencia=2026-07#dar-baixa",
+      "/areas/financas/pagamentos-recorrentes/bill-1?registrar=1&competencia=2026-07",
     )
 
-    fireEvent.click(darBaixa)
+    fireEvent.click(registrar)
     expect(screen.getByRole("button")).toHaveAttribute("aria-expanded", "true")
   })
 

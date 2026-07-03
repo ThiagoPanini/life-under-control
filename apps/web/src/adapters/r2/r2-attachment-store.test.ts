@@ -15,6 +15,15 @@ function clienteSintetico(): S3Client {
 }
 
 describe("r2AttachmentStore (assinatura, sem rede)", () => {
+  it("test_endpoint_local_usa_path_style_sem_alterar_o_port", () => {
+    expect(
+      r2ClientConfig("conta-fake", "fake-key", "fake-secret", "http://127.0.0.1:9000"),
+    ).toMatchObject({
+      endpoint: "http://127.0.0.1:9000",
+      forcePathStyle: true,
+    })
+  })
+
   it("test_url_de_upload_assina_put_com_a_chave_e_expiracao", async () => {
     const store = r2AttachmentStore(clienteSintetico(), "bucket-teste")
 

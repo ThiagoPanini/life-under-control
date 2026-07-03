@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest"
-import { gateRedirect } from "./gate"
+import { gateRedirect, localAuthBypass } from "./gate"
+
+describe("localAuthBypass", () => {
+  it("test_bypass_so_existe_em_desenvolvimento_com_opt_in_explicito", () => {
+    expect(localAuthBypass("development", "true")).toBe(true)
+    expect(localAuthBypass("development", undefined)).toBe(false)
+    expect(localAuthBypass("production", "true")).toBe(false)
+  })
+})
 
 /** A porta (ADR-0004): decisão pura de redirecionamento, testável sem middleware. */
 describe("gateRedirect", () => {

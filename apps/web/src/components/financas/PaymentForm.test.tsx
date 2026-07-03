@@ -153,7 +153,7 @@ describe("PaymentForm — aviso de competência repetida (Seam 3)", () => {
     )
     expect(screen.getByRole("status")).toBeInTheDocument()
 
-    await user.click(screen.getByRole("button", { name: "Dar baixa" }))
+    await user.click(screen.getByRole("button", { name: "Registrar pagamento" }))
     expect(formAction).not.toHaveBeenCalled()
 
     await user.click(screen.getByRole("button", { name: "Confirmar" }))
@@ -172,11 +172,11 @@ describe("PaymentForm — aviso de competência repetida (Seam 3)", () => {
       />,
     )
 
-    await user.click(screen.getByRole("button", { name: "Dar baixa" }))
+    await user.click(screen.getByRole("button", { name: "Registrar pagamento" }))
     await user.click(screen.getByRole("button", { name: "Voltar" }))
 
     expect(formAction).not.toHaveBeenCalled()
-    expect(screen.getByRole("button", { name: "Dar baixa" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Registrar pagamento" })).toBeInTheDocument()
   })
 
   it("test_edicao_com_aviso_nao_duplica_o_cancelar", async () => {
@@ -195,7 +195,7 @@ describe("PaymentForm — aviso de competência repetida (Seam 3)", () => {
       />,
     )
 
-    await user.click(screen.getByRole("button", { name: "Dar baixa" }))
+    await user.click(screen.getByRole("button", { name: "Registrar pagamento" }))
 
     expect(screen.getAllByRole("button", { name: "Cancelar" })).toHaveLength(1)
     expect(screen.getByRole("button", { name: "Voltar" })).toBeInTheDocument()
@@ -224,7 +224,7 @@ describe("PaymentForm — disparo e erros (Seam 3)", () => {
     const formAction = vi.fn()
     const user = userEvent.setup()
     render(<PaymentForm formAction={formAction} pessoas={PESSOAS} inicial={inicial()} />)
-    await user.click(screen.getByRole("button", { name: "Dar baixa" }))
+    await user.click(screen.getByRole("button", { name: "Registrar pagamento" }))
     expect(formAction).toHaveBeenCalledOnce()
   })
 

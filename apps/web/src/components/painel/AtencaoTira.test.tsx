@@ -8,12 +8,14 @@ import { AtencaoTira } from "./AtencaoTira"
 afterEach(cleanup)
 
 const hrefConta = (contaId: string) => `/areas/financas/pagamentos-recorrentes/${contaId}`
-const hrefBaixa = (contaId: string, competencia: string) =>
-  `/areas/financas/pagamentos-recorrentes/${contaId}?competencia=${competencia}`
+const paymentHref = (contaId: string, competencia: string) =>
+  `/areas/financas/pagamentos-recorrentes/${contaId}?registrar=1&competencia=${competencia}`
 
 describe("AtencaoTira (Seam 3)", () => {
   it("test_calma_mostra_estado_tudo_em_dia_sem_lista", () => {
-    render(<AtencaoTira tira={{ estado: "calma" }} hrefConta={hrefConta} hrefBaixa={hrefBaixa} />)
+    render(
+      <AtencaoTira tira={{ estado: "calma" }} hrefConta={hrefConta} paymentHref={paymentHref} />,
+    )
     expect(screen.getByText(/tudo em dia/i)).toBeInTheDocument()
     expect(screen.queryByRole("list")).not.toBeInTheDocument()
   })
@@ -35,7 +37,7 @@ describe("AtencaoTira (Seam 3)", () => {
       ],
       totalEstimado: 11000,
     }
-    render(<AtencaoTira tira={tira} hrefConta={hrefConta} hrefBaixa={hrefBaixa} />)
+    render(<AtencaoTira tira={tira} hrefConta={hrefConta} paymentHref={paymentHref} />)
 
     expect(screen.getByText("Pede atenção · 1")).toBeInTheDocument()
     expect(screen.getByText(/R\$ 110,00 pedem atenção agora/)).toBeInTheDocument()
@@ -44,10 +46,10 @@ describe("AtencaoTira (Seam 3)", () => {
     expect(screen.getByText("Finanças · Pagamentos Recorrentes")).toBeInTheDocument()
     expect(screen.getByText("estimativa")).toBeInTheDocument()
 
-    const darBaixa = screen.getByRole("link", { name: /Dar baixa/ })
-    expect(darBaixa).toHaveAttribute(
+    const registrar = screen.getByRole("link", { name: /Registrar pagamento/ })
+    expect(registrar).toHaveAttribute(
       "href",
-      "/areas/financas/pagamentos-recorrentes/luz?competencia=2026-07",
+      "/areas/financas/pagamentos-recorrentes/luz?registrar=1&competencia=2026-07",
     )
     const verConta = screen.getByRole("link", { name: /Ver Conta/ })
     expect(verConta).toHaveAttribute("href", "/areas/financas/pagamentos-recorrentes/luz")
@@ -70,7 +72,7 @@ describe("AtencaoTira (Seam 3)", () => {
       ],
       totalEstimado: null,
     }
-    render(<AtencaoTira tira={tira} hrefConta={hrefConta} hrefBaixa={hrefBaixa} />)
+    render(<AtencaoTira tira={tira} hrefConta={hrefConta} paymentHref={paymentHref} />)
     expect(screen.queryByText("estimativa")).not.toBeInTheDocument()
   })
 })

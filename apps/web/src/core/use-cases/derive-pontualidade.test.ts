@@ -3,7 +3,11 @@ import type { Bill } from "@/core/domain/bill"
 import type { Payment } from "@/core/domain/payment"
 import { fakeCalendar } from "./calendar.fake"
 import { addMeses, type GridCelula, gridOcorrencias } from "./derive-bill-card"
-import { calcularPontualidade12m, calcularPontualidadeDaConta } from "./derive-pontualidade"
+import {
+  calcularPontualidade12m,
+  calcularPontualidadeDaConta,
+  detalharPontualidadeDaConta,
+} from "./derive-pontualidade"
 
 /** Conta mensal, dia-fixo 10, sem offset — base que cada teste muta. */
 function billBase(over: Partial<Bill> = {}): Bill {
@@ -102,6 +106,22 @@ function celula(over: Partial<GridCelula> = {}): GridCelula {
 }
 
 describe("calcularPontualidadeDaConta (Seam 1)", () => {
+  it("test_detalhe_expoe_contagem_como_frase_pronta", () => {
+    const grid = [
+      celula({ competencia: "a", estado: "em-dia" }),
+      celula({ competencia: "b", estado: "em-dia" }),
+      celula({ competencia: "c", estado: "atraso" }),
+    ]
+
+    expect(detalharPontualidadeDaConta(grid)).toEqual({
+      estado: "calculada",
+      percentual: 67,
+      noPrazo: 2,
+      total: 3,
+      frase: "2/3 no prazo",
+    })
+  })
+
   it("test_grid_vazio_sem_historico", () => {
     expect(calcularPontualidadeDaConta([])).toEqual({ estado: "sem-historico" })
   })

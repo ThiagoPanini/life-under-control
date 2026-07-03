@@ -13,11 +13,10 @@ import { MetricCard } from "@/components/ds/MetricCard"
 import { Pill } from "@/components/ds/Pill"
 import { FAROL } from "@/components/financas/BillCard"
 import { BillLogoTile } from "@/components/financas/BillLogoTile"
-import { ConnectedPaymentForm } from "@/components/financas/ConnectedPaymentForm"
-import { DarBaixaSurface } from "@/components/financas/DarBaixaSurface"
 import { HistoriaConta } from "@/components/financas/HistoriaConta"
 import { LancamentoRegistradoToast } from "@/components/financas/LancamentoRegistradoToast"
 import { LancamentosLista } from "@/components/financas/LancamentosLista"
+import { PaymentWizardModal } from "@/components/financas/PaymentWizardModal"
 import type { PaymentFormInicial } from "@/components/financas/payment-form-inicial"
 import type { Attachment } from "@/core/domain/attachment"
 import { descreverRecorrencia, descreverVencimento, formatarDataBr } from "@/core/domain/bill"
@@ -34,7 +33,7 @@ import {
   leituraLongaDaOcorrencia,
   type Ocorrencia,
 } from "@/core/use-cases/derive-estado-ocorrencia"
-import { calcularPontualidadeDaConta } from "@/core/use-cases/derive-pontualidade"
+import { detalharPontualidadeDaConta } from "@/core/use-cases/derive-pontualidade"
 import { getBill } from "@/core/use-cases/get-bill"
 import { getLogoUrl } from "@/core/use-cases/get-logo-url"
 import { getPainel } from "@/core/use-cases/get-painel"
@@ -55,10 +54,10 @@ export default async function ContaDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ competencia?: string; lancado?: string }>
+  searchParams: Promise<{ competencia?: string; lancado?: string; registrar?: string }>
 }) {
   const { id } = await params
-  const { competencia: compParam, lancado: lancadoParam } = await searchParams
+  const { competencia: compParam, lancado: lancadoParam, registrar } = await searchParams
 
   // Dado o Lar, a Conta, seus Lançamentos e a sessão são independentes — em paralelo.
   const { lar } = await getPainel(drizzleHouseholdRepo())
@@ -97,7 +96,7 @@ export default async function ContaDetailPage({
       ? card.grid.filter((celula) => celula.vencimento <= (bill.encerradaEm as string))
       : card.grid
   const { media: mediaRelevante } = resumoPagamentos(gridRelevante)
-  const pontualidade = calcularPontualidadeDaConta(gridRelevante)
+  const pontualidade = detalharPontualidadeDaConta(gridRelevante)
 
   const celulaVigente = card.grid[card.grid.length - 1]
   const ocorrenciaVigente: Ocorrencia | null =
@@ -135,6 +134,9 @@ export default async function ContaDetailPage({
     )
 
   const lancadoValido = ehCompetenciaValida(lancadoParam ?? "") ? (lancadoParam as string) : null
+  const detalheHref = `/areas/financas/pagamentos-recorrentes/${bill.id}`
+  const abrirRegistro = registrar === "1" || ehCompetenciaValida(compParam ?? "")
+  const registrarHref = `${detalheHref}?registrar=1&competencia=${encodeURIComponent(competencia)}`
 
   return (
     <div className="luc-page-gutter py-7 lg:py-7">
@@ -186,13 +188,19 @@ export default async function ContaDetailPage({
               </div>
             </div>
           </div>
-          <Button
-            href={`/areas/financas/pagamentos-recorrentes/${bill.id}/editar`}
-            variant="secondary"
-            className="self-start"
-          >
-            Editar Conta
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {bill.estado === "ativa" && (
+              <Button href={registrarHref} variant="primary">
+                Registrar pagamento
+              </Button>
+            )}
+            <Button
+              href={`/areas/financas/pagamentos-recorrentes/${bill.id}/editar`}
+              variant="secondary"
+            >
+              Editar Conta
+            </Button>
+          </div>
         </header>
 
         <section aria-labelledby="instrumentos-heading" className="flex flex-col gap-3">
@@ -216,11 +224,7 @@ export default async function ContaDetailPage({
             <MetricCard
               label="Pontualidade 12m"
               value={pontualidade.estado === "sem-historico" ? "—" : `${pontualidade.percentual}%`}
-              support={
-                pontualidade.estado === "calculada"
-                  ? `${pontualidade.percentual}% dos vencimentos no prazo`
-                  : undefined
-              }
+              support={pontualidade.estado === "calculada" ? pontualidade.frase : undefined}
             />
           </div>
         </section>
@@ -231,21 +235,6 @@ export default async function ContaDetailPage({
           </h2>
           <HistoriaConta grid={gridRelevante} />
         </section>
-
-        <DarBaixaSurface
-          abrirPorDefault={Boolean(compParam)}
-          competenciaLabel={descreverCompetencia(competencia, bill.recurrence)}
-        >
-          {/* key pela contagem: depois de uma baixa o detalhe revalida e a
-              contagem muda → o formulário remonta limpo (não retém os valores). */}
-          <ConnectedPaymentForm
-            key={`baixa-${lancamentos.length}`}
-            action={criarLancamento.bind(null, bill.id)}
-            pessoas={pessoasComAvatar}
-            inicial={inicialBaixa}
-            competenciasComLancamento={competenciasComLancamento}
-          />
-        </DarBaixaSurface>
 
         <section className="flex flex-col gap-5">
           <h2 className="text-sm font-bold text-luc-text-strong">
@@ -269,6 +258,18 @@ export default async function ContaDetailPage({
           )}
         </section>
       </div>
+      {abrirRegistro && bill.estado === "ativa" && (
+        <PaymentWizardModal
+          key={`registro-${lancamentos.length}`}
+          billId={bill.id}
+          billName={bill.nome}
+          action={criarLancamento.bind(null, bill.id)}
+          pessoas={pessoasComAvatar}
+          inicial={inicialBaixa}
+          competenciasComLancamento={competenciasComLancamento}
+          closeHref={detalheHref}
+        />
+      )}
     </div>
   )
 }

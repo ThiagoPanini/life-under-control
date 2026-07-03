@@ -38,7 +38,8 @@ export function LancamentosLista({
   if (lancamentos.length === 0) {
     return (
       <p className="rounded-luc-lg border border-luc-border border-dashed bg-luc-surface-1 p-6 text-luc-text-2 leading-relaxed">
-        Nenhum Lançamento ainda. Dê a primeira baixa acima — o valor real do mês entra aqui.
+        Nenhum Lançamento ainda. Registre o primeiro pagamento — o valor real da Competência entra
+        aqui.
       </p>
     )
   }

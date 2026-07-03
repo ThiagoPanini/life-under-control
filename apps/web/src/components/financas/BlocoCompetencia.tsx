@@ -18,11 +18,13 @@ function percentualPago(pago: number, projetado: EstimativaMes): number {
 
 export function BlocoCompetencia({
   competencia,
+  emCurso,
   pago,
   projetado,
   quitadas,
 }: {
   competencia: string
+  emCurso: boolean
   pago: number
   projetado: EstimativaMes
   quitadas: QuitadasMes
@@ -34,9 +36,16 @@ export function BlocoCompetencia({
       <span className="font-mono text-[10px] text-luc-faint uppercase tracking-[0.14em]">
         Competência
       </span>
-      <h2 className="font-semibold text-[15px] text-luc-text capitalize">
-        {descreverMesPorExtenso(competencia)}
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-semibold text-[15px] text-luc-text capitalize">
+          {descreverMesPorExtenso(competencia)}
+        </h2>
+        <span
+          className={`rounded-luc-sm px-2 py-1 font-mono text-[9.5px] ${emCurso ? "bg-luc-accent-12 text-luc-accent-bright" : "bg-white/[0.04] text-luc-muted"}`}
+        >
+          {emCurso ? "em curso" : "fechada"}
+        </span>
+      </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-luc-border">
         <div className="h-full rounded-full bg-luc-accent" style={{ width: `${percent}%` }} />
       </div>

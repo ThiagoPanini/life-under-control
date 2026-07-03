@@ -11,6 +11,7 @@ describe("BlocoCompetencia (Seam 2)", () => {
     render(
       <BlocoCompetencia
         competencia="2026-07"
+        emCurso
         pago={95000}
         projetado={{ estado: "estimado", valor: 120000 }}
         quitadas={{ quitadas: 3, total: 5 }}
@@ -27,6 +28,7 @@ describe("BlocoCompetencia (Seam 2)", () => {
     render(
       <BlocoCompetencia
         competencia="2026-07"
+        emCurso
         pago={0}
         projetado={{ estado: "sem-historico" }}
         quitadas={{ quitadas: 0, total: 2 }}

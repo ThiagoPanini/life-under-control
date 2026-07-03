@@ -26,7 +26,7 @@ export function PaymentForm({
   competenciasComLancamento = [],
   erros = [],
   pending = false,
-  submitLabel = "Dar baixa",
+  submitLabel = "Registrar pagamento",
   submittingLabel = "Registrando…",
   onCancelar,
 }: {

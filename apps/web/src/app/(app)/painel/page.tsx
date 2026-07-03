@@ -46,8 +46,8 @@ export default async function PainelPage() {
   const contasAtivas = bills.filter((bill) => bill.estado === "ativa").length
 
   const hrefConta = (contaId: string) => `/areas/financas/pagamentos-recorrentes/${contaId}`
-  const hrefBaixa = (contaId: string, competencia: string) =>
-    `/areas/financas/pagamentos-recorrentes/${contaId}?competencia=${competencia}`
+  const paymentHref = (contaId: string, competencia: string) =>
+    `/areas/financas/pagamentos-recorrentes/${contaId}?registrar=1&competencia=${competencia}`
 
   return (
     <div className="luc-page-gutter py-7 lg:py-7">
@@ -65,7 +65,7 @@ export default async function PainelPage() {
           className="mb-1.5"
         />
 
-        <AtencaoTira tira={atencao.tira} hrefConta={hrefConta} hrefBaixa={hrefBaixa} />
+        <AtencaoTira tira={atencao.tira} hrefConta={hrefConta} paymentHref={paymentHref} />
 
         {areaFinancas && assuntoAtivo && (
           <HeroAreaAtivaCard

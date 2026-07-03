@@ -81,6 +81,7 @@ describe("BillForm — erros do servidor (Seam 3)", () => {
 
     await user.click(screen.getByRole("button", { name: "Próximo →" }))
     await user.click(screen.getByRole("button", { name: "Próximo →" }))
+    await user.click(screen.getByRole("button", { name: "Próximo →" }))
     await user.click(screen.getByRole("button", { name: "Cadastrar Conta" }))
 
     expect(formAction).toHaveBeenCalledOnce()
@@ -124,6 +125,7 @@ describe("BillForm — modo edição (Seam 3)", () => {
         inicial={billParaInicial(conta)}
         submitLabel="Salvar alterações"
         submittingLabel="Salvando…"
+        mode="edit"
       />,
     )
 
@@ -135,6 +137,8 @@ describe("BillForm — modo edição (Seam 3)", () => {
     // anual: a âncora aparece preenchida
     expect(screen.getByLabelText("Mês-âncora")).toHaveValue("3")
     await user.click(screen.getByRole("button", { name: "Próximo →" }))
+    await user.click(screen.getByRole("button", { name: "Próximo →" }))
+    expect(screen.getByText("Tudo certo para salvar?")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Salvar alterações" })).toBeInTheDocument()
   })
 })

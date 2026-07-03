@@ -60,7 +60,7 @@ function pessoaDe(pessoas: PessoaComAvatar[], id: string): PessoaComAvatar | und
  * varredura densa (farol, frase de urgência #62, grid #21, valor
  * estado-dependente); a expansão inline É a profundidade que os cards
  * davam. Expansão é *sibling* do cabeçalho clicável (não descendente) — as
- * ações internas ("Ver Conta"/"Dar baixa") nunca disparam o toggle porque não
+ * ações internas ("Ver Conta"/"Registrar pagamento") nunca disparam o toggle porque não
  * há handler de clique nesse ramo da árvore pra elas borbulharem até.
  */
 export function LinhaConta({
@@ -114,7 +114,7 @@ export function LinhaConta({
 
   const ultimos = ultimosLancamentos(lancamentos)
   const verContaHref = `/areas/financas/pagamentos-recorrentes/${bill.id}`
-  const darBaixaHref = `/areas/financas/pagamentos-recorrentes/${bill.id}?competencia=${linha.competenciaVigente}#dar-baixa`
+  const registrarHref = `/areas/financas/pagamentos-recorrentes/${bill.id}?registrar=1&competencia=${linha.competenciaVigente}`
 
   return (
     <li
@@ -223,8 +223,8 @@ export function LinhaConta({
             <Button href={verContaHref} variant="secondary" className="min-h-9 px-3 py-1.5 text-xs">
               Ver Conta
             </Button>
-            <Button href={darBaixaHref} variant="primary" className="min-h-9 px-3 py-1.5 text-xs">
-              Dar baixa
+            <Button href={registrarHref} variant="primary" className="min-h-9 px-3 py-1.5 text-xs">
+              Registrar pagamento
             </Button>
           </div>
         </div>

@@ -1,7 +1,9 @@
 import { somarPedemAtencaoAgora } from "@/core/use-cases/derive-atencao-mes"
 import type { FormaCompetencia } from "@/core/use-cases/derive-forma-competencia"
+import type { InsightsCompetencia as InsightsCompetenciaModel } from "@/core/use-cases/derive-insights-competencia"
 import type { Pontualidade12m } from "@/core/use-cases/derive-pontualidade"
 import { BlocoCompetencia } from "./BlocoCompetencia"
+import { InsightsCompetencia } from "./InsightsCompetencia"
 import { InstrumentosHeroi } from "./InstrumentosHeroi"
 import { PendenciasAnterioresChip } from "./PendenciasAnterioresChip"
 import { PistaDoMes } from "./PistaDoMes"
@@ -18,12 +20,14 @@ export function CockpitFinancas({
   forma,
   gastoMensalMedio,
   pontualidade,
+  insights,
 }: {
   competencia: string
   hoje: string
   forma: FormaCompetencia
   gastoMensalMedio: number | null
   pontualidade: Pontualidade12m
+  insights: InsightsCompetenciaModel
 }) {
   const pedemAtencaoAgora = somarPedemAtencaoAgora(forma.marcadores)
 
@@ -32,6 +36,7 @@ export function CockpitFinancas({
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         <BlocoCompetencia
           competencia={competencia}
+          emCurso={insights.estadoCompetencia === "em-curso"}
           pago={forma.pago}
           projetado={forma.projetado}
           quitadas={forma.quitadas}
@@ -55,6 +60,8 @@ export function CockpitFinancas({
         gastoMensalMedio={gastoMensalMedio}
         pontualidade={pontualidade}
       />
+
+      <InsightsCompetencia insights={insights} />
 
       <p className="px-1 text-luc-text-3 text-xs leading-snug">
         <span className="font-medium text-luc-text-2">Falta pagar</span> é uma <em>estimativa</em>{" "}

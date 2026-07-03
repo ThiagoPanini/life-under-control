@@ -8,11 +8,19 @@ import { Button } from "@/components/ds/Button"
 import { PageHeader } from "@/components/ds/PageHeader"
 import { SectionHeading } from "@/components/ds/SectionHeading"
 import { CockpitFinancas } from "@/components/financas/CockpitFinancas"
+import {
+  CompetenciaSelector,
+  type OpcaoCompetencia,
+} from "@/components/financas/CompetenciaSelector"
 import { EncerradasSection } from "@/components/financas/EncerradasSection"
 import { LinhaConta } from "@/components/financas/LinhaConta"
+import { NovaContaModal } from "@/components/financas/NovaContaModal"
+import { descreverMesPorExtenso } from "@/core/domain/bill"
+import { ehCompetenciaValida } from "@/core/domain/payment"
 import { gastoMensalMedio } from "@/core/use-cases/derive-agregados-financas"
-import { mesDe } from "@/core/use-cases/derive-bill-card"
+import { mesDe, ocorrenciasRecentes } from "@/core/use-cases/derive-bill-card"
 import { derivarFormaCompetencia } from "@/core/use-cases/derive-forma-competencia"
+import { derivarInsightsCompetencia } from "@/core/use-cases/derive-insights-competencia"
 import { derivarLinhasContas } from "@/core/use-cases/derive-linha-conta"
 import { calcularPontualidade12m } from "@/core/use-cases/derive-pontualidade"
 import { getLogoUrl } from "@/core/use-cases/get-logo-url"
@@ -31,7 +39,12 @@ const EYEBROW = (
 )
 
 /** Cockpit do Assunto Pagamentos Recorrentes: agregados do mês no topo (#22) + lista de Contas e cadastro. */
-export default async function FinancasPage() {
+export default async function FinancasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ competencia?: string; nova?: string }>
+}) {
+  const { competencia: competenciaParam, nova } = await searchParams
   const { lar } = await getPainel(drizzleHouseholdRepo())
   const bills = await listBills(drizzleBillRepo(), lar.id)
   const ativas = bills.filter((b) => b.estado === "ativa")
@@ -41,7 +54,18 @@ export default async function FinancasPage() {
   // de todos os Lançamentos das Contas ativas (sem N+1 por Conta).
   const pagamentos = await listAllPayments(drizzlePaymentRepo(), lar.id)
   const hoje = systemClock().hoje()
-  const competencia = mesDe(hoje)
+  const competenciaCorrente = mesDe(hoje)
+  const competenciasDisponiveis = ocorrenciasRecentes(
+    { intervalMonths: 1, anchorMonth: null },
+    competenciaCorrente,
+    12,
+  )
+  const competencia =
+    ehCompetenciaValida(competenciaParam ?? "") &&
+    competenciasDisponiveis.includes(competenciaParam as string)
+      ? (competenciaParam as string)
+      : competenciaCorrente
+  const insights = derivarInsightsCompetencia(systemClock(), ativas, pagamentos, competencia)
   const forma = derivarFormaCompetencia(
     systemClock(),
     nationalBankCalendar(),
@@ -49,8 +73,23 @@ export default async function FinancasPage() {
     pagamentos,
     competencia,
   )
-  const pontualidade = calcularPontualidade12m(ativas, pagamentos, hoje, nationalBankCalendar())
-  const gastoMedio = gastoMensalMedio(ativas, pagamentos, hoje)
+  const pontualidade = calcularPontualidade12m(
+    ativas,
+    pagamentos,
+    insights.dataReferencia,
+    nationalBankCalendar(),
+  )
+  const gastoMedio = gastoMensalMedio(ativas, pagamentos, insights.dataReferencia)
+  const opcoesCompetencia: OpcaoCompetencia[] = competenciasDisponiveis.map((value) => ({
+    value,
+    label: descreverMesPorExtenso(value).replace(/^./, (letra) => letra.toUpperCase()),
+    emCurso: value === competenciaCorrente,
+  }))
+  const queryCompetencia = competencia === competenciaCorrente ? "" : `competencia=${competencia}`
+  const closeNovaHref = queryCompetencia
+    ? `/areas/financas/pagamentos-recorrentes?${queryCompetencia}`
+    : "/areas/financas/pagamentos-recorrentes"
+  const novaHref = `${closeNovaHref}${queryCompetencia ? "&" : "?"}nova=1`
 
   // Logo das Contas que têm (#50): a URL assinada é presign local (sem rede),
   // então resolver todas de uma vez é barato — sem N+1 real.
@@ -75,7 +114,7 @@ export default async function FinancasPage() {
           eyebrow={EYEBROW}
           title="Pagamentos Recorrentes"
           actions={
-            <Button href="/areas/financas/pagamentos-recorrentes/nova" variant="primary">
+            <Button href={novaHref} variant="primary">
               Nova Conta
             </Button>
           }
@@ -87,6 +126,13 @@ export default async function FinancasPage() {
               id="panorama-heading"
               title="Panorama"
               subtitle="Métricas do mês e a tendência dos pagamentos"
+              actions={
+                <CompetenciaSelector
+                  competencia={competencia}
+                  competenciaCorrente={competenciaCorrente}
+                  opcoes={opcoesCompetencia}
+                />
+              }
             />
             <CockpitFinancas
               competencia={competencia}
@@ -94,6 +140,7 @@ export default async function FinancasPage() {
               forma={forma}
               gastoMensalMedio={gastoMedio}
               pontualidade={pontualidade}
+              insights={insights}
             />
           </section>
         )}
@@ -138,6 +185,7 @@ export default async function FinancasPage() {
 
         <EncerradasSection bills={encerradas} logoUrls={logoUrls} />
       </div>
+      {nova === "1" && <NovaContaModal closeHref={closeNovaHref} />}
     </div>
   )
 }

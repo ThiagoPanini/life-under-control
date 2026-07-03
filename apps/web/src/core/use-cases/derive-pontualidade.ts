@@ -14,11 +14,28 @@ export type Pontualidade12m =
   | { estado: "sem-historico" }
   | { estado: "calculada"; percentual: number }
 
+export type PontualidadeDetalhada =
+  | { estado: "sem-historico" }
+  | {
+      estado: "calculada"
+      percentual: number
+      noPrazo: number
+      total: number
+      frase: string
+    }
+
 function contasAtivas(bills: Bill[]): Bill[] {
   return bills.filter((b) => b.estado === "ativa")
 }
 
 function pontualidadeDoGrid(grid: GridCelula[]): Pontualidade12m {
+  const detalhe = detalharPontualidadeDaConta(grid)
+  if (detalhe.estado === "sem-historico") return detalhe
+  return { estado: "calculada", percentual: detalhe.percentual }
+}
+
+/** Leitura pronta para a UI do detalhe: percentual e frase factual N/M. */
+export function detalharPontualidadeDaConta(grid: GridCelula[]): PontualidadeDetalhada {
   let noPrazo = 0
   let total = 0
   for (const celula of grid) {
@@ -27,7 +44,13 @@ function pontualidadeDoGrid(grid: GridCelula[]): Pontualidade12m {
     if (celula.estado === "em-dia") noPrazo += 1
   }
   if (total === 0) return { estado: "sem-historico" }
-  return { estado: "calculada", percentual: Math.round((noPrazo / total) * 100) }
+  return {
+    estado: "calculada",
+    percentual: Math.round((noPrazo / total) * 100),
+    noPrazo,
+    total,
+    frase: `${noPrazo}/${total} no prazo`,
+  }
 }
 
 export function calcularPontualidade12m(

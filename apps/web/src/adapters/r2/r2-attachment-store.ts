@@ -44,10 +44,12 @@ export function r2ClientConfig(
   accountId: string,
   accessKeyId: string,
   secretAccessKey: string,
+  endpointLocal?: string,
 ): S3ClientConfig {
   return {
-    region: "auto",
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    region: endpointLocal ? "us-east-1" : "auto",
+    endpoint: endpointLocal ?? `https://${accountId}.r2.cloudflarestorage.com`,
+    forcePathStyle: Boolean(endpointLocal),
     credentials: { accessKeyId, secretAccessKey },
     requestChecksumCalculation: "WHEN_REQUIRED",
     responseChecksumValidation: "WHEN_REQUIRED",
@@ -65,6 +67,7 @@ export function getR2Client(): S3Client {
         lerEnv("R2_ACCOUNT_ID"),
         lerEnv("R2_ACCESS_KEY_ID"),
         lerEnv("R2_SECRET_ACCESS_KEY"),
+        process.env.R2_ENDPOINT,
       ),
     )
   }
