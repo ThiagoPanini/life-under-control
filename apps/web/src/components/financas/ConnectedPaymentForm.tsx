@@ -29,6 +29,8 @@ export function ConnectedPaymentForm({
   submittingLabel,
   onCancelar,
   wizard = false,
+  compacto = false,
+  notaValor,
   billId,
   successHref,
 }: {
@@ -40,9 +42,15 @@ export function ConnectedPaymentForm({
   submittingLabel?: string
   onCancelar?: () => void
   wizard?: boolean
+  /** Modal compacto (Final): um passo só, competência fixa e comprovantes inline. */
+  compacto?: boolean
+  notaValor?: string
   billId?: string
   successHref?: string
 }) {
+  // Wizard e compacto compartilham o pós-registro: upload dos comprovantes em
+  // duas etapas e o redirect com `lancado=` — só a coleta dos campos difere.
+  const comComprovantes = wizard || compacto
   const [state, formAction, pending] = useActionState(action, { erros: [] })
   const [arquivos, setArquivos] = useState<File[]>([])
   const [finalizando, setFinalizando] = useState(false)
@@ -101,7 +109,7 @@ export function ConnectedPaymentForm({
 
   useEffect(() => {
     if (
-      !wizard ||
+      !comComprovantes ||
       !state.createdPaymentId ||
       !state.competencia ||
       iniciadoRef.current === state.createdPaymentId
@@ -109,9 +117,9 @@ export function ConnectedPaymentForm({
       return
     iniciadoRef.current = state.createdPaymentId
     void finalizarRegistro(state.createdPaymentId, state.competencia)
-  }, [finalizarRegistro, state.competencia, state.createdPaymentId, wizard])
+  }, [comComprovantes, finalizarRegistro, state.competencia, state.createdPaymentId])
 
-  if (wizard && state.createdPaymentId && state.competencia) {
+  if (comComprovantes && state.createdPaymentId && state.competencia) {
     return (
       <div className="flex min-h-[300px] flex-col items-center justify-center rounded-luc-lg border border-luc-border bg-luc-surface-2 p-6 text-center">
         <span
@@ -182,6 +190,10 @@ export function ConnectedPaymentForm({
       submitLabel={submitLabel}
       submittingLabel={submittingLabel}
       onCancelar={onCancelar}
+      competenciaOculta={compacto}
+      notaValor={notaValor}
+      arquivos={compacto ? arquivos : undefined}
+      onArquivosChange={compacto ? setArquivos : undefined}
     />
   )
 }

@@ -1,5 +1,6 @@
 "use client"
 
+import { FileText, Upload } from "lucide-react"
 import { useId, useState } from "react"
 import { Button } from "@/components/ds/Button"
 import { Field, FieldError, getFieldError, inputClass } from "@/components/ds/FormField"
@@ -7,6 +8,11 @@ import { PersonChip } from "@/components/ds/PersonChip"
 import type { PaymentFormInicial } from "@/components/financas/payment-form-inicial"
 import type { ErroCampo } from "@/core/domain/bill"
 import type { PessoaComAvatar } from "@/core/use-cases/resolve-avatares"
+
+/** Dois arquivos homônimos de tamanhos diferentes são anexos distintos — a chave junta os dois. */
+function chaveArquivo(file: File): string {
+  return `${file.name}:${file.size}`
+}
 
 /**
  * Formulário de baixa de Lançamento (borda fina — Seam 3). Coleta valor, data de
@@ -29,6 +35,10 @@ export function PaymentForm({
   submitLabel = "Registrar pagamento",
   submittingLabel = "Registrando…",
   onCancelar,
+  competenciaOculta = false,
+  notaValor,
+  arquivos = [],
+  onArquivosChange,
 }: {
   formAction: (formData: FormData) => void
   pessoas: PessoaComAvatar[]
@@ -40,6 +50,13 @@ export function PaymentForm({
   submitLabel?: string
   submittingLabel?: string
   onCancelar?: () => void
+  /** Modal compacto (Final): a competência vem fixa do bloco — submete como hidden, sem campo. */
+  competenciaOculta?: boolean
+  /** Nota faint sob o valor (ex.: a estimativa pelo histórico — o valor exato nasce no Lançamento). */
+  notaValor?: string
+  /** Comprovantes opcionais (modal compacto): presença de `onArquivosChange` liga o picker. */
+  arquivos?: File[]
+  onArquivosChange?: (files: File[]) => void
 }) {
   const [valor, setValor] = useState(inicial.valor)
   const [dataPagamento, setDataPagamento] = useState(inicial.dataPagamento)
@@ -60,6 +77,13 @@ export function PaymentForm({
     setConfirmando(false)
   }
 
+  function adicionarArquivos(lista: FileList | null) {
+    if (!lista || !onArquivosChange) return
+    const porChave = new Map(arquivos.map((file) => [chaveArquivo(file), file]))
+    for (const file of lista) porChave.set(chaveArquivo(file), file)
+    onArquivosChange([...porChave.values()])
+  }
+
   return (
     <form action={formAction} className="flex flex-col gap-5" aria-busy={pending}>
       <Field label="Valor" htmlFor={`${formId}-valor`} error={erroDe("valor")}>
@@ -76,25 +100,37 @@ export function PaymentForm({
           aria-invalid={Boolean(erroDe("valor"))}
           aria-describedby={erroDe("valor") ? `${formId}-valor-error` : undefined}
         />
+        {notaValor && <p className="text-[10.5px] text-luc-faint leading-snug">{notaValor}</p>}
       </Field>
 
-      <Field label="Competência" htmlFor={`${formId}-competencia`} error={erroDe("competencia")}>
-        <input
-          id={`${formId}-competencia`}
-          name="competencia"
-          type="month"
-          value={competencia}
-          onChange={(e) => mudarCompetencia(e.target.value)}
-          className={inputClass}
-          aria-invalid={Boolean(erroDe("competencia"))}
-          aria-describedby={erroDe("competencia") ? `${formId}-competencia-error` : undefined}
-        />
-        {avisaCompetencia && (
-          <p role="status" className="text-luc-warn text-sm leading-snug">
-            Já existe um Lançamento nesta competência — confirme para registrar mesmo assim.
-          </p>
-        )}
-      </Field>
+      {competenciaOculta ? (
+        <>
+          <input type="hidden" name="competencia" value={competencia} />
+          {avisaCompetencia && (
+            <p role="status" className="text-luc-warn text-sm leading-snug">
+              Já existe um Lançamento nesta competência — confirme para registrar mesmo assim.
+            </p>
+          )}
+        </>
+      ) : (
+        <Field label="Competência" htmlFor={`${formId}-competencia`} error={erroDe("competencia")}>
+          <input
+            id={`${formId}-competencia`}
+            name="competencia"
+            type="month"
+            value={competencia}
+            onChange={(e) => mudarCompetencia(e.target.value)}
+            className={inputClass}
+            aria-invalid={Boolean(erroDe("competencia"))}
+            aria-describedby={erroDe("competencia") ? `${formId}-competencia-error` : undefined}
+          />
+          {avisaCompetencia && (
+            <p role="status" className="text-luc-warn text-sm leading-snug">
+              Já existe um Lançamento nesta competência — confirme para registrar mesmo assim.
+            </p>
+          )}
+        </Field>
+      )}
 
       <Field label="Data de pagamento" htmlFor={`${formId}-data`} error={erroDe("dataPagamento")}>
         <input
@@ -145,6 +181,51 @@ export function PaymentForm({
           </fieldset>
         )
       })()}
+
+      {onArquivosChange && (
+        <div className="flex flex-col gap-2">
+          <span className="text-[11.5px] font-semibold text-luc-text-3">
+            Comprovantes <span className="font-normal text-luc-faint">· opcional</span>
+          </span>
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-luc-md border border-luc-border border-dashed bg-luc-surface-2 px-4 py-3 transition-colors hover:border-luc-border-strong focus-within:ring-2 focus-within:ring-luc-accent">
+            <Upload aria-hidden size={14} className="text-luc-accent" />
+            <span className="text-[11.5px] text-luc-text-2">Escolher imagens ou PDFs</span>
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              className="sr-only"
+              onChange={(event) => adicionarArquivos(event.target.files)}
+            />
+          </label>
+          {arquivos.length > 0 && (
+            <ul className="flex flex-col gap-1.5">
+              {arquivos.map((file) => (
+                <li
+                  key={chaveArquivo(file)}
+                  className="flex items-center gap-2 rounded-luc-md border border-luc-row-line bg-luc-surface-1 px-3 py-2"
+                >
+                  <FileText aria-hidden size={14} className="shrink-0 text-luc-text-3" />
+                  <span className="min-w-0 flex-1 truncate text-[11.5px] text-luc-text-2">
+                    {file.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onArquivosChange(
+                        arquivos.filter((item) => chaveArquivo(item) !== chaveArquivo(file)),
+                      )
+                    }
+                    className="text-[10.5px] text-luc-text-3 hover:text-luc-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent"
+                  >
+                    Remover
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center justify-end gap-3 pt-1">
         {onCancelar && (

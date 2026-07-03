@@ -254,3 +254,62 @@ describe("PaymentForm — disparo e erros (Seam 3)", () => {
     expect(screen.getByRole("button", { name: "Cancelar" })).toBeInTheDocument()
   })
 })
+
+describe("PaymentForm — modo compacto do modal (Final)", () => {
+  it("test_competencia_oculta_submete_hidden_e_mantem_aviso", () => {
+    const { container } = render(
+      <PaymentForm
+        formAction={noop}
+        pessoas={PESSOAS}
+        inicial={inicial()}
+        competenciaOculta
+        competenciasComLancamento={["2026-06"]}
+      />,
+    )
+    expect(screen.queryByLabelText("Competência")).not.toBeInTheDocument()
+    const hidden = container.querySelector('input[name="competencia"]')
+    expect(hidden).toHaveAttribute("type", "hidden")
+    expect(hidden).toHaveValue("2026-06")
+    // a trava de duplicidade não depende do campo visível
+    expect(screen.getByRole("status")).toHaveTextContent("Já existe um Lançamento")
+  })
+
+  it("test_nota_de_estimativa_sob_o_valor", () => {
+    render(
+      <PaymentForm
+        formAction={noop}
+        pessoas={PESSOAS}
+        inicial={inicial()}
+        notaValor="estimativa pelo histórico: ~R$ 120,00 — o valor exato nasce agora, no Lançamento"
+      />,
+    )
+    expect(
+      screen.getByText(
+        "estimativa pelo histórico: ~R$ 120,00 — o valor exato nasce agora, no Lançamento",
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it("test_comprovantes_lista_e_remove", async () => {
+    const onArquivosChange = vi.fn()
+    const user = userEvent.setup()
+    const arquivo = new File(["conteudo"], "recibo.pdf", { type: "application/pdf" })
+    render(
+      <PaymentForm
+        formAction={noop}
+        pessoas={PESSOAS}
+        inicial={inicial()}
+        arquivos={[arquivo]}
+        onArquivosChange={onArquivosChange}
+      />,
+    )
+    expect(screen.getByText("recibo.pdf")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Remover" }))
+    expect(onArquivosChange).toHaveBeenCalledWith([])
+  })
+
+  it("test_sem_onArquivosChange_nao_ha_picker", () => {
+    render(<PaymentForm formAction={noop} pessoas={PESSOAS} inicial={inicial()} />)
+    expect(screen.queryByText("Comprovantes")).not.toBeInTheDocument()
+  })
+})

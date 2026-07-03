@@ -4,16 +4,22 @@ import { drizzleBillRepo } from "@/adapters/db/bill-repo.drizzle"
 import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
 import { drizzlePaymentRepo } from "@/adapters/db/payment-repo.drizzle"
 import { r2AttachmentStore } from "@/adapters/r2/r2-attachment-store"
+import { criarLancamento } from "@/app/(app)/areas/financas/actions"
+import { auth } from "@/auth"
 import { Button } from "@/components/ds/Button"
 import { PageHeader } from "@/components/ds/PageHeader"
 import { SectionHeading } from "@/components/ds/SectionHeading"
 import { CenarioPagamentosMes } from "@/components/financas/CenarioPagamentosMes"
 import { EncerradasSection } from "@/components/financas/EncerradasSection"
+import { LancamentoRegistradoToast } from "@/components/financas/LancamentoRegistradoToast"
 import { LinhaConta } from "@/components/financas/LinhaConta"
 import { NovaContaModal } from "@/components/financas/NovaContaModal"
 import { type BlocoPanorama, PanoramaContas } from "@/components/financas/PanoramaContas"
 import { PendenciasAnterioresChip } from "@/components/financas/PendenciasAnterioresChip"
+import { RegistrarPagamentoModal } from "@/components/financas/RegistrarPagamentoModal"
 import { formatarDataBr } from "@/core/domain/bill"
+import { centavosParaCampo, formatBRL } from "@/core/domain/money"
+import { descreverCompetencia, ehCompetenciaValida } from "@/core/domain/payment"
 import { derivarCenarioMes } from "@/core/use-cases/derive-cenario-mes"
 import { listarPendenciasAnteriores } from "@/core/use-cases/derive-forma-competencia"
 import { derivarLinhasContas, type LinhaConta as Linha } from "@/core/use-cases/derive-linha-conta"
@@ -42,11 +48,16 @@ function fraseDoBloco(linha: Linha, dataPagamento: string | null | undefined): s
 export default async function FinancasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ nova?: string }>
+  searchParams: Promise<{
+    nova?: string
+    registrar?: string
+    lancado?: string
+    lancadoConta?: string
+  }>
 }) {
-  const { nova } = await searchParams
+  const { nova, registrar, lancado, lancadoConta } = await searchParams
   const { lar } = await getPainel(drizzleHouseholdRepo())
-  const bills = await listBills(drizzleBillRepo(), lar.id)
+  const [bills, session] = await Promise.all([listBills(drizzleBillRepo(), lar.id), auth()])
   const ativas = bills.filter((b) => b.estado === "ativa")
   const encerradas = bills.filter((b) => b.estado === "encerrada")
 
@@ -100,13 +111,42 @@ export default async function FinancasPage({
         registrarHref:
           linha.farol === "verde"
             ? null
-            : `/areas/financas/pagamentos-recorrentes/${bill.id}?registrar=1&competencia=${linha.competenciaVigente}`,
+            : `/areas/financas/pagamentos-recorrentes?registrar=${bill.id}`,
       }
     })
     .filter((bloco): bloco is BlocoPanorama => bloco != null)
 
+  // Baixa direta do bloco (Final): modal compacto na própria página, com a
+  // competência fixa da ocorrência vigente. Defaults iguais aos do detalhe —
+  // valor do último Lançamento, hoje, Pessoa logada (casada por e-mail).
+  const linhaRegistrar = registrar ? linhas.find((linha) => linha.billId === registrar) : undefined
+  const billRegistrar = linhaRegistrar ? billsPorId.get(linhaRegistrar.billId) : undefined
+  const emailLogado = session?.user?.email?.toLowerCase()
+  const pessoaLogada =
+    (emailLogado && lar.pessoas.find((p) => p.email.toLowerCase() === emailLogado)) ||
+    lar.pessoas[0]
+  const lancamentosRegistrar = billRegistrar
+    ? pagamentos
+        .filter((p) => p.billId === billRegistrar.id)
+        .sort((a, b) =>
+          `${b.competencia}:${b.dataPagamento ?? ""}`.localeCompare(
+            `${a.competencia}:${a.dataPagamento ?? ""}`,
+          ),
+        )
+    : []
+  const ultimoRegistrar = lancamentosRegistrar[0]
+
+  // Toast pós-baixa: `lancadoConta` + `lancado` válidos — a mesma mensagem do detalhe.
+  const billLancado = lancadoConta ? billsPorId.get(lancadoConta) : undefined
+  const lancadoValido = ehCompetenciaValida(lancado ?? "") ? (lancado as string) : null
+
   return (
     <div className="luc-page-gutter py-7 sm:py-9 lg:py-10">
+      {billLancado && lancadoValido && (
+        <LancamentoRegistradoToast
+          mensagem={`Lançamento registrado — ${billLancado.nome} · ${descreverCompetencia(lancadoValido, billLancado.recurrence)}`}
+        />
+      )}
       <div className="mx-auto flex max-w-[1120px] flex-col gap-6">
         <PageHeader
           eyebrow={EYEBROW}
@@ -179,6 +219,30 @@ export default async function FinancasPage({
         <EncerradasSection bills={encerradas} logoUrls={logoUrls} />
       </div>
       {nova === "1" && <NovaContaModal closeHref="/areas/financas/pagamentos-recorrentes" />}
+      {billRegistrar && linhaRegistrar && (
+        <RegistrarPagamentoModal
+          key={`registro-${billRegistrar.id}-${lancamentosRegistrar.length}`}
+          billId={billRegistrar.id}
+          billName={billRegistrar.nome}
+          action={criarLancamento.bind(null, billRegistrar.id)}
+          pessoas={pessoasComAvatar}
+          inicial={{
+            valor: ultimoRegistrar ? centavosParaCampo(ultimoRegistrar.valor) : "",
+            dataPagamento: hoje,
+            competencia: linhaRegistrar.competenciaVigente,
+            paidBy: pessoaLogada?.id ?? "",
+          }}
+          competenciasComLancamento={lancamentosRegistrar.map((p) => p.competencia)}
+          contexto={`competência ${descreverCompetencia(linhaRegistrar.competenciaVigente, billRegistrar.recurrence)} · ${linhaRegistrar.frase} (${formatarDataBr(linhaRegistrar.vencimento).slice(0, 5)})`}
+          notaValor={
+            linhaRegistrar.media != null
+              ? `estimativa pelo histórico: ~${formatBRL(linhaRegistrar.media)} — o valor exato nasce agora, no Lançamento`
+              : undefined
+          }
+          closeHref="/areas/financas/pagamentos-recorrentes"
+          successHref={`/areas/financas/pagamentos-recorrentes?lancadoConta=${billRegistrar.id}`}
+        />
+      )}
     </div>
   )
 }
