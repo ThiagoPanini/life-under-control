@@ -60,6 +60,11 @@ pnpm --filter @luc/web dev                 # :3000
 pnpm --filter @luc/web typecheck
 pnpm --filter @luc/web test                # vitest
 node_modules/.bin/biome check apps/web     # NÃO use `pnpm exec biome` (falso-verde)
+
+# Execução local (Docker) — dependências em container, app nativo. Ver docs/agents/local-dev.md.
+pnpm dev:up                                # Postgres :5432 + MinIO :9000
+pnpm --filter @luc/web db:migrate          # migra + semeia o Postgres local
+pnpm dev:smoke                             # smoke fiel à prod (imagem do Dockerfile)
 ```
 
 ## Gate

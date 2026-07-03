@@ -7,7 +7,11 @@
   },
   "scripts": {
     "lint": "biome check apps/web",
-    "format": "biome check --write apps/web"
+    "format": "biome check --write apps/web",
+    "dev:up": "docker compose up -d",
+    "dev:down": "docker compose down",
+    "dev:reset": "docker compose down -v",
+    "dev:smoke": "docker compose --profile full up --build"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0"
