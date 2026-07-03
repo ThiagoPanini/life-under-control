@@ -108,35 +108,36 @@ describe("AppShell sidebar (Seam 3)", () => {
     expect(container.querySelector("aside")).toHaveAttribute("data-collapsed", "true")
   })
 
-  it("test_pessoas_com_avatarurl_mostram_foto_no_header_e_no_rodape_da_sidebar", () => {
-    const pessoas: ShellPessoa[] = [
-      {
-        id: "u-1",
-        nome: "Thiago",
-        inicial: "T",
-        avatarUrl: "https://conta.r2.cloudflarestorage.com/t.jpg",
-      },
-      { id: "u-2", nome: "Jakeline", inicial: "J", avatarUrl: null },
-    ]
+  it("test_usuario_com_avatarurl_mostra_foto_e_nome_no_rodape_da_sidebar", () => {
+    const usuario: ShellPessoa = {
+      id: "u-1",
+      nome: "Thiago",
+      inicial: "T",
+      avatarUrl: "https://conta.r2.cloudflarestorage.com/t.jpg",
+    }
     render(
-      <AppShell pessoas={pessoas}>
+      <AppShell usuario={usuario}>
         <div>conteúdo</div>
       </AppShell>,
     )
 
-    expect(screen.getAllByAltText("Thiago")).toHaveLength(2) // header + rodapé
-    expect(screen.getAllByLabelText("Jakeline")).toHaveLength(2) // fallback inicial, sem foto
+    expect(screen.getByAltText("Thiago")).toBeInTheDocument()
+    expect(screen.getByText("Thiago")).toBeInTheDocument()
+    expect(screen.getByText("Conta Google")).toBeInTheDocument()
+    expect(screen.queryByText("Jakeline")).toBeNull()
+    expect(screen.queryByText(/acesso simétrico/)).toBeNull()
   })
 
-  it("test_sem_pessoas_a_casca_ainda_mostra_os_dois_badges_com_fallback", () => {
+  it("test_sem_usuario_a_casca_ainda_mostra_fallback_no_rodape", () => {
     render(
       <AppShell>
         <div>conteúdo</div>
       </AppShell>,
     )
 
-    expect(screen.getAllByLabelText("Thiago")).toHaveLength(2)
-    expect(screen.getAllByLabelText("Jakeline")).toHaveLength(2)
+    const badge = screen.getByLabelText("Usuário")
+    expect(badge).toBeInTheDocument()
+    expect(badge).not.toHaveStyle({ color: "var(--luc-thiago-fg)" })
   })
 
   it("test_navegacao_principal_nao_lista_mais_financas", () => {
@@ -239,16 +240,33 @@ describe("AppShell sidebar (Seam 3)", () => {
     expect(within(areas).queryByRole("link", { name: "Saúde" })).toBeNull()
   })
 
-  it("test_assunto_em_breve_listado_mas_inerte", async () => {
+  it("test_assunto_em_breve_nao_aparece_na_sidebar_expandida", async () => {
     const user = userEvent.setup()
     render(<AppShell>conteúdo</AppShell>)
     const areas = screen.getByRole("navigation", { name: "Áreas" })
 
     await user.click(within(areas).getByRole("button", { name: "Finanças" }))
 
-    const investimentos = within(areas).getByText("Investimentos").closest("[aria-disabled]")
-    expect(investimentos).toHaveAttribute("aria-disabled", "true")
-    expect(within(areas).queryByRole("link", { name: "Investimentos" })).toBeNull()
+    expect(within(areas).queryByText("Investimentos")).toBeNull()
+  })
+
+  it("test_label_controle_e_divisor_precedem_o_grupo_areas", () => {
+    const { container } = render(<AppShell>conteúdo</AppShell>)
+    const aside = container.querySelector("aside") as HTMLElement
+
+    expect(within(aside).getByText("Controle")).toBeInTheDocument()
+    expect(within(aside).getByText("Áreas")).toBeInTheDocument()
+  })
+
+  it("test_com_assunto_ativo_so_o_leaf_destaca_grupo_fica_neutro", () => {
+    usePathnameMock.mockReturnValue("/areas/financas/pagamentos-recorrentes")
+    render(<AppShell>conteúdo</AppShell>)
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+    const grupo = within(areas).getByRole("button", { name: "Finanças" })
+    const leaf = within(areas).getByRole("link", { name: "Pagamentos Recorrentes" })
+
+    expect(grupo).not.toHaveClass("bg-luc-accent-12")
+    expect(leaf).toHaveClass("bg-luc-accent-12")
   })
 
   it("test_command_palette_abre_pelo_atalho_e_lista_apenas_assuntos_ativos", async () => {
@@ -265,6 +283,27 @@ describe("AppShell sidebar (Seam 3)", () => {
     )
     expect(within(dialog).getByRole("link", { name: /Agenda/ })).toHaveAttribute("href", "/agenda")
     expect(within(dialog).queryByRole("link", { name: /Saúde/ })).toBeNull()
+  })
+
+  it("test_header_mostra_breadcrumb_e_nao_tem_busca_visivel_nem_badges", () => {
+    usePathnameMock.mockReturnValue("/areas/financas/pagamentos-recorrentes")
+    const { container } = render(<AppShell>conteúdo</AppShell>)
+    const desktopHeader = container.querySelectorAll("header")[1] as HTMLElement
+
+    expect(within(desktopHeader).getByText("Finanças › Pagamentos Recorrentes")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Buscar" })).toBeNull()
+    expect(screen.queryByText("⌘K")).toBeNull()
+    expect(screen.queryByLabelText("Thiago")).toBeNull()
+    expect(screen.queryByLabelText("Jakeline")).toBeNull()
+  })
+
+  it("test_atalho_de_comando_continua_funcionando_sem_botao_visivel", async () => {
+    const user = userEvent.setup()
+    render(<AppShell>conteúdo</AppShell>)
+
+    await user.keyboard("{Control>}k{/Control}")
+
+    expect(screen.getByRole("dialog", { name: "Ir para…" })).toBeInTheDocument()
   })
 })
 
@@ -352,7 +391,7 @@ describe("AppShell sidebar colapsada — flyout de Assuntos (issue #52)", () => 
     renderColapsada()
     const areas = screen.getByRole("navigation", { name: "Áreas" })
     const trigger = within(areas).getByRole("button", { name: "Finanças" })
-    const fora = screen.getByRole("button", { name: "Buscar" })
+    const fora = screen.getByRole("link", { name: "Life Under Control" })
 
     await user.click(trigger)
     await user.tab()
@@ -406,6 +445,23 @@ describe("AppShell sidebar colapsada — flyout de Assuntos (issue #52)", () => 
     )
   })
 
+  it("test_gatilho_do_rail_neutraliza_quando_flyout_abre_com_assunto_ativo", async () => {
+    const user = userEvent.setup()
+    usePathnameMock.mockReturnValue("/areas/financas/pagamentos-recorrentes")
+    renderColapsada()
+    const areas = screen.getByRole("navigation", { name: "Áreas" })
+    const trigger = within(areas).getByRole("button", { name: "Finanças" })
+
+    expect(trigger).toHaveClass("bg-luc-accent-12")
+
+    await user.click(trigger)
+
+    expect(trigger).not.toHaveClass("bg-luc-accent-12")
+    expect(within(areas).getByRole("link", { name: "Pagamentos Recorrentes" })).toHaveClass(
+      "bg-luc-accent-12",
+    )
+  })
+
   it("test_aria_controls_do_gatilho_so_existe_com_flyout_aberto", async () => {
     const user = userEvent.setup()
     renderColapsada()
@@ -432,7 +488,7 @@ describe("AppShell sidebar colapsada — flyout de Assuntos (issue #52)", () => 
     expect(within(areas).getByRole("link", { name: "Pagamentos Recorrentes" })).toHaveFocus()
   })
 
-  it("test_assunto_em_breve_no_flyout_fica_inerte", async () => {
+  it("test_assunto_em_breve_nao_aparece_no_flyout", async () => {
     const user = userEvent.setup()
     renderColapsada()
     const areas = screen.getByRole("navigation", { name: "Áreas" })
@@ -440,9 +496,7 @@ describe("AppShell sidebar colapsada — flyout de Assuntos (issue #52)", () => 
 
     await user.click(trigger)
 
-    const investimentos = within(areas).getByText("Investimentos").closest("[aria-disabled]")
-    expect(investimentos).toHaveAttribute("aria-disabled", "true")
-    expect(within(areas).queryByRole("link", { name: "Investimentos" })).toBeNull()
+    expect(within(areas).queryByText("Investimentos")).toBeNull()
   })
 })
 
@@ -533,7 +587,7 @@ describe("AppShell mobile", () => {
     expect(container.querySelector("div[data-open]")).toHaveAttribute("data-open", "false")
   })
 
-  it("test_area_e_assunto_em_breve_ficam_inertes_no_drawer", async () => {
+  it("test_area_em_breve_fica_inerte_e_assunto_em_breve_nao_aparece_no_drawer", async () => {
     const user = userEvent.setup()
     render(
       <AppShell>
@@ -547,11 +601,7 @@ describe("AppShell mobile", () => {
     expect(within(areaNavigation).queryByRole("button", { name: "Saúde" })).toBeNull()
 
     await user.click(within(areaNavigation).getByRole("button", { name: "Finanças" }))
-    const investimentos = within(areaNavigation)
-      .getByText("Investimentos")
-      .closest("[aria-disabled]")
-    expect(investimentos).toHaveAttribute("aria-disabled", "true")
-    expect(within(areaNavigation).queryByRole("link", { name: "Investimentos" })).toBeNull()
+    expect(within(areaNavigation).queryByText("Investimentos")).toBeNull()
   })
 
   it("test_alvos_de_toque_da_area_e_do_assunto_tem_pelo_menos_44px", async () => {

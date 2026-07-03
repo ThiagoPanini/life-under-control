@@ -8,7 +8,7 @@ describe("buildNavModel (ADR-0009, issue #46)", () => {
 
     expect(financas.expandivel).toBe(true)
     expect(financas.inerte).toBe(false)
-    expect(financas.assuntos).toHaveLength(2)
+    expect(financas.assuntos).toHaveLength(1)
   })
 
   it("test_area_em_breve_sem_assuntos_inerte", () => {
@@ -19,13 +19,12 @@ describe("buildNavModel (ADR-0009, issue #46)", () => {
     expect(saude.assuntos).toEqual([])
   })
 
-  it("test_assunto_em_breve_listado_mas_inerte", () => {
+  it("test_assunto_em_breve_nao_aparece_na_lista_de_assuntos", () => {
     const financas = buildNavModel("/painel").find((area) => area.slug === "financas")
     const investimentos = financas?.assuntos.find((assunto) => assunto.slug === "investimentos")
 
-    expect(investimentos).toBeDefined()
-    expect(investimentos?.estado).toBe("em-breve")
-    expect(investimentos?.inerte).toBe(true)
+    expect(investimentos).toBeUndefined()
+    expect(financas?.assuntos.map((assunto) => assunto.slug)).toEqual(["pagamentos-recorrentes"])
   })
 
   it("test_trilha_ativa_marca_area_da_rota", () => {

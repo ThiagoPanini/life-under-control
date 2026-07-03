@@ -24,7 +24,7 @@ export const SUBJECTS: Subject[] = [
   {
     slug: "pagamentos-recorrentes",
     nome: "Pagamentos Recorrentes",
-    icon: "wallet",
+    icon: "repeat",
     estado: "ativa",
     areaSlug: "financas",
     resumo: "Contas e Lançamentos do mês",

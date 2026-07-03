@@ -11,9 +11,7 @@ export type NavSubject = {
   nome: string
   icon: string
   href: string
-  estado: Subject["estado"]
   ativa: boolean
-  inerte: boolean
 }
 
 export type NavArea = {
@@ -40,8 +38,10 @@ export function buildNavModel(
   subjects: Subject[] = SUBJECTS,
 ): NavArea[] {
   return areas.map((area) => {
-    const assuntosDaArea = subjects.filter((subject) => subject.areaSlug === area.slug)
-    const expandivel = assuntosDaArea.length > 0
+    const assuntosVisiveis = subjects.filter(
+      (subject) => subject.areaSlug === area.slug && subject.estado !== "em-breve",
+    )
+    const expandivel = assuntosVisiveis.length > 0
 
     return {
       slug: area.slug,
@@ -52,16 +52,14 @@ export function buildNavModel(
       expandivel,
       ativa: naArea(pathname, area.slug),
       inerte: !expandivel,
-      assuntos: assuntosDaArea.map((subject) => {
+      assuntos: assuntosVisiveis.map((subject) => {
         const href = `/areas/${area.slug}/${subject.slug}`
         return {
           slug: subject.slug,
           nome: subject.nome,
           icon: subject.icon,
           href,
-          estado: subject.estado,
           ativa: pathname === href || pathname.startsWith(`${href}/`),
-          inerte: subject.estado === "em-breve",
         }
       }),
     }

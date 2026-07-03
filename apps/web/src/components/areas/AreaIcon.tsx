@@ -4,6 +4,7 @@ import {
   HeartPulse,
   House,
   type LucideIcon,
+  Repeat,
   ShoppingCart,
   TrendingUp,
   Wallet,
@@ -18,6 +19,7 @@ const ICONS: Record<string, LucideIcon> = {
   house: House,
   car: Car,
   "trending-up": TrendingUp,
+  repeat: Repeat,
 }
 
 export function AreaIcon({ name, size = 20 }: { name: string; size?: number }) {

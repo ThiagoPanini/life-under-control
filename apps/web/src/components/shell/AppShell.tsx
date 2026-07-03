@@ -27,9 +27,7 @@ import { AreaIcon } from "@/components/areas/AreaIcon"
 import { Logo } from "@/components/brand/Logo"
 import { PersonAvatar } from "@/components/ds/PersonAvatar"
 import { personKey } from "@/components/ds/PersonChip"
-import { Pill } from "@/components/ds/Pill"
-import { AREAS, type Area } from "@/core/domain/areas"
-import { buildNavModel, type NavArea, naArea } from "@/core/domain/nav-model"
+import { buildNavModel, type NavArea } from "@/core/domain/nav-model"
 import { SUBJECTS } from "@/core/domain/subjects"
 
 export const SIDEBAR_STORAGE_KEY = "luc:sidebar-collapsed"
@@ -38,7 +36,7 @@ export const SIDEBAR_EXPANDED_STORAGE_KEY = "luc:sidebar-expanded"
 const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-luc-bg"
 
-/** A Pessoa como a casca precisa pra desenhar o badge (id, exibição, foto). */
+/** A Pessoa autenticada como a casca precisa pra desenhar o rodapé (id, exibição, foto). */
 export type ShellPessoa = {
   id: string
   nome: string
@@ -46,19 +44,16 @@ export type ShellPessoa = {
   avatarUrl?: string | null
 }
 
-/** Sem sessão carregada (ex.: testes de componente isolado), a casca ainda desenha os dois badges — só sem foto. */
-const PESSOAS_PADRAO: ShellPessoa[] = [
-  { id: "thiago", nome: "Thiago", inicial: "T" },
-  { id: "jakeline", nome: "Jakeline", inicial: "J" },
-]
+/** Sem sessão carregada (ex.: testes de componente isolado), a casca cai neste fallback genérico. */
+const USUARIO_PADRAO: ShellPessoa = { id: "usuario", nome: "Usuário", inicial: "U" }
 
 /** Casca responsiva do app: sidebar no desktop e navegação dedicada no mobile. */
 export function AppShell({
   children,
-  pessoas = PESSOAS_PADRAO,
+  usuario = USUARIO_PADRAO,
 }: {
   children: ReactNode
-  pessoas?: ShellPessoa[]
+  usuario?: ShellPessoa
 }) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -73,12 +68,19 @@ export function AppShell({
   const [expandedAreas, setExpandedAreas] = useState<Set<string>>(() => new Set())
   const primeiraRotaRef = useRef(true)
 
-  const currentLabel =
+  const areaAtiva = navModel.find((area) => area.ativa)
+  const assuntoAtivo = areaAtiva?.assuntos.find((assunto) => assunto.ativa)
+  const breadcrumb =
     pathname === "/painel"
-      ? "Painel"
+      ? ["Painel"]
       : pathname === "/agenda"
-        ? "Agenda"
-        : (AREAS.find((area) => naArea(pathname, area.slug))?.nome ?? "Life Under Control")
+        ? ["Agenda"]
+        : areaAtiva
+          ? assuntoAtivo
+            ? [areaAtiva.nome, assuntoAtivo.nome]
+            : [areaAtiva.nome]
+          : ["Life Under Control"]
+  const currentLabel = breadcrumb.join(" › ")
 
   useEffect(() => {
     setCollapsed(localStorage.getItem(SIDEBAR_STORAGE_KEY) === "1")
@@ -212,7 +214,7 @@ export function AppShell({
       <DesktopSidebar
         pathname={pathname}
         collapsed={collapsed}
-        pessoas={pessoas}
+        usuario={usuario}
         navModel={navModel}
         expandedAreas={expandedAreas}
         onToggleArea={toggleArea}
@@ -243,13 +245,7 @@ export function AppShell({
           </button>
         </header>
 
-        <DesktopHeader
-          label={currentLabel}
-          collapsed={collapsed}
-          onToggle={toggleDesktopSidebar}
-          onOpenCommand={() => setCommandOpen(true)}
-          pessoas={pessoas}
-        />
+        <DesktopHeader label={currentLabel} collapsed={collapsed} onToggle={toggleDesktopSidebar} />
 
         <main
           id="conteudo-principal"
@@ -280,17 +276,13 @@ function DesktopHeader({
   label,
   collapsed,
   onToggle,
-  onOpenCommand,
-  pessoas,
 }: {
   label: string
   collapsed: boolean
   onToggle: () => void
-  onOpenCommand: () => void
-  pessoas: ShellPessoa[]
 }) {
   return (
-    <header className="sticky top-0 z-30 hidden h-14 shrink-0 items-center justify-between border-luc-border border-b bg-luc-bg/70 px-6 backdrop-blur-lg lg:flex">
+    <header className="sticky top-0 z-30 hidden h-14 shrink-0 items-center border-luc-border border-b bg-luc-bg/70 px-6 backdrop-blur-lg lg:flex">
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -301,26 +293,6 @@ function DesktopHeader({
           <PanelLeft size={16} strokeWidth={1.8} aria-hidden />
         </button>
         <div className="text-sm font-bold text-luc-text">{label}</div>
-      </div>
-
-      <div className="flex items-center gap-3.5">
-        <button
-          type="button"
-          onClick={onOpenCommand}
-          aria-label="Buscar"
-          className={`inline-flex min-h-[34px] items-center gap-2 rounded-luc-md border border-luc-border bg-luc-surface-2 px-3 text-[12.5px] text-luc-text-3 transition-colors hover:border-luc-border-strong hover:text-luc-text ${FOCUS}`}
-        >
-          <Search size={14} strokeWidth={1.8} aria-hidden />
-          Buscar
-          <kbd className="rounded-[5px] border border-luc-border-strong px-1.5 font-mono text-[11px] text-luc-muted">
-            ⌘K
-          </kbd>
-        </button>
-        <div className="flex items-center gap-1">
-          {pessoas.map((pessoa) => (
-            <ShellPersonBadge key={pessoa.id} pessoa={pessoa} />
-          ))}
-        </div>
       </div>
     </header>
   )
@@ -340,14 +312,14 @@ function parseSlugSet(raw: string): Set<string> {
 function DesktopSidebar({
   pathname,
   collapsed,
-  pessoas,
+  usuario,
   navModel,
   expandedAreas,
   onToggleArea,
 }: {
   pathname: string
   collapsed: boolean
-  pessoas: ShellPessoa[]
+  usuario: ShellPessoa
   navModel: NavArea[]
   expandedAreas: Set<string>
   onToggleArea: (slug: string) => void
@@ -371,24 +343,33 @@ function DesktopSidebar({
         )}
       </Link>
 
-      <nav aria-label="Principal" className="flex flex-col gap-1">
-        <NavItem
-          href="/painel"
-          label="Painel"
-          active={pathname === "/painel"}
-          collapsed={collapsed}
-        >
-          <LayoutDashboard size={18} strokeWidth={1.7} aria-hidden />
-        </NavItem>
-        <NavItem
-          href="/agenda"
-          label="Agenda"
-          active={pathname === "/agenda"}
-          collapsed={collapsed}
-        >
-          <Calendar size={18} strokeWidth={1.7} aria-hidden />
-        </NavItem>
-      </nav>
+      <div className="flex flex-col gap-1">
+        {!collapsed && (
+          <p className="px-2.5 pb-1 font-mono text-[10px] text-luc-text-3 uppercase tracking-[0.16em]">
+            Controle
+          </p>
+        )}
+        <nav aria-label="Principal" className="flex flex-col gap-1">
+          <NavItem
+            href="/painel"
+            label="Painel"
+            active={pathname === "/painel"}
+            collapsed={collapsed}
+          >
+            <LayoutDashboard size={18} strokeWidth={1.7} aria-hidden />
+          </NavItem>
+          <NavItem
+            href="/agenda"
+            label="Agenda"
+            active={pathname === "/agenda"}
+            collapsed={collapsed}
+          >
+            <Calendar size={18} strokeWidth={1.7} aria-hidden />
+          </NavItem>
+        </nav>
+      </div>
+
+      <div aria-hidden className="border-luc-border border-t" />
 
       <div className="flex flex-col gap-1">
         {!collapsed && (
@@ -426,16 +407,13 @@ function DesktopSidebar({
       </div>
 
       <div className="mt-auto flex flex-col gap-2 border-luc-border border-t pt-3">
-        <div className={`flex items-center ${collapsed ? "flex-col gap-1.5" : "gap-1.5 px-2"}`}>
-          {pessoas.map((pessoa) => (
-            <ShellPersonBadge key={pessoa.id} pessoa={pessoa} />
-          ))}
+        <div className={`flex items-center gap-2.5 ${collapsed ? "justify-center px-0" : "px-2"}`}>
+          <ShellPersonBadge pessoa={usuario} />
           {!collapsed && (
-            <span className="ml-1 text-[10.5px] leading-tight text-luc-muted">
-              Thiago · Jakeline
-              <br />
-              <span className="text-luc-disabled">acesso simétrico</span>
-            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[13px] font-semibold text-luc-text">{usuario.nome}</p>
+              <p className="truncate text-[10.5px] text-luc-muted">Conta Google</p>
+            </div>
           )}
         </div>
         <form action={logout}>
@@ -482,6 +460,9 @@ function AreaNavGroup({
     size === "mobile"
       ? "text-luc-text-2 active:bg-luc-surface-2 active:text-luc-text"
       : "text-luc-text-2 hover:bg-luc-surface-2 hover:text-luc-text"
+  // Só o leaf recebe destaque quando um Assunto está ativo (issue #85) — senão
+  // grupo e leaf acendiam juntos, já que a rota de um Assunto também casa `naArea`.
+  const grupoDestacado = area.ativa && !area.assuntos.some((subject) => subject.ativa)
 
   if (!area.expandivel) {
     return (
@@ -517,7 +498,7 @@ function AreaNavGroup({
         aria-controls={assuntosId}
         onClick={onToggle}
         className={`relative flex ${rowMinH} w-full items-center gap-3 rounded-luc-md px-3 text-[13.5px] font-semibold transition-colors ${FOCUS} ${
-          area.ativa ? "bg-luc-accent-12 text-luc-text" : idleTone
+          grupoDestacado ? "bg-luc-accent-12 text-luc-text" : idleTone
         }`}
       >
         <ChevronRight
@@ -540,36 +521,28 @@ function AreaNavGroup({
           aria-label={`Assuntos de ${area.nome}`}
           className="mt-0.5 ml-[27px] flex flex-col gap-0.5 border-luc-border border-l pl-2.5"
         >
-          {area.assuntos.map((subject) =>
-            subject.inerte ? (
-              <div
-                key={subject.slug}
-                aria-disabled="true"
-                className={`flex ${subjectMinH} items-center gap-2 rounded-luc-md px-2.5 text-[13px] text-luc-disabled`}
-              >
-                <span className="min-w-0 flex-1 truncate">{subject.nome}</span>
-                <Pill tone="warn">em breve</Pill>
-              </div>
-            ) : (
-              <Link
-                key={subject.slug}
-                href={subject.href}
-                aria-current={subject.ativa ? "page" : undefined}
-                onClick={onNavigate}
-                className={`relative flex ${subjectMinH} items-center rounded-luc-md px-2.5 text-[13px] font-medium transition-colors ${FOCUS} ${
-                  subject.ativa ? "bg-luc-accent-12 text-luc-text" : idleTone
-                }`}
-              >
-                {subject.ativa && (
-                  <span
-                    aria-hidden
-                    className="absolute top-1.5 bottom-1.5 -left-[13px] w-[2px] rounded-full bg-luc-accent"
-                  />
-                )}
-                <span className="min-w-0 flex-1 truncate">{subject.nome}</span>
-              </Link>
-            ),
-          )}
+          {area.assuntos.map((subject) => (
+            <Link
+              key={subject.slug}
+              href={subject.href}
+              aria-current={subject.ativa ? "page" : undefined}
+              onClick={onNavigate}
+              className={`relative flex ${subjectMinH} items-center gap-2 rounded-luc-md px-2.5 text-[13px] font-medium transition-colors ${FOCUS} ${
+                subject.ativa ? "bg-luc-accent-12 text-luc-text" : idleTone
+              }`}
+            >
+              {subject.ativa && (
+                <span
+                  aria-hidden
+                  className="absolute top-1.5 bottom-1.5 -left-[13px] w-[2px] rounded-full bg-luc-accent"
+                />
+              )}
+              <span className={`shrink-0 ${subject.ativa ? "text-luc-accent-bright" : ""}`}>
+                <AreaIcon name={subject.icon} size={16} />
+              </span>
+              <span className="min-w-0 flex-1 truncate">{subject.nome}</span>
+            </Link>
+          ))}
         </nav>
       )}
     </div>
@@ -588,6 +561,10 @@ function AreaFlyoutTrigger({ area }: { area: NavArea }) {
   const triggerRef = useRef<HTMLButtonElement>(null)
   const suppressReopenRef = useRef(false)
   const flyoutId = `area-flyout-${area.slug}`
+  // Com o flyout fechado, o gatilho é a única pista visual de "você está em
+  // Finanças" no rail — mantém o destaque. Aberto, o leaf ativo lá dentro já
+  // assume esse papel (issue #85): neutraliza o gatilho pra não acender junto.
+  const gatilhoDestacado = area.ativa && !open
 
   // O <aside> ancestral tem overflow-y-auto; pela spec de overflow, isso força
   // overflow-x a computar "auto" também e clipa um flyout absolute dentro dele.
@@ -673,12 +650,12 @@ function AreaFlyoutTrigger({ area }: { area: NavArea }) {
         aria-current={area.ativa ? "page" : undefined}
         onClick={() => setOpen(true)}
         className={`relative flex min-h-10 w-full items-center justify-center rounded-luc-md text-[13.5px] font-semibold transition-colors ${FOCUS} ${
-          area.ativa
+          gatilhoDestacado
             ? "bg-luc-accent-12 text-luc-text"
             : "text-luc-text-2 hover:bg-luc-surface-2 hover:text-luc-text"
         }`}
       >
-        {area.ativa && (
+        {gatilhoDestacado && (
           <span
             aria-hidden
             className="absolute top-2 bottom-2 -left-3 w-[2.5px] rounded-full bg-luc-accent"
@@ -710,32 +687,24 @@ function AreaFlyoutTrigger({ area }: { area: NavArea }) {
             </span>
           </div>
           <nav aria-label={`Assuntos de ${area.nome}`} className="flex flex-col gap-0.5">
-            {area.assuntos.map((subject) =>
-              subject.inerte ? (
-                <div
-                  key={subject.slug}
-                  aria-disabled="true"
-                  className="flex min-h-8 items-center gap-2 rounded-luc-md px-2.5 text-[13px] text-luc-disabled"
-                >
-                  <span className="min-w-0 flex-1 truncate">{subject.nome}</span>
-                  <Pill tone="warn">em breve</Pill>
-                </div>
-              ) : (
-                <Link
-                  key={subject.slug}
-                  href={subject.href}
-                  aria-current={subject.ativa ? "page" : undefined}
-                  onClick={() => setOpen(false)}
-                  className={`flex min-h-8 items-center rounded-luc-md px-2.5 text-[13px] font-medium transition-colors ${FOCUS} ${
-                    subject.ativa
-                      ? "bg-luc-accent-12 text-luc-text"
-                      : "text-luc-text-2 hover:bg-luc-surface-2 hover:text-luc-text"
-                  }`}
-                >
-                  <span className="min-w-0 flex-1 truncate">{subject.nome}</span>
-                </Link>
-              ),
-            )}
+            {area.assuntos.map((subject) => (
+              <Link
+                key={subject.slug}
+                href={subject.href}
+                aria-current={subject.ativa ? "page" : undefined}
+                onClick={() => setOpen(false)}
+                className={`flex min-h-8 items-center gap-2 rounded-luc-md px-2.5 text-[13px] font-medium transition-colors ${FOCUS} ${
+                  subject.ativa
+                    ? "bg-luc-accent-12 text-luc-text"
+                    : "text-luc-text-2 hover:bg-luc-surface-2 hover:text-luc-text"
+                }`}
+              >
+                <span className={`shrink-0 ${subject.ativa ? "text-luc-accent-bright" : ""}`}>
+                  <AreaIcon name={subject.icon} size={15} />
+                </span>
+                <span className="min-w-0 flex-1 truncate">{subject.nome}</span>
+              </Link>
+            ))}
           </nav>
         </div>
       )}
@@ -932,7 +901,7 @@ function NavItem({
   active: boolean
   collapsed?: boolean
   onNavigate?: () => void
-  areaState?: Area["estado"]
+  areaState?: NavArea["estado"]
   children: ReactNode
 }) {
   return (
@@ -975,12 +944,20 @@ function NavItem({
   )
 }
 
-function ShellPersonBadge({ pessoa }: { pessoa: ShellPessoa }) {
+/** Fallback sem Pessoa resolvida (ver `USUARIO_PADRAO`) — nunca herda a cor nominal de Thiago/Jakeline. */
+function corDoBadge(pessoa: ShellPessoa): CSSProperties {
+  if (pessoa.id === USUARIO_PADRAO.id) {
+    return { color: "var(--luc-text-2)", backgroundColor: "var(--luc-surface-2)" }
+  }
   const key = personKey(pessoa)
-  const colors = {
+  return {
     color: `var(--luc-${key}-fg)`,
     backgroundColor: `var(--luc-${key}-bg)`,
-  } satisfies CSSProperties
+  }
+}
+
+function ShellPersonBadge({ pessoa }: { pessoa: ShellPessoa }) {
+  const colors = corDoBadge(pessoa)
 
   return (
     <PersonAvatar
