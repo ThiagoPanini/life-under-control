@@ -3,6 +3,7 @@
 import { FileText, Upload } from "lucide-react"
 import { useId, useState } from "react"
 import { Button } from "@/components/ds/Button"
+import { DatePicker } from "@/components/ds/DatePicker"
 import { Field, FieldError, getFieldError, inputClass } from "@/components/ds/FormField"
 import { PersonChip } from "@/components/ds/PersonChip"
 import type { PaymentFormInicial } from "@/components/financas/payment-form-inicial"
@@ -158,15 +159,13 @@ export function PaymentForm({
       )}
 
       <Field label="Data de pagamento" htmlFor={`${formId}-data`} error={erroDe("dataPagamento")}>
-        <input
+        <DatePicker
           id={`${formId}-data`}
           name="dataPagamento"
-          type="date"
           value={dataPagamento}
-          onChange={(e) => setDataPagamento(e.target.value)}
-          className={inputClass}
-          aria-invalid={Boolean(erroDe("dataPagamento"))}
-          aria-describedby={erroDe("dataPagamento") ? `${formId}-data-error` : undefined}
+          onChange={setDataPagamento}
+          invalid={Boolean(erroDe("dataPagamento"))}
+          describedBy={erroDe("dataPagamento") ? `${formId}-data-error` : undefined}
         />
       </Field>
 

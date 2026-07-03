@@ -81,10 +81,13 @@ describe("paymentParaInicial (Seam 3)", () => {
 
 describe("PaymentForm — pré-preenchimento (Seam 3)", () => {
   it("test_pre_preenche_valor_competencia_e_data", () => {
-    render(<PaymentForm formAction={noop} pessoas={PESSOAS} inicial={inicial()} />)
+    const { container } = render(
+      <PaymentForm formAction={noop} pessoas={PESSOAS} inicial={inicial()} />,
+    )
     expect(screen.getByLabelText("Valor")).toHaveValue("129,90")
     expect(screen.getByLabelText("Competência")).toHaveValue("2026-06")
-    expect(screen.getByLabelText("Data de pagamento")).toHaveValue("2026-06-29")
+    expect(screen.getByLabelText("Data de pagamento")).toHaveTextContent("29/06/2026")
+    expect(container.querySelector('input[name="dataPagamento"]')).toHaveValue("2026-06-29")
   })
 
   it("test_quem_pagou_default_a_logada", () => {
