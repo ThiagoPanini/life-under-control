@@ -3,7 +3,7 @@
 import { useState } from "react"
 import type { PaymentFormState } from "@/app/(app)/areas/financas/actions"
 import { Modal } from "@/components/ds/Modal"
-import { BillIcon } from "@/components/financas/BillIcon"
+import { BillHeaderChip } from "@/components/financas/BillHeaderChip"
 import { ConnectedPaymentForm } from "@/components/financas/ConnectedPaymentForm"
 import type { PaymentFormInicial } from "@/components/financas/payment-form-inicial"
 import type { PessoaComAvatar } from "@/core/use-cases/resolve-avatares"
@@ -56,16 +56,7 @@ export function RegistrarPagamentoModal({
       eyebrow="Registrar Lançamento"
       description={contexto}
       descriptionMono
-      icon={
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-[8px] bg-luc-accent-12 text-luc-accent-bright">
-          {logoUrl ? (
-            // biome-ignore lint/performance/noImgElement: URL assinada volátil; sem domínio fixo pro next/image
-            <img src={logoUrl} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <BillIcon name={billIcon} size={15} />
-          )}
-        </span>
-      }
+      icon={<BillHeaderChip icon={billIcon} logoUrl={logoUrl} />}
       closeHref={closeHref}
       width="narrow"
       travado={travado}

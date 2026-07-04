@@ -13,7 +13,7 @@ import {
 } from "@/components/ds/FormField"
 import { BillIcon } from "@/components/financas/BillIcon"
 import { BillLogoPicker } from "@/components/financas/BillLogoPicker"
-import { BILL_ICONS, type DueRuleKind } from "@/core/domain/bill"
+import { BILL_ICON_NOMES, BILL_ICONS, type DueRuleKind } from "@/core/domain/bill"
 
 /**
  * Os campos-string que a edição rápida pré-preenche: nome, ícone e a regra de
@@ -44,8 +44,9 @@ function segmentoClass(selecionado: boolean): string {
 /**
  * Formulário compacto da edição rápida de uma Conta (o lápis do card), na
  * composição exata do protótipo Final: Nome → Vencimento (segmentado + "todo
- * dia N" inline) → Ícone · ou um logo (grade 36px, escondida quando há logo) →
- * nota de domínio → um único "Salvar alterações" de largura cheia (o X do modal
+ * dia N" inline) → Ícone · ou um logo (grade 36px, sempre visível — o ícone é o
+ * fallback persistido) → nota de domínio → um único "Salvar alterações" de
+ * largura cheia (o X do modal
  * é a saída). Coleta só a allowlist — as regras avançadas (descrição,
  * periodicidade, âncora, n-ésimo dia útil, deslocamento) **não aparecem** aqui:
  * seguem na edição completa e são preservadas byte a byte pelo `quickEditBill`.
@@ -61,11 +62,14 @@ export function QuickEditBillForm({
   logoUrl,
   inicial,
   action,
+  onOperacaoEmAndamento,
 }: {
   billId: string
   logoUrl: string | null
   inicial: QuickBillInicial
   action: (prev: ContaFormState, formData: FormData) => Promise<ContaFormState>
+  /** Sobe o enviando/removendo do logo pro modal travar o descarte silencioso (#100, AC13). */
+  onOperacaoEmAndamento?: (emAndamento: boolean) => void
 }) {
   const [state, formAction, pending] = useActionState(action, { erros: [] })
   const formId = useId()
@@ -133,7 +137,11 @@ export function QuickEditBillForm({
           ))}
         </div>
         {dueRuleKind === "dia-fixo" && (
-          <div className="mt-0.5 flex min-h-[38px] items-center gap-2 rounded-[9px] border border-luc-border-strong bg-white/[0.03] px-3 transition-[border-color,box-shadow] focus-within:border-luc-accent focus-within:ring-2 focus-within:ring-luc-accent">
+          <div
+            className={`mt-0.5 flex min-h-[38px] items-center gap-2 rounded-[9px] border bg-white/[0.03] px-3 transition-[border-color,box-shadow] focus-within:border-luc-accent focus-within:ring-2 focus-within:ring-luc-accent ${
+              erroDe("dueRuleDay") ? "border-luc-warn" : "border-luc-border-strong"
+            }`}
+          >
             <Calendar aria-hidden size={14} className="shrink-0 text-luc-muted" />
             <label
               htmlFor={`${formId}-dia`}
@@ -166,37 +174,42 @@ export function QuickEditBillForm({
             · ou um logo
           </span>
         </legend>
-        {/* Com logo, a grade some (o logo é a identidade); remover o logo a traz de volta. */}
-        {!logoUrl && (
-          <div className="flex flex-wrap gap-1.5">
-            {BILL_ICONS.map((ic) => (
-              <label
-                key={ic}
-                title={ic}
-                className={`flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-[9px] border transition-colors focus-within:ring-2 focus-within:ring-luc-accent ${
-                  icon === ic
-                    ? "border-luc-accent/45 bg-luc-accent-12 text-luc-accent-bright"
-                    : "border-luc-border bg-white/[0.03] text-luc-text-2 hover:border-luc-border-strong"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="icon"
-                  value={ic}
-                  checked={icon === ic}
-                  onChange={() => setIcon(ic)}
-                  className="sr-only"
-                />
-                <BillIcon name={ic} size={16} />
-                <span className="sr-only">{ic}</span>
-              </label>
-            ))}
-          </div>
-        )}
-        {/* Com logo, o form segue submetendo o ícone atual (o fallback do tile). */}
-        {logoUrl && <input type="hidden" name="icon" value={icon} />}
+        {/* O protótipo esconde a grade quando há logo, mas o ícone é o fallback
+            persistido (tiles sem logo, estados degradados) — o mock não dita
+            comportamento: a grade fica visível pra trocar o fallback sem antes
+            destruir o logo (a remoção é imediata e sem desfazer). */}
+        <div className="flex flex-wrap gap-1.5">
+          {BILL_ICONS.map((ic) => (
+            <label
+              key={ic}
+              title={BILL_ICON_NOMES[ic]}
+              className={`flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-[9px] border transition-colors focus-within:ring-2 focus-within:ring-luc-accent ${
+                icon === ic
+                  ? "border-luc-accent/45 bg-luc-accent-12 text-luc-accent-bright"
+                  : "border-luc-border bg-white/[0.03] text-luc-text-2 hover:border-luc-border-strong"
+              }`}
+            >
+              <input
+                type="radio"
+                name="icon"
+                value={ic}
+                checked={icon === ic}
+                onChange={() => setIcon(ic)}
+                className="sr-only"
+              />
+              <BillIcon name={ic} size={16} />
+              <span className="sr-only">{BILL_ICON_NOMES[ic]}</span>
+            </label>
+          ))}
+        </div>
         {erroDe("icon") && <FieldError>{erroDe("icon")}</FieldError>}
-        <BillLogoPicker billId={billId} icon={icon} logoUrl={logoUrl} variant="compacto" />
+        <BillLogoPicker
+          billId={billId}
+          icon={icon}
+          logoUrl={logoUrl}
+          variant="compacto"
+          onOperacaoEmAndamento={onOperacaoEmAndamento}
+        />
         <span className="text-[10.5px] text-luc-faint">
           A Conta guarda o quando, nunca o quanto — o valor nasce em cada Lançamento.
         </span>

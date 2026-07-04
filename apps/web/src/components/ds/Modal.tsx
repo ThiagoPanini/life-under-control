@@ -53,11 +53,21 @@ export function Modal({
     fechar()
   }
 
+  // Só na montagem: travar o scroll do body e dar o foco inicial ao X. Sem o
+  // array vazio, QUALQUER re-render (ex.: `travado` mudando durante a baixa)
+  // roubava o foco de volta pro X — um Enter reflexo acionava a saída
+  // deliberada bem no meio da operação que a trava protege (#100, AC13).
   useEffect(() => {
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = "hidden"
     closeRef.current?.focus()
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [])
 
+  // O listener de teclado re-liga quando `travado` muda (o Escape lê a trava).
+  useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault()
@@ -80,7 +90,6 @@ export function Modal({
 
     document.addEventListener("keydown", onKeyDown)
     return () => {
-      document.body.style.overflow = previousOverflow
       document.removeEventListener("keydown", onKeyDown)
     }
   })

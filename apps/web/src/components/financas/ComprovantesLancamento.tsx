@@ -9,18 +9,11 @@ import {
   removerComprovante,
 } from "@/app/(app)/areas/financas/actions"
 import { Button } from "@/components/ds/Button"
+import { formatarTamanhoArquivo } from "@/components/financas/file-size"
 import type { Attachment } from "@/core/domain/attachment"
 
 /** O picker aceita imagem ou PDF (o use-case revalida o tipo do lado servidor). */
 const ACEITA = "image/*,application/pdf"
-
-/** Tamanho legível a partir de bytes (B · KB · MB). */
-function formatarTamanho(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  const kb = bytes / 1024
-  if (kb < 1024) return `${Math.round(kb)} KB`
-  return `${(kb / 1024).toFixed(1)} MB`
-}
 
 /**
  * Comprovantes de um Lançamento (borda fina — ADR-0008). Lista os anexos (abrir /
@@ -131,7 +124,7 @@ export function ComprovantesLancamento({
               </button>
               <div className="flex shrink-0 items-center gap-3">
                 <span className="font-mono text-[11px] text-luc-text-3">
-                  {formatarTamanho(c.tamanhoBytes)}
+                  {formatarTamanhoArquivo(c.tamanhoBytes)}
                 </span>
                 <button
                   type="button"

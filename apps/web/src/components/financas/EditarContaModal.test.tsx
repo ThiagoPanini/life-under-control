@@ -35,13 +35,14 @@ function renderModal(
   action: (prev: ContaFormState, fd: FormData) => Promise<ContaFormState> = async () => ({
     erros: [],
   }),
+  logoUrl: string | null = null,
 ) {
   return render(
     <EditarContaModal
       billId="luz"
       billName="Luz"
       billIcon="zap"
-      logoUrl={null}
+      logoUrl={logoUrl}
       contexto="recorrência mensal · o valor nasce em cada Lançamento"
       inicial={{ nome: "Luz", icon: "zap", dueRuleKind: "dia-fixo", dueRuleDay: "10", ...inicial }}
       action={action}
@@ -96,6 +97,15 @@ describe("EditarContaModal (#97)", () => {
     // recuperação seguem do picker)
     renderModal()
     expect(screen.getByRole("button", { name: /Enviar um logo/ })).toBeInTheDocument()
+  })
+
+  it("test_conta_com_logo_mantem_grade_de_icones_visivel", () => {
+    // O protótipo esconde a grade com logo, mas o ícone é o fallback persistido
+    // (mock não dita comportamento): trocar o fallback não pode exigir destruir
+    // o logo antes — a remoção é imediata e sem desfazer.
+    renderModal({}, undefined, "https://r2.example/logo.png")
+    expect(screen.getByRole("radio", { name: "Energia" })).toBeChecked()
+    expect(screen.getByRole("button", { name: /Trocar o logo/ })).toBeInTheDocument()
   })
 
   it("test_fechar_dispensa_o_modal_via_replace", async () => {

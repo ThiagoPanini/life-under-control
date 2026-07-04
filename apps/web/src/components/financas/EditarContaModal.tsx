@@ -1,6 +1,9 @@
+"use client"
+
+import { useState } from "react"
 import type { ContaFormState } from "@/app/(app)/areas/financas/actions"
 import { Modal } from "@/components/ds/Modal"
-import { BillIcon } from "@/components/financas/BillIcon"
+import { BillHeaderChip } from "@/components/financas/BillHeaderChip"
 import { type QuickBillInicial, QuickEditBillForm } from "@/components/financas/QuickEditBillForm"
 
 /**
@@ -32,26 +35,27 @@ export function EditarContaModal({
   action: (prev: ContaFormState, formData: FormData) => Promise<ContaFormState>
   closeHref: string
 }) {
+  // Upload/remoção de logo em curso trava o descarte silencioso (Escape/backdrop)
+  // — mesmo contrato do modal de Registrar (#100, AC13): só o X sai no meio.
+  const [travado, setTravado] = useState(false)
   return (
     <Modal
       title={billName}
       eyebrow="Editar Conta"
       description={contexto}
       descriptionMono
-      icon={
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-[8px] bg-luc-accent-12 text-luc-accent-bright">
-          {logoUrl ? (
-            // biome-ignore lint/performance/noImgElement: URL assinada volátil; sem domínio fixo pro next/image
-            <img src={logoUrl} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <BillIcon name={billIcon} size={15} />
-          )}
-        </span>
-      }
+      icon={<BillHeaderChip icon={billIcon} logoUrl={logoUrl} />}
       closeHref={closeHref}
       width="narrow"
+      travado={travado}
     >
-      <QuickEditBillForm billId={billId} logoUrl={logoUrl} inicial={inicial} action={action} />
+      <QuickEditBillForm
+        billId={billId}
+        logoUrl={logoUrl}
+        inicial={inicial}
+        action={action}
+        onOperacaoEmAndamento={setTravado}
+      />
     </Modal>
   )
 }

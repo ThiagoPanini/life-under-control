@@ -101,6 +101,31 @@ export const BILL_ICONS = [
   "shopping-cart",
 ] as const
 
+/**
+ * Nome pt-BR de cada ícone do catálogo — o id Lucide é detalhe de persistência
+ * e nunca vira copy (tooltip, leitor de tela). Identificador em inglês, termo
+ * pro Lar em pt-BR (CONTEXT.md).
+ */
+export const BILL_ICON_NOMES: Record<(typeof BILL_ICONS)[number], string> = {
+  "building-2": "Condomínio",
+  "credit-card": "Cartão de crédito",
+  zap: "Energia",
+  droplet: "Água",
+  wifi: "Internet",
+  flame: "Gás",
+  "heart-pulse": "Saúde",
+  "graduation-cap": "Educação",
+  dumbbell: "Academia",
+  shield: "Seguro",
+  receipt: "Boleto",
+  car: "Carro",
+  home: "Casa",
+  smartphone: "Celular",
+  tv: "TV/Streaming",
+  wallet: "Carteira",
+  "shopping-cart": "Mercado",
+}
+
 /** Meses em pt-BR (índice 0 = janeiro), para descrever Recorrência e âncora. */
 export const MESES = [
   "Janeiro",

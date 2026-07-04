@@ -29,11 +29,14 @@ export function BillLogoPicker({
   icon,
   logoUrl,
   variant = "padrao",
+  onOperacaoEmAndamento,
 }: {
   billId: string
   icon: string
   logoUrl: string | null
   variant?: "padrao" | "compacto"
+  /** Avisa o dono (modal) que um envio/remoção começou/terminou — trava o descarte silencioso. */
+  onOperacaoEmAndamento?: (emAndamento: boolean) => void
 }) {
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -44,6 +47,7 @@ export function BillLogoPicker({
   async function enviar(file: File) {
     setErro(null)
     setEnviando(true)
+    onOperacaoEmAndamento?.(true)
     try {
       const prep = await prepararLogoConta(billId, file.type, file.size)
       if (!prep.ok) {
@@ -70,6 +74,7 @@ export function BillLogoPicker({
       setErro("Algo deu errado ao enviar o logo.")
     } finally {
       setEnviando(false)
+      onOperacaoEmAndamento?.(false)
       if (inputRef.current) inputRef.current.value = ""
     }
   }
@@ -77,6 +82,7 @@ export function BillLogoPicker({
   async function remover() {
     setErro(null)
     setRemovendo(true)
+    onOperacaoEmAndamento?.(true)
     try {
       const res = await removerLogoConta(billId)
       if (!res.ok) {
@@ -88,6 +94,7 @@ export function BillLogoPicker({
       setErro("Não foi possível remover. Tente de novo.")
     } finally {
       setRemovendo(false)
+      onOperacaoEmAndamento?.(false)
     }
   }
 

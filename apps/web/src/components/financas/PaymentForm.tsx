@@ -312,7 +312,12 @@ export function PaymentForm({
               accept="image/*,application/pdf"
               multiple
               className="sr-only"
-              onChange={(event) => adicionarArquivos(event.target.files)}
+              onChange={(event) => {
+                adicionarArquivos(event.target.files)
+                // Zera o input: remover um arquivo e reanexar o MESMO não dispara
+                // change se o value ficar retido — o chip nunca voltaria.
+                event.target.value = ""
+              }}
             />
           </label>
         </div>
