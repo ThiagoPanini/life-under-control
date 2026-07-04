@@ -34,6 +34,7 @@ export function ConnectedPaymentForm({
   billId,
   successHref,
   closeHref,
+  onOperacaoEmAndamento,
 }: {
   action: (prev: PaymentFormState, formData: FormData) => Promise<PaymentFormState>
   pessoas: PessoaComAvatar[]
@@ -50,6 +51,12 @@ export function ConnectedPaymentForm({
   successHref?: string
   /** Modal compacto (Final): rota do "Cancelar" do rodapé — o mesmo destino do X do Modal. */
   closeHref?: string
+  /**
+   * Modal compacto (#100): avisa o pai quando a operação pós-registro está em
+   * curso (Lançamento criado, uploads/decisão pendentes) — o modal usa isso para
+   * travar o descarte silencioso (Escape/backdrop) enquanto não conclui (AC13).
+   */
+  onOperacaoEmAndamento?: (emAndamento: boolean) => void
 }) {
   // Wizard e compacto compartilham o pós-registro: upload dos comprovantes em
   // duas etapas e o redirect com `lancado=` — só a coleta dos campos difere.
@@ -59,10 +66,30 @@ export function ConnectedPaymentForm({
   const [finalizando, setFinalizando] = useState(false)
   const [erroFinalizacao, setErroFinalizacao] = useState<string | null>(null)
   const iniciadoRef = useRef<string | null>(null)
+  // Comprovantes de fato associados, somados através de eventuais retries — o
+  // número que o toast final anuncia (não o de arquivos tentados, #100).
+  const enviadosRef = useRef(0)
   const router = useRouter()
 
+  // Fecha o modal com sucesso: leva competência, valor e a contagem de
+  // comprovantes associados no destino, para o toast identificar os três (#100).
+  const irParaSucesso = useCallback(
+    (competencia: string, valor?: number) => {
+      if (!successHref) return
+      const separador = successHref.includes("?") ? "&" : "?"
+      const params = new URLSearchParams({
+        lancado: competencia,
+        comprovantes: String(enviadosRef.current),
+      })
+      if (valor != null) params.set("valor", String(valor))
+      router.replace(`${successHref}${separador}${params.toString()}`)
+      router.refresh()
+    },
+    [router, successHref],
+  )
+
   const finalizarRegistro = useCallback(
-    async (paymentId: string, competencia: string) => {
+    async (paymentId: string, competencia: string, valor?: number) => {
       if (!billId || !successHref) return
       setFinalizando(true)
       setErroFinalizacao(null)
@@ -93,6 +120,9 @@ export function ConnectedPaymentForm({
         }
       }
 
+      // Só os que passaram entram na contagem — acumula entre retries (#100).
+      enviadosRef.current += arquivos.length - falhos.length
+
       if (falhos.length > 0) {
         setArquivos(falhos)
         setErroFinalizacao(
@@ -102,13 +132,24 @@ export function ConnectedPaymentForm({
         return
       }
 
-      const separador = successHref.includes("?") ? "&" : "?"
-      router.replace(`${successHref}${separador}lancado=${encodeURIComponent(competencia)}`)
-      router.refresh()
+      irParaSucesso(competencia, valor)
       setFinalizando(false)
     },
-    [arquivos, billId, router, successHref],
+    [arquivos, billId, successHref, irParaSucesso],
   )
+
+  // A operação está em curso já no submit em voo (`pending`) e segue até a tela
+  // de progresso concluir (uploads correndo ou decisão sobre falhas) — o pai trava
+  // o descarte silencioso em todo esse intervalo. Incluir `pending` fecha a janela
+  // em que o Lançamento nasce no servidor mas ainda não voltou: fechar aí o
+  // gravaria sem comprovantes nem toast (#100, AC13).
+  const emProgresso = Boolean(
+    comComprovantes && (pending || (state.createdPaymentId && state.competencia)),
+  )
+
+  useEffect(() => {
+    onOperacaoEmAndamento?.(emProgresso)
+  }, [emProgresso, onOperacaoEmAndamento])
 
   useEffect(() => {
     if (
@@ -119,8 +160,8 @@ export function ConnectedPaymentForm({
     )
       return
     iniciadoRef.current = state.createdPaymentId
-    void finalizarRegistro(state.createdPaymentId, state.competencia)
-  }, [comComprovantes, finalizarRegistro, state.competencia, state.createdPaymentId])
+    void finalizarRegistro(state.createdPaymentId, state.competencia, state.valor)
+  }, [comComprovantes, finalizarRegistro, state.competencia, state.createdPaymentId, state.valor])
 
   if (comComprovantes && state.createdPaymentId && state.competencia) {
     return (
@@ -144,6 +185,7 @@ export function ConnectedPaymentForm({
                 void finalizarRegistro(
                   state.createdPaymentId as string,
                   state.competencia as string,
+                  state.valor,
                 )
               }
             >
@@ -152,12 +194,7 @@ export function ConnectedPaymentForm({
             <Button
               type="button"
               variant="secondary"
-              onClick={() => {
-                const separador = successHref.includes("?") ? "&" : "?"
-                router.replace(
-                  `${successHref}${separador}lancado=${encodeURIComponent(state.competencia as string)}`,
-                )
-              }}
+              onClick={() => irParaSucesso(state.competencia as string, state.valor)}
             >
               Continuar sem comprovante
             </Button>
