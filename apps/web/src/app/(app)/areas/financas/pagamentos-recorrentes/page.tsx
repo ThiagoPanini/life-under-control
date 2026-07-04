@@ -37,8 +37,8 @@ import { resolverUsuarioAutenticado } from "@/core/use-cases/resolve-usuario-aut
 export const dynamic = "force-dynamic"
 
 const EYEBROW = (
-  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-luc-faint">
-    Finanças · Assunto
+  <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-luc-faint">
+    Finanças
   </span>
 )
 
@@ -157,7 +157,7 @@ export default async function FinancasPage({
           mensagem={`Lançamento registrado — ${billLancado.nome} · ${descreverCompetencia(lancadoValido, billLancado.recurrence)}`}
         />
       )}
-      <div className="mx-auto flex max-w-[1120px] flex-col gap-6">
+      <div className="mx-auto flex max-w-[1120px] flex-col gap-[26px]">
         <PageHeader
           eyebrow={EYEBROW}
           title="Pagamentos Recorrentes"

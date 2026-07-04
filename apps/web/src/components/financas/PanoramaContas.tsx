@@ -75,8 +75,10 @@ function BlocoConta({ bloco }: { bloco: BlocoPanorama }) {
     <li
       data-testid="bloco-panorama"
       data-estado={bloco.estado}
-      className={`flex min-w-0 flex-col rounded-[13px] border px-[15px] pt-3.5 pb-3 ${
-        bloco.estado === "vencida" ? "border-luc-danger/40" : "border-luc-border"
+      className={`flex min-w-0 flex-col rounded-[13px] border px-[15px] pt-3.5 pb-3 transition-[border-color,background-color,opacity,filter] duration-150 motion-reduce:transition-none hover:bg-luc-surface-3 hover:opacity-100 hover:saturate-100 ${
+        bloco.estado === "vencida"
+          ? "border-luc-danger/40 hover:border-luc-danger/60"
+          : "border-luc-border hover:border-luc-border-strong"
       } ${pago ? "bg-luc-surface-1 opacity-[0.62] saturate-[0.55]" : "bg-luc-surface-2"}`}
     >
       <div className="flex min-w-0 items-center gap-2.5">

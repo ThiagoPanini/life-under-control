@@ -245,7 +245,7 @@ export function AppShell({
           </button>
         </header>
 
-        <DesktopHeader label={currentLabel} collapsed={collapsed} onToggle={toggleDesktopSidebar} />
+        <DesktopHeader parts={breadcrumb} collapsed={collapsed} onToggle={toggleDesktopSidebar} />
 
         <main
           id="conteudo-principal"
@@ -273,26 +273,46 @@ export function AppShell({
 }
 
 function DesktopHeader({
-  label,
+  parts,
   collapsed,
   onToggle,
 }: {
-  label: string
+  parts: string[]
   collapsed: boolean
   onToggle: () => void
 }) {
   return (
     <header className="sticky top-0 z-30 hidden h-14 shrink-0 items-center border-luc-border border-b bg-luc-bg/70 px-6 backdrop-blur-lg lg:flex">
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         <button
           type="button"
           onClick={onToggle}
           aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-          className={`inline-flex h-[30px] w-[30px] items-center justify-center rounded-[8px] border border-luc-border bg-luc-surface-2 text-luc-text-3 transition-colors hover:border-luc-border-strong hover:text-luc-text ${FOCUS}`}
+          className={`inline-flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[8px] border border-luc-border bg-luc-surface-2 text-luc-text-3 transition-colors hover:border-luc-border-strong hover:text-luc-text ${FOCUS}`}
         >
           <PanelLeft size={16} strokeWidth={1.8} aria-hidden />
         </button>
-        <div className="text-sm font-bold text-luc-text">{label}</div>
+        {/* Breadcrumb hierárquico (protótipo Final): Área muted, separador disabled, Assunto forte. */}
+        <nav aria-label="Trilha" className="flex min-w-0 items-center gap-2">
+          {parts.map((part, i) => (
+            <span key={part} className="flex min-w-0 items-center gap-2">
+              {i > 0 && (
+                <span aria-hidden className="shrink-0 text-luc-disabled">
+                  ›
+                </span>
+              )}
+              <span
+                className={
+                  i === parts.length - 1
+                    ? "truncate font-bold text-[14px] text-luc-text"
+                    : "shrink-0 whitespace-nowrap text-[13px] text-luc-muted"
+                }
+              >
+                {part}
+              </span>
+            </span>
+          ))}
+        </nav>
       </div>
     </header>
   )
