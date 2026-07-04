@@ -73,6 +73,19 @@ O card completo reúne nome e regra, farol vigente, grid das últimas 12 ocorrê
 
 O grid distingue `em-dia`, `atraso-leve`, `atraso`, `em-aberto`, `aguardando` e `pago-sem-data` por forma, intensidade e texto acessível; nunca apenas por cor.
 
+### Panorama do mês vigente — estados (#93)
+
+O Panorama de Contas deriva de `derivarPanoramaMensal` uma leitura única por Conta com ocorrência vigente; a UI não recalcula domínio. São quatro estados, e só `vencida` veste `danger` (vermelho) — `vence em breve` é atenção (âmbar).
+
+| Estado | Regra derivada | Cor | Tratamento acessível |
+|---|---|---|---|
+| `pago` | há Lançamento na Competência (prevalece); o valor é a soma das baixas fracionadas | success | ponto preenchido, card apagado no repouso e rótulo |
+| `a vencer` | vencimento a cinco dias ou mais | text-3 neutro | ponto neutro e rótulo |
+| `vence em breve` | vencimento entre hoje e quatro dias (`vence hoje` incluso) | warn | ponto contornado e rótulo |
+| `vencida` | vencimento já passou — `vence hoje` nunca é atraso consumado | danger | ponto preenchido com anel e rótulo explícito |
+
+O valor acompanha o estado: soma exata quando `pago`, `≈ média` quando em aberto com histórico, e `—` (ausência explícita) sem base — nunca `R$ 0,00` inventado.
+
 ## Command palette
 
 Overlay escuro com blur leve. Painel em `--luc-surface-3`, borda strong, raio 13–15px, sombra profunda. Abre por `Ctrl/⌘+K`, fecha por Escape e clique no overlay, prende foco enquanto aberta e lista apenas destinos existentes. Placeholder: “Ir para…”.
@@ -86,5 +99,5 @@ O protótipo não define formulários. Para telas existentes:
 - foco segue o estado comum; erro usa warn, mensagem textual e `aria-describedby`;
 - radios e seletores de ícone usam o mesmo padrão ativo da navegação;
 - wizard mostra etapa atual com accent e etapas concluídas com success;
-- ações destrutivas usam warn, linguagem explícita e confirmação; não introduzem vermelho fora da paleta;
+- ações destrutivas usam `danger` (vermelho), linguagem explícita e confirmação — o mesmo semântico do vencimento consumado, reservado a perigo e destruição;
 - pending desabilita submissão, mantém o rótulo legível e expõe `aria-busy` quando aplicável.

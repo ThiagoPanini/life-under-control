@@ -24,7 +24,8 @@
 | `--luc-accent-12` | `rgba(76,196,230,.12)` | navegação ativa |
 | `--luc-accent-06` | `rgba(76,196,230,.06)` | superfície ativa sutil |
 | `--luc-success` | `#5fd0a0` | quitada, favorito e pronto |
-| `--luc-warn` | `#e0a05f` | pendente, a vencer e `em breve` |
+| `--luc-warn` | `#e0a05f` | atenção — `vence em breve`, alerta de formulário e destaque de gasto |
+| `--luc-danger` | `#e0655f` | perigo — `vencida` (vencimento consumado) e ação destrutiva |
 | `--luc-thiago-fg` | `hsl(211 76% 74%)` | frente do chip de Thiago |
 | `--luc-thiago-bg` | `hsl(211 44% 23%)` | fundo do chip de Thiago |
 | `--luc-jakeline-fg` | `hsl(14 76% 74%)` | frente do chip de Jakeline |

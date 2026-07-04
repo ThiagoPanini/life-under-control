@@ -1,7 +1,14 @@
 import type { ComponentProps, ReactNode } from "react"
 
 /** Selo compacto de estado. Cor sempre acompanha um rótulo textual. */
-export type PillTone = "neutral" | "muted" | "accent" | "success" | "warn" | "coming-soon"
+export type PillTone =
+  | "neutral"
+  | "muted"
+  | "accent"
+  | "success"
+  | "warn"
+  | "danger"
+  | "coming-soon"
 
 const TONES: Record<PillTone, string> = {
   neutral: "border-transparent bg-white/[0.06] text-luc-text-2",
@@ -9,6 +16,7 @@ const TONES: Record<PillTone, string> = {
   accent: "border-transparent bg-luc-accent-16 text-luc-accent-bright",
   success: "border-transparent bg-luc-success/10 text-luc-success",
   warn: "border-transparent bg-luc-warn/10 text-luc-warn",
+  danger: "border-transparent bg-luc-danger/10 text-luc-danger",
   "coming-soon": "border-luc-warn/20 bg-luc-warn/10 text-luc-warn",
 }
 

@@ -61,6 +61,8 @@ As formas recorrentes descobertas até aqui. Dois grupos: **itens** (o que você
 
 **Competência** (`ReferencePeriod`) — O período a que um Lançamento se refere (o condomínio "de julho"), independente da data em que foi pago. _Evite_: mês de pagamento, vencimento.
 
+**Estado do mês** (`EstadoMes`) — A leitura derivada de uma Conta no mês vigente, em quatro nomes: **pago** (há Lançamento na Competência — prevalece, e o valor é a soma das baixas fracionadas), **a vencer** (vencimento a cinco dias ou mais), **vence em breve** (vencimento entre hoje e quatro dias — `vence hoje` incluso) e **vencida** (vencimento já passou). Derivado do `Clock`, nunca coluna (invariante #3); `vence hoje` não é atraso consumado. O semântico **danger** (vermelho) é reservado a **vencida** e a ações destrutivas; âmbar continua sendo atenção (`vence em breve`). _Evite_: pendente, atrasado como rótulo persistido.
+
 ### Capacidades transversais
 
 **Recorrência** (`Recurrence`) — A cadência de um Gerador (e, às vezes, de uma Tarefa que se repete): com que frequência as ocorrências futuras são projetadas, sem criá-las até acontecerem.
