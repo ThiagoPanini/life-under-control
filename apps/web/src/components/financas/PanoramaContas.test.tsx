@@ -75,3 +75,49 @@ describe("PanoramaContas (Seam 2)", () => {
     expect(screen.getByText("Nenhuma Conta com ocorrência neste mês.")).toBeInTheDocument()
   })
 })
+
+describe("PanoramaContas restyle Final (#95)", () => {
+  it("test_bloco_interativo_muda_borda_e_superficie_no_hover", () => {
+    render(<PanoramaContas blocos={[bloco()]} />)
+    const card = screen.getByTestId("bloco-panorama")
+    // Interação perceptível por borda + superfície (não só cor): borda mais forte
+    // e superfície elevada no hover.
+    expect(card).toHaveClass("hover:border-luc-border-strong")
+    expect(card).toHaveClass("hover:bg-luc-surface-3")
+  })
+
+  it("test_bloco_pago_atenuado_em_repouso_recupera_contraste_no_hover", () => {
+    render(
+      <PanoramaContas
+        blocos={[
+          bloco({
+            estado: "pago",
+            frase: "pago em 02/07",
+            valor: { estado: "pago", total: 12345 },
+            registrarHref: null,
+          }),
+        ]}
+      />,
+    )
+    const card = screen.getByTestId("bloco-panorama")
+    // Repouso atenuado…
+    expect(card).toHaveClass("opacity-[0.62]")
+    expect(card).toHaveClass("saturate-[0.55]")
+    // …e contraste recuperado no hover.
+    expect(card).toHaveClass("hover:opacity-100")
+    expect(card).toHaveClass("hover:saturate-100")
+  })
+
+  it("test_bloco_vencida_reforca_borda_danger_no_hover", () => {
+    render(<PanoramaContas blocos={[bloco({ estado: "vencida", frase: "venceu há 2 dias" })]} />)
+    const card = screen.getByTestId("bloco-panorama")
+    expect(card).toHaveClass("hover:border-luc-danger/60")
+  })
+
+  it("test_transicao_de_estados_respeita_reduced_motion", () => {
+    render(<PanoramaContas blocos={[bloco()]} />)
+    const card = screen.getByTestId("bloco-panorama")
+    expect(card.className).toContain("transition-")
+    expect(card).toHaveClass("motion-reduce:transition-none")
+  })
+})

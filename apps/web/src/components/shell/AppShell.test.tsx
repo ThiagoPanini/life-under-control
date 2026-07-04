@@ -290,7 +290,13 @@ describe("AppShell sidebar (Seam 3)", () => {
     const { container } = render(<AppShell>conteúdo</AppShell>)
     const desktopHeader = container.querySelectorAll("header")[1] as HTMLElement
 
-    expect(within(desktopHeader).getByText("Finanças › Pagamentos Recorrentes")).toBeInTheDocument()
+    // Breadcrumb hierárquico (#95): Área muted, separador disabled, Assunto forte.
+    const financas = within(desktopHeader).getByText("Finanças")
+    expect(financas).toHaveClass("text-luc-muted")
+    expect(within(desktopHeader).getByText("›")).toHaveClass("text-luc-disabled")
+    const assunto = within(desktopHeader).getByText("Pagamentos Recorrentes")
+    expect(assunto).toHaveClass("font-bold")
+    expect(assunto).toHaveClass("text-luc-text")
     expect(screen.queryByRole("button", { name: "Buscar" })).toBeNull()
     expect(screen.queryByText("⌘K")).toBeNull()
     expect(screen.queryByLabelText("Thiago")).toBeNull()
