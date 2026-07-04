@@ -57,7 +57,7 @@ describe("TotalPagoPorMes (Seam 2)", () => {
     )
     // texto, não só cor
     expect(screen.getByText("(em curso)")).toBeInTheDocument()
-    const barra = screen.getByTestId("total-pago-barra")
+    const barra = screen.getByTestId("total-pago-ponto")
     expect(barra).toHaveAttribute("data-estado", "em-curso")
     expect(barra).toHaveAttribute("aria-label", expect.stringContaining("em curso"))
   })
@@ -68,7 +68,7 @@ describe("TotalPagoPorMes (Seam 2)", () => {
         serie={comDados([ponto({ competencia: "2026-04", valor: 4000, estado: "fechado" })])}
       />,
     )
-    expect(screen.getByTestId("total-pago-barra")).toHaveAttribute("data-estado", "fechado")
+    expect(screen.getByTestId("total-pago-ponto")).toHaveAttribute("data-estado", "fechado")
   })
 
   it("test_hover_em_outra_barra_nao_apaga_tooltip_de_quem_tem_foco", () => {
@@ -80,7 +80,7 @@ describe("TotalPagoPorMes (Seam 2)", () => {
         ])}
       />,
     )
-    const [marco, abril] = screen.getAllByTestId("total-pago-barra")
+    const [marco, abril] = screen.getAllByTestId("total-pago-ponto")
     fireEvent.focus(marco)
     expect(screen.getByRole("tooltip")).toHaveTextContent("mar/26")
     fireEvent.mouseEnter(abril)
@@ -108,18 +108,18 @@ describe("TotalPagoPorMes (Seam 2)", () => {
     expect(linha.queryByText("R$ 0,00")).not.toBeInTheDocument()
     // traço + texto: o mês segue marcado como em curso, sem cifra
     expect(screen.getByText("(em curso)")).toBeInTheDocument()
-    expect(screen.getByTestId("total-pago-barra")).toHaveAttribute(
+    expect(screen.getByTestId("total-pago-ponto")).toHaveAttribute(
       "aria-label",
       expect.stringContaining("sem lançamento"),
     )
   })
 
-  it("test_grafico_nao_e_imagem_opaca_e_barras_seguem_focaveis", () => {
+  it("test_grafico_nao_e_imagem_opaca_e_pontos_seguem_focaveis", () => {
     // role="img" no <svg> colapsaria a subárvore e calaria os aria-label das
     // barras focáveis; sem esse role, os filhos rotulados seguem anunciáveis.
     render(<TotalPagoPorMes serie={comDados([ponto()])} />)
     expect(screen.queryByRole("img")).not.toBeInTheDocument()
-    const barra = screen.getByTestId("total-pago-barra")
+    const barra = screen.getByTestId("total-pago-ponto")
     expect(barra).toHaveAttribute("tabindex", "0")
     expect(barra).toHaveAttribute("aria-label", expect.stringContaining("abr/26"))
   })
