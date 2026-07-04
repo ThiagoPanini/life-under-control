@@ -131,12 +131,15 @@ export default async function FinancasPage({
   const billRegistrar = linhaRegistrar ? billsPorId.get(linhaRegistrar.billId) : undefined
   // Autoria default: a Pessoa da sessão, resolvida pelo MESMO use-case da casca
   // (issue #94) — casa pelo e-mail Google vinculado, nunca pela posição no Lar.
-  // A layout já garante a resolubilidade antes desta página renderizar.
+  // Sob bypass, ignora a sessão real (como a layout) pra operar contra o seed.
+  // Sem vínculo, `pessoaLogada` fica `undefined` e o modal deixa "quem pagou" em
+  // branco (o domínio exige a escolha) — nunca defaulta pra Pessoa errada.
   const bypass = localAuthBypass(
     process.env.NODE_ENV ?? "development",
     process.env.LUC_LOCAL_AUTH_BYPASS,
   )
-  const pessoaLogada = resolverUsuarioAutenticado(pessoasComAvatar, session?.user?.email, bypass)
+  const emailLogado = bypass ? undefined : session?.user?.email
+  const pessoaLogada = resolverUsuarioAutenticado(pessoasComAvatar, emailLogado, bypass)
   const lancamentosRegistrar = billRegistrar
     ? pagamentos
         .filter((p) => p.billId === billRegistrar.id)
@@ -243,7 +246,7 @@ export default async function FinancasPage({
             valor: ultimoRegistrar ? centavosParaCampo(ultimoRegistrar.valor) : "",
             dataPagamento: hoje,
             competencia: linhaRegistrar.competenciaVigente,
-            paidBy: pessoaLogada.id,
+            paidBy: pessoaLogada?.id ?? "",
           }}
           competenciasComLancamento={lancamentosRegistrar.map((p) => p.competencia)}
           contexto={`competência ${descreverCompetencia(linhaRegistrar.competenciaVigente, billRegistrar.recurrence)} · ${linhaRegistrar.frase} (${formatarDataBr(linhaRegistrar.vencimento).slice(0, 5)})`}

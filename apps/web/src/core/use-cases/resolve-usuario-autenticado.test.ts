@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest"
-import {
-  resolverUsuarioAutenticado,
-  SessaoAusenteError,
-  VinculoInexistenteError,
-} from "./resolve-usuario-autenticado"
+import { resolverUsuarioAutenticado } from "./resolve-usuario-autenticado"
 
 const thiago = { googleEmail: "thiago@gmail.com", nome: "Thiago" }
 const jakeline = { googleEmail: "jakeline@gmail.com", nome: "Jakeline" }
@@ -23,16 +19,14 @@ describe("resolverUsuarioAutenticado (issue #94)", () => {
   })
 
   it("test_pessoa_sem_google_email_nunca_casa", () => {
-    expect(() => resolverUsuarioAutenticado([semVinculo], "orfa@gmail.com", false)).toThrow(
-      VinculoInexistenteError,
-    )
+    expect(resolverUsuarioAutenticado([semVinculo], "orfa@gmail.com", false)).toBeUndefined()
   })
 
-  it("test_sessao_real_sem_vinculo_em_producao_lanca_explicito", () => {
-    // bypass desligado (produção): sessão válida sem vínculo NÃO cai na primeira Pessoa.
-    expect(() =>
-      resolverUsuarioAutenticado([thiago, jakeline], "estranho@gmail.com", false),
-    ).toThrow(VinculoInexistenteError)
+  it("test_sessao_real_sem_vinculo_em_producao_nao_resolve_e_nao_pega_a_primeira", () => {
+    // bypass desligado (produção): sessão válida sem vínculo → undefined, NUNCA a primeira Pessoa.
+    const usuario = resolverUsuarioAutenticado([thiago, jakeline], "estranho@gmail.com", false)
+
+    expect(usuario).toBeUndefined()
   })
 
   it("test_sem_sessao_com_bypass_local_usa_primeira_pessoa", () => {
@@ -41,10 +35,8 @@ describe("resolverUsuarioAutenticado (issue #94)", () => {
     expect(usuario).toBe(thiago)
   })
 
-  it("test_sem_sessao_sem_bypass_lanca_sessao_ausente", () => {
-    expect(() => resolverUsuarioAutenticado([thiago, jakeline], null, false)).toThrow(
-      SessaoAusenteError,
-    )
+  it("test_sem_sessao_sem_bypass_nao_resolve", () => {
+    expect(resolverUsuarioAutenticado([thiago, jakeline], null, false)).toBeUndefined()
   })
 
   it("test_sessao_sem_vinculo_com_bypass_tolera_e_cai_na_primeira", () => {
@@ -54,10 +46,8 @@ describe("resolverUsuarioAutenticado (issue #94)", () => {
     expect(usuario).toBe(thiago)
   })
 
-  it("test_lar_sem_pessoas_lanca", () => {
-    expect(() => resolverUsuarioAutenticado([], "thiago@gmail.com", true)).toThrow(
-      VinculoInexistenteError,
-    )
-    expect(() => resolverUsuarioAutenticado(undefined, null, true)).toThrow(SessaoAusenteError)
+  it("test_lar_sem_pessoas_devolve_undefined", () => {
+    expect(resolverUsuarioAutenticado([], "thiago@gmail.com", true)).toBeUndefined()
+    expect(resolverUsuarioAutenticado(undefined, null, true)).toBeUndefined()
   })
 })

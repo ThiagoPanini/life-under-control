@@ -22,6 +22,7 @@ import { deletePayment } from "@/core/use-cases/delete-payment"
 import { BillNaoEncontradaError, editBill } from "@/core/use-cases/edit-bill"
 import { editPayment, PaymentNaoEncontradoError } from "@/core/use-cases/edit-payment"
 import { EncerramentoInvalidoError, encerrarBill } from "@/core/use-cases/encerrar-bill"
+import { localAuthBypass } from "@/core/use-cases/gate"
 import { getPainel } from "@/core/use-cases/get-painel"
 import { openAttachment } from "@/core/use-cases/open-attachment"
 import {
@@ -33,6 +34,7 @@ import { PaymentInvalidoError, recordPayment } from "@/core/use-cases/record-pay
 import { registerAttachment } from "@/core/use-cases/register-attachment"
 import { removeAttachment } from "@/core/use-cases/remove-attachment"
 import { removeLogo } from "@/core/use-cases/remove-logo"
+import { resolverUsuarioAutenticado } from "@/core/use-cases/resolve-usuario-autenticado"
 
 /** Estado do formulário de Conta entre submissões — só os erros por campo (vazio = ok). */
 export type ContaFormState = { erros: ErroCampo[]; createdBillId?: string }
@@ -276,11 +278,25 @@ export type PrepararComprovanteResult =
 /** Resultado de confirmar/remover um comprovante — sucesso ou uma mensagem de erro. */
 export type ComprovanteResult = { ok: true } | { ok: false; erro: string }
 
-/** A Pessoa logada (autoria do upload), casada por e-mail; sem casar, a 1ª do Lar. */
+/**
+ * A Pessoa logada (autoria do upload de comprovante), resolvida pelo MESMO
+ * use-case da casca (issue #94): casa pelo e-mail Google vinculado, não pelo
+ * e-mail nominal semeado (que nunca casa a sessão real — hoje TODO upload cai
+ * em `pessoas[0]`). Sob bypass ignora a sessão real e usa a 1ª Pessoa.
+ *
+ * Diferente da baixa de pagamento (que expõe "quem pagou" e pode ficar em branco
+ * pra escolha manual), o upload não tem UI de autor — precisa de um id pro FK.
+ * Na janela pré-vínculo (produção sem `google_email` aplicado, #96) cai na 1ª
+ * Pessoa como último recurso; é metadado secundário do comprovante, enquanto a
+ * autoria primária do Lançamento é escolhida pela Pessoa. Já vinculado, acerta.
+ */
 async function idDaPessoaLogada(pessoas: Pessoa[]): Promise<string> {
-  const session = await auth()
-  const email = session?.user?.email?.toLowerCase()
-  const pessoa = (email && pessoas.find((p) => p.email.toLowerCase() === email)) || pessoas[0]
+  const bypass = localAuthBypass(
+    process.env.NODE_ENV ?? "development",
+    process.env.LUC_LOCAL_AUTH_BYPASS,
+  )
+  const email = bypass ? undefined : (await auth())?.user?.email
+  const pessoa = resolverUsuarioAutenticado(pessoas, email, bypass) ?? pessoas[0]
   return pessoa?.id ?? ""
 }
 

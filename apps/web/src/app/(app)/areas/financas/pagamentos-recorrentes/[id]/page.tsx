@@ -34,12 +34,14 @@ import {
   type Ocorrencia,
 } from "@/core/use-cases/derive-estado-ocorrencia"
 import { detalharPontualidadeDaConta } from "@/core/use-cases/derive-pontualidade"
+import { localAuthBypass } from "@/core/use-cases/gate"
 import { getBill } from "@/core/use-cases/get-bill"
 import { getLogoUrl } from "@/core/use-cases/get-logo-url"
 import { getPainel } from "@/core/use-cases/get-painel"
 import { listAttachmentsDeLancamentos } from "@/core/use-cases/list-attachments"
 import { listPayments } from "@/core/use-cases/list-payments"
 import { resolveAvatares } from "@/core/use-cases/resolve-avatares"
+import { resolverUsuarioAutenticado } from "@/core/use-cases/resolve-usuario-autenticado"
 
 // Lê o banco a cada request: os Lançamentos mudam; nada de prerender (sem DB no build).
 export const dynamic = "force-dynamic"
@@ -108,13 +110,16 @@ export default async function ContaDetailPage({
           quitada: celulaVigente.valor != null,
         }
       : null
-  // "Quem pagou" default = a Pessoa logada, casada por e-mail (case-insensitive,
-  // resiliente à normalização do OAuth). Sem casar (atribuição completa depende
-  // do auth, #7), cai na 1ª Pessoa — e o campo é editável antes de gravar.
-  const emailLogado = session?.user?.email?.toLowerCase()
-  const pessoaLogada =
-    (emailLogado && lar.pessoas.find((p) => p.email.toLowerCase() === emailLogado)) ||
-    lar.pessoas[0]
+  // "Quem pagou" default = a Pessoa logada, resolvida pelo MESMO use-case da casca
+  // (issue #94): casa pelo e-mail Google vinculado, nunca pela posição no Lar. Sob
+  // bypass ignora a sessão real (opera contra o seed). Sem vínculo fica `undefined`
+  // e o campo nasce em branco (o domínio exige a escolha) — jamais a Pessoa errada.
+  const bypass = localAuthBypass(
+    process.env.NODE_ENV ?? "development",
+    process.env.LUC_LOCAL_AUTH_BYPASS,
+  )
+  const emailLogado = bypass ? undefined : session?.user?.email
+  const pessoaLogada = resolverUsuarioAutenticado(lar.pessoas, emailLogado, bypass)
 
   const inicialBaixa: PaymentFormInicial = {
     valor: ultimo ? centavosParaCampo(ultimo.valor) : "",

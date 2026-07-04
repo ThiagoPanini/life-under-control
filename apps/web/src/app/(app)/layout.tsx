@@ -15,12 +15,12 @@ import { resolverUsuarioAutenticado } from "@/core/use-cases/resolve-usuario-aut
  * (rodapé da sidebar, #85) mostra a Pessoa autenticada — casada pelo e-mail
  * Google **vinculado** (issue #94) — com avatar já resolvido (#51).
  *
- * Duas falhas distintas: se as Pessoas nem carregam (R2/banco fora do ar), a
- * casca degrada pro fallback padrão e o resto da rota renderiza (nunca um 500
- * universal). Mas se as Pessoas carregam e a sessão real não casa vínculo algum,
- * `resolverUsuarioAutenticado` LANÇA — em produção isso falha explícito em vez de
- * atribuir silenciosamente a sessão à primeira Pessoa (ADR-0002). O bypass local
- * tolera e cai na primeira Pessoa pra operar contra o seed.
+ * `resolverUsuarioAutenticado` devolve `undefined` quando não consegue casar a
+ * sessão (Lar não carregou, ou sessão real ainda sem vínculo — o vínculo real é
+ * aplicado por um passo operacional posterior, #96) e a casca cai no fallback.
+ * Nunca atribui a sessão à primeira Pessoa (ADR-0002) e nunca derruba a rota:
+ * degradar é preferível a um 500 universal na janela pré-vínculo. O bypass local
+ * cai na primeira Pessoa pra operar contra o seed.
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const bypass = localAuthBypass(
@@ -31,12 +31,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   if (!bypass && !session) redirect("/login")
 
   const pessoas = await carregarPessoasComAvatar()
-  // Só resolve quando o Lar carregou; `undefined` é falha de infra e mantém a
-  // casca no fallback (a resolução lançaria, e um hiccup de infra não deve
-  // derrubar toda rota autenticada). Sessão sem vínculo com Lar carregado, sim.
-  const usuario = pessoas
-    ? resolverUsuarioAutenticado(pessoas, session?.user?.email, bypass)
-    : undefined
+  const usuario = resolverUsuarioAutenticado(pessoas, session?.user?.email, bypass)
 
   return <AppShell usuario={usuario}>{children}</AppShell>
 }

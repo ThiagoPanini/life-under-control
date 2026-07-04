@@ -8,33 +8,22 @@
  * Regras (ADR-0002: identidade/autoria nunca inferida por posição):
  * - Sessão cujo e-mail casa um `googleEmail` vinculado → aquela Pessoa.
  * - Sem sessão + bypass local (dev) → a primeira Pessoa (opera contra o seed).
- * - Sessão real sem vínculo, sem bypass (produção) → `VinculoInexistenteError`:
- *   falha explícita, jamais cai silenciosamente na primeira Pessoa.
- * - Sem sessão e sem bypass → `SessaoAusenteError` (não deveria alcançar a
- *   casca, que fica atrás do gate; explícito por segurança).
+ * - Sessão real sem vínculo (produção) → `undefined`: NÃO resolve. Nunca cai
+ *   silenciosamente na primeira Pessoa (senão a autoria default sairia errada).
+ *   A borda degrada explícito — a casca mostra o fallback e o modal de baixa
+ *   deixa "quem pagou" em branco, forçando a escolha manual em vez de adivinhar.
+ *
+ * Retorna `undefined` de propósito (em vez de lançar): o vínculo real é aplicado
+ * por um passo operacional posterior (#96), então existe uma janela pós-deploy em
+ * que ninguém está vinculado. Lançar aqui derrubaria toda rota autenticada com um
+ * 500 para as duas Pessoas nessa janela; `undefined` mantém o portal de pé e
+ * degrada com honestidade.
  */
-
-/** Sessão válida sem Pessoa vinculada — em produção, falha em vez de adivinhar. */
-export class VinculoInexistenteError extends Error {
-  constructor(email: string) {
-    super(`Sessão autenticada (${email}) não está vinculada a nenhuma Pessoa do Lar`)
-    this.name = "VinculoInexistenteError"
-  }
-}
-
-/** Sem sessão e sem bypass local habilitado — resolução impossível. */
-export class SessaoAusenteError extends Error {
-  constructor() {
-    super("Sessão ausente e bypass local desabilitado")
-    this.name = "SessaoAusenteError"
-  }
-}
-
 export function resolverUsuarioAutenticado<T extends { googleEmail: string | null }>(
   pessoas: T[] | undefined,
   emailLogado: string | null | undefined,
   bypassLocal: boolean,
-): T {
+): T | undefined {
   const lar = pessoas ?? []
 
   if (emailLogado) {
@@ -42,10 +31,11 @@ export function resolverUsuarioAutenticado<T extends { googleEmail: string | nul
     const vinculada = lar.find((pessoa) => pessoa.googleEmail?.toLowerCase() === email)
     if (vinculada) return vinculada
     // Tolerância só de dev: um e-mail de sessão que não casa ainda opera contra o seed.
-    if (bypassLocal && lar[0]) return lar[0]
-    throw new VinculoInexistenteError(emailLogado)
+    if (bypassLocal) return lar[0]
+    // Sessão real sem vínculo (produção): não resolve — jamais a primeira Pessoa.
+    return undefined
   }
 
-  if (bypassLocal && lar[0]) return lar[0]
-  throw new SessaoAusenteError()
+  if (bypassLocal) return lar[0]
+  return undefined
 }

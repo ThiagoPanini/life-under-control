@@ -1,5 +1,15 @@
 import { sql } from "drizzle-orm"
-import { bigint, check, date, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core"
+import {
+  bigint,
+  check,
+  date,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core"
 
 /**
  * Schema Drizzle do LUC. `households` e `users` são identidade/autoria
@@ -12,23 +22,31 @@ export const households = pgTable("households", {
   nome: text("nome").notNull(),
 })
 
-export const users = pgTable("users", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  householdId: uuid("household_id")
-    .notNull()
-    .references(() => households.id),
-  email: text("email").notNull().unique(),
-  nome: text("nome").notNull(),
-  // E-mail Google vinculado (issue #94) — chave de autenticação/autoria, distinta
-  // do `email` nominal semeado. Nulo até o vínculo auditável (ADR-0004) ser
-  // aplicado; único (normalizado em minúsculas pela operação de vínculo).
-  googleEmail: text("google_email").unique(),
-  hue: integer("hue").notNull(),
-  inicial: text("inicial").notNull(),
-  // Chave do avatar no R2 (foto do Google espelhada no login, #51). Nula até o
-  // 1º login bem-sucedido — o badge cai no fallback inicial+hue.
-  avatarKey: text("avatar_key"),
-})
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id),
+    email: text("email").notNull().unique(),
+    nome: text("nome").notNull(),
+    // E-mail Google vinculado (issue #94) — chave de autenticação/autoria, distinta
+    // do `email` nominal semeado. Nulo até o vínculo auditável (ADR-0004) ser
+    // aplicado.
+    googleEmail: text("google_email"),
+    hue: integer("hue").notNull(),
+    inicial: text("inicial").notNull(),
+    // Chave do avatar no R2 (foto do Google espelhada no login, #51). Nula até o
+    // 1º login bem-sucedido — o badge cai no fallback inicial+hue.
+    avatarKey: text("avatar_key"),
+  },
+  // Unicidade case-insensitive do vínculo Google (issue #94): a operação já grava
+  // em minúsculas, mas o índice em `lower(...)` garante no banco que dois e-mails
+  // que só diferem na caixa não coexistam — defesa-em-profundidade. NULLs múltiplos
+  // são permitidos, então as duas Pessoas coexistem sem vínculo.
+  (t) => [uniqueIndex("users_google_email_lower_unique").on(sql`lower(${t.googleEmail})`)],
+)
 
 /**
  * Contas de Finanças (`bills`) — tabela própria da Área (ADR-0005), não um spine

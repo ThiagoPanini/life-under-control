@@ -50,6 +50,13 @@
       "when": 1782999688122,
       "tag": "0006_add_bill_logo",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1783127160781,
+      "tag": "0007_add_google_email",
+      "breakpoints": true
     }
   ]
 }
