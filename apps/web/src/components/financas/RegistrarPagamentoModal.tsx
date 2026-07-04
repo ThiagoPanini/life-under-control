@@ -1,3 +1,6 @@
+"use client"
+
+import { useState } from "react"
 import type { PaymentFormState } from "@/app/(app)/areas/financas/actions"
 import { Modal } from "@/components/ds/Modal"
 import { BillIcon } from "@/components/financas/BillIcon"
@@ -40,6 +43,10 @@ export function RegistrarPagamentoModal({
   closeHref: string
   successHref: string
 }) {
+  // Enquanto a baixa finaliza (Lançamento criado, uploads/decisão pendentes), o
+  // modal trava o descarte silencioso — só o X, os botões da tela de progresso ou
+  // o sucesso o fecham (#100, AC10/AC13).
+  const [travado, setTravado] = useState(false)
   return (
     <Modal
       title={billName}
@@ -53,6 +60,7 @@ export function RegistrarPagamentoModal({
       }
       closeHref={closeHref}
       width="narrow"
+      travado={travado}
     >
       <ConnectedPaymentForm
         action={action}
@@ -64,6 +72,7 @@ export function RegistrarPagamentoModal({
         billId={billId}
         successHref={successHref}
         closeHref={closeHref}
+        onOperacaoEmAndamento={setTravado}
       />
     </Modal>
   )

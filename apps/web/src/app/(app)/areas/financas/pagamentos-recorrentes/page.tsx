@@ -16,6 +16,7 @@ import { EditarContaModal } from "@/components/financas/EditarContaModal"
 import { EncerradasSection } from "@/components/financas/EncerradasSection"
 import { LancamentoRegistradoToast } from "@/components/financas/LancamentoRegistradoToast"
 import { LinhaConta } from "@/components/financas/LinhaConta"
+import { mensagemLancamentoRegistrado } from "@/components/financas/lancamento-toast"
 import { NovaContaModal } from "@/components/financas/NovaContaModal"
 import { type BlocoPanorama, PanoramaContas } from "@/components/financas/PanoramaContas"
 import { PendenciasAnterioresChip } from "@/components/financas/PendenciasAnterioresChip"
@@ -63,9 +64,12 @@ export default async function FinancasPage({
     editado?: string
     lancado?: string
     lancadoConta?: string
+    valor?: string
+    comprovantes?: string
   }>
 }) {
-  const { nova, registrar, editar, editado, lancado, lancadoConta } = await searchParams
+  const { nova, registrar, editar, editado, lancado, lancadoConta, valor, comprovantes } =
+    await searchParams
   const { lar } = await getPainel(drizzleHouseholdRepo())
   const [bills, session] = await Promise.all([listBills(drizzleBillRepo(), lar.id), auth()])
   const ativas = bills.filter((b) => b.estado === "ativa")
@@ -170,15 +174,23 @@ export default async function FinancasPage({
     : []
   const ultimoRegistrar = lancamentosRegistrar[0]
 
-  // Toast pós-baixa: `lancadoConta` + `lancado` válidos — a mesma mensagem do detalhe.
+  // Toast pós-baixa: `lancadoConta` + `lancado` válidos. O modal compacto (#100)
+  // ainda anexa `valor` (centavos) e `comprovantes` (nº associado) para a mensagem
+  // identificar os três; sem eles cai na forma antiga (Conta · competência).
   const billLancado = lancadoConta ? billsPorId.get(lancadoConta) : undefined
   const lancadoValido = ehCompetenciaValida(lancado ?? "") ? (lancado as string) : null
+  const valorLancado = valor && /^\d+$/.test(valor) ? Number(valor) : null
+  const comprovantesLancados = comprovantes && /^\d+$/.test(comprovantes) ? Number(comprovantes) : 0
 
   return (
     <div className="luc-page-gutter py-7 sm:py-9 lg:py-10">
       {billLancado && lancadoValido && (
         <LancamentoRegistradoToast
-          mensagem={`Lançamento registrado — ${billLancado.nome} · ${descreverCompetencia(lancadoValido, billLancado.recurrence)}`}
+          mensagem={
+            valorLancado != null
+              ? mensagemLancamentoRegistrado(billLancado.nome, valorLancado, comprovantesLancados)
+              : `Lançamento registrado — ${billLancado.nome} · ${descreverCompetencia(lancadoValido, billLancado.recurrence)}`
+          }
         />
       )}
       {billEditado && <ContaEditadaToast mensagem={`Conta atualizada — ${billEditado.nome}`} />}

@@ -17,6 +17,7 @@ export function Modal({
   closeHref,
   children,
   width = "wide",
+  travado = false,
 }: {
   title: string
   eyebrow?: string
@@ -29,6 +30,11 @@ export function Modal({
   children: ReactNode
   /** "narrow": 400px + entrada luc-modal-pop + padding 18px — hoje só o modal de Registrar pagamento (Final, #87). */
   width?: "wide" | "compact" | "narrow"
+  /**
+   * Trava os descartes **silenciosos** (Escape/backdrop) enquanto uma operação
+   * está em curso — o X rotulado segue funcional como saída deliberada (#100, AC13).
+   */
+  travado?: boolean
 }) {
   const router = useRouter()
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -36,8 +42,15 @@ export function Modal({
   const titleId = useId()
   const descriptionId = useId()
 
-  function close() {
+  function fechar() {
     router.replace(closeHref, { scroll: false })
+  }
+
+  // Escape e backdrop são descartes silenciosos: uma operação em andamento os
+  // ignora, para não abandonar o fluxo sem decisão explícita (#100, AC13).
+  function fecharSilencioso() {
+    if (travado) return
+    fechar()
   }
 
   useEffect(() => {
@@ -48,7 +61,7 @@ export function Modal({
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault()
-        close()
+        fecharSilencioso()
         return
       }
       if (event.key !== "Tab") return
@@ -78,7 +91,7 @@ export function Modal({
         type="button"
         tabIndex={-1}
         aria-label="Fechar diálogo"
-        onClick={close}
+        onClick={fecharSilencioso}
         className="absolute inset-0 bg-luc-bg/80 backdrop-blur-[6px] [animation:luc-modal-backdrop_160ms_ease-out]"
       />
       <div
@@ -126,7 +139,7 @@ export function Modal({
             ref={closeRef}
             type="button"
             aria-label="Fechar"
-            onClick={close}
+            onClick={fechar}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-luc-md text-luc-text-2 transition-colors hover:bg-luc-surface-2 hover:text-luc-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent"
           >
             <X aria-hidden size={19} />

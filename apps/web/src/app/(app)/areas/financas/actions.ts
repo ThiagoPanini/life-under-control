@@ -225,6 +225,8 @@ export type PaymentFormState = {
   erros: ErroCampo[]
   createdPaymentId?: string
   competencia?: string
+  /** Valor persistido (centavos) — o cliente o repassa ao toast final (#100). */
+  valor?: number
 }
 
 /** A rota do detalhe da Conta — destino e chave de revalidação das ações de baixa. */
@@ -270,6 +272,7 @@ export async function criarLancamento(
       erros: [],
       createdPaymentId: created.id,
       competencia: created.competencia,
+      valor: created.valor,
     }
   } catch (e) {
     if (e instanceof PaymentInvalidoError) return { erros: e.erros }

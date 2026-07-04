@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest"
-import { cleanup, render, screen } from "@testing-library/react"
+import { act, cleanup, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import type { PaymentFormState } from "@/app/(app)/areas/financas/actions"
+import { confirmarComprovante, prepararComprovante } from "@/app/(app)/areas/financas/actions"
 import { RegistrarPagamentoModal } from "./RegistrarPagamentoModal"
 
 // next/navigation não tem router montado nos testes — mockamos o mínimo; a
@@ -20,9 +22,22 @@ vi.mock("@/app/(app)/areas/financas/actions", () => ({
   confirmarComprovante: vi.fn(),
 }))
 
+const prepararMock = vi.mocked(prepararComprovante)
+const confirmarMock = vi.mocked(confirmarComprovante)
+
+beforeEach(() => {
+  prepararMock.mockReset()
+  confirmarMock.mockReset()
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({ ok: true }) as Response),
+  )
+})
+
 afterEach(() => {
   cleanup()
   replace.mockClear()
+  vi.unstubAllGlobals()
 })
 
 const PESSOAS = [
@@ -111,5 +126,86 @@ describe("RegistrarPagamentoModal (Seam 2)", () => {
     expect(replace).toHaveBeenCalledWith("/areas/financas/pagamentos-recorrentes", {
       scroll: false,
     })
+  })
+})
+
+const CLOSE_HREF = "/areas/financas/pagamentos-recorrentes"
+
+function renderModal(
+  action: (prev: PaymentFormState, formData: FormData) => Promise<PaymentFormState>,
+) {
+  const utils = render(
+    <RegistrarPagamentoModal
+      billId="luz"
+      billName="Luz"
+      billIcon="zap"
+      action={action}
+      pessoas={PESSOAS}
+      inicial={{
+        valor: "120,00",
+        dataPagamento: "2026-07-09",
+        competencia: "2026-07",
+        paidBy: "p-1",
+      }}
+      competenciasComLancamento={[]}
+      contexto="competência julho de 2026 · vence em 6 dias (18/07)"
+      closeHref={CLOSE_HREF}
+      successHref="/areas/financas/pagamentos-recorrentes?lancadoConta=luz"
+    />,
+  )
+  const input = utils.container.querySelector('input[type="file"]') as HTMLInputElement
+  return { input, ...utils }
+}
+
+// Cobre a cadeia inteira da trava (emProgresso → onOperacaoEmAndamento → travado →
+// Modal), não cada peça isolada: se a fiação se desconectar, este teste cai.
+describe("RegistrarPagamentoModal — trava a operação em andamento (#100, AC13)", () => {
+  const SUCESSO: PaymentFormState = {
+    erros: [],
+    createdPaymentId: "pay-1",
+    competencia: "2026-07",
+    valor: 12000,
+  }
+
+  it("test_falha_parcial_trava_escape_e_backdrop_mas_o_x_fecha", async () => {
+    prepararMock.mockResolvedValue({ ok: true, attachmentId: "att", uploadUrl: "https://r2/put" })
+    confirmarMock.mockResolvedValue({ ok: false, erro: "falhou" })
+    const user = userEvent.setup()
+    const { input } = renderModal(async () => SUCESSO)
+
+    await user.upload(input, [new File(["x"], "recibo.pdf", { type: "application/pdf" })])
+    await user.click(screen.getByRole("button", { name: "Registrar pagamento" }))
+    // tela de progresso com falha: operação em andamento (Lançamento salvo, decisão pendente)
+    await screen.findByText(/comprovante não foi enviado/i)
+
+    await user.keyboard("{Escape}")
+    await user.click(screen.getByRole("button", { name: "Fechar diálogo" }))
+    // nem Escape nem backdrop descartam silenciosamente
+    expect(replace).not.toHaveBeenCalledWith(CLOSE_HREF, { scroll: false })
+
+    // o X rotulado é saída deliberada — segue funcional
+    await user.click(screen.getByRole("button", { name: "Fechar" }))
+    expect(replace).toHaveBeenCalledWith(CLOSE_HREF, { scroll: false })
+  })
+
+  it("test_trava_ja_no_submit_em_voo_antes_do_lancamento_existir", async () => {
+    // A criação server-side (criarLancamento) também é operação em andamento:
+    // com a ação pendente, Escape não pode descartar o modal.
+    let resolver: (s: PaymentFormState) => void = () => {}
+    const action = vi.fn(
+      () =>
+        new Promise<PaymentFormState>((res) => {
+          resolver = res
+        }),
+    )
+    const user = userEvent.setup()
+    renderModal(action)
+
+    await user.click(screen.getByRole("button", { name: "Registrar pagamento" }))
+    await user.keyboard("{Escape}")
+    expect(replace).not.toHaveBeenCalledWith(CLOSE_HREF, { scroll: false })
+
+    // encerra a ação pendente para não vazar promessa
+    await act(async () => resolver({ erros: [] }))
   })
 })
