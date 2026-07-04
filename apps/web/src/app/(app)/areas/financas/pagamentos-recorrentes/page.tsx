@@ -23,7 +23,7 @@ import { PendenciasAnterioresChip } from "@/components/financas/PendenciasAnteri
 import { RegistrarPagamentoModal } from "@/components/financas/RegistrarPagamentoModal"
 import { TotalPagoPorMes } from "@/components/financas/TotalPagoPorMes"
 import { formatarDataBr } from "@/core/domain/bill"
-import { centavosParaCampo, formatBRL } from "@/core/domain/money"
+import { centavosParaCampo, formatBRLSemCentavos } from "@/core/domain/money"
 import { descreverCompetencia, ehCompetenciaValida } from "@/core/domain/payment"
 import { derivarAnaliseHistorica } from "@/core/use-cases/derive-analise-historica"
 import { derivarCenarioMes } from "@/core/use-cases/derive-cenario-mes"
@@ -183,7 +183,7 @@ export default async function FinancasPage({
   const comprovantesLancados = comprovantes && /^\d+$/.test(comprovantes) ? Number(comprovantes) : 0
 
   return (
-    <div className="luc-page-gutter py-7 sm:py-9 lg:py-10">
+    <div className="luc-page-gutter py-7 sm:pt-[26px] sm:pb-[72px]">
       {billLancado && lancadoValido && (
         <LancamentoRegistradoToast
           mensagem={
@@ -198,7 +198,7 @@ export default async function FinancasPage({
         <PageHeader
           eyebrow={EYEBROW}
           title="Pagamentos Recorrentes"
-          description="Gerenciamento de Contas e pagamentos recorrentes (normalmente mensais) relevantes para o casal."
+          description="Gerenciamento de Contas e pagamentos recorrentes (normalmente mensais) relevantes para o casal"
         />
 
         {ativas.length > 0 && (
@@ -305,7 +305,7 @@ export default async function FinancasPage({
           contexto={`competência ${descreverCompetencia(cardRegistrar.competencia, billRegistrar.recurrence)} · ${cardRegistrar.frase} (${formatarDataBr(cardRegistrar.vencimento).slice(0, 5)})`}
           notaValor={
             cardRegistrar.media != null
-              ? `estimativa pelo histórico: ≈ ${formatBRL(cardRegistrar.media)} — o valor exato nasce agora, no Lançamento`
+              ? `estimativa pelo histórico: ≈ ${formatBRLSemCentavos(cardRegistrar.media)} — o valor exato nasce agora, no Lançamento`
               : undefined
           }
           closeHref="/areas/financas/pagamentos-recorrentes"

@@ -1,14 +1,14 @@
 import { MESES } from "@/core/domain/bill"
-import { formatBRL } from "@/core/domain/money"
+import { formatBRL, formatBRLSemCentavos } from "@/core/domain/money"
 import type { CenarioMes } from "@/core/use-cases/derive-cenario-mes"
 
 /**
  * **Cenário de Pagamentos do Mês** (redesign Final da Análise): a leitura em
- * três tempos do mês vigente — o pago (exato), o gasto ainda estimado (`~`,
- * médias das Contas em aberto) e a projeção de fechamento comparada ao mês
- * anterior. Espelha o shape honesto do use-case: sem histórico vira `—`, nunca
- * `R$ 0,00` disfarçado; o delta compara projeção de mês cheio, não acumulado
- * parcial (#48).
+ * três tempos do mês vigente — o pago (exato), o gasto ainda estimado (`≈`, sem
+ * centavos: médias das Contas em aberto não fingem fato) e a projeção de
+ * fechamento comparada ao mês anterior. Espelha o shape honesto do use-case:
+ * sem histórico vira `—`, nunca `R$ 0,00` disfarçado; o delta compara projeção
+ * de mês cheio, não acumulado parcial (#48).
  */
 
 function ddmm(dataIso: string): string {
@@ -71,7 +71,7 @@ export function CenarioPagamentosMes({ cenario }: { cenario: CenarioMes }) {
     ) : (
       <>
         <span className="whitespace-nowrap font-mono text-[26px] font-semibold tracking-[-0.02em] text-luc-text-2">
-          ~{formatBRL(cenario.faltaEstimada.valor)}
+          ≈ {formatBRLSemCentavos(cenario.faltaEstimada.valor)}
         </span>
         <span className="text-[11.5px] text-luc-muted">
           {cenario.pendentes} Conta{cenario.pendentes === 1 ? "" : "s"} até {ddmm(cenario.fimDoMes)}{" "}
@@ -85,7 +85,7 @@ export function CenarioPagamentosMes({ cenario }: { cenario: CenarioMes }) {
       {cenario.projecao.estado === "sem-estimativa"
         ? "—"
         : cenario.projecao.estado === "estimada"
-          ? `~${formatBRL(cenario.projecao.valor)}`
+          ? `≈ ${formatBRLSemCentavos(cenario.projecao.valor)}`
           : formatBRL(cenario.projecao.valor)}
     </span>
   )
@@ -136,7 +136,7 @@ export function CenarioPagamentosMes({ cenario }: { cenario: CenarioMes }) {
                 />
               </div>
               <span className="shrink-0 whitespace-nowrap font-mono text-[11px] text-luc-muted">
-                {quitadas}/{total} quitadas
+                {quitadas}/{total} pagas
               </span>
             </div>
           </Leitura>

@@ -28,14 +28,14 @@ describe("CenarioPagamentosMes (Seam 2)", () => {
     render(<CenarioPagamentosMes cenario={cenario()} />)
     expect(screen.getByText("Pago até o dia 09")).toBeInTheDocument()
     expect(screen.getByText("R$ 950,00")).toBeInTheDocument()
-    expect(screen.getByText("3/5 quitadas")).toBeInTheDocument()
+    expect(screen.getByText("3/5 pagas")).toBeInTheDocument()
   })
 
   it("test_falta_estimada_com_prazo_e_projecao_com_queda", () => {
     render(<CenarioPagamentosMes cenario={cenario()} />)
-    expect(screen.getByText("~R$ 400,00")).toBeInTheDocument()
+    expect(screen.getByText("≈ R$ 400")).toBeInTheDocument()
     expect(screen.getByText("2 Contas até 31/07 · estimativa")).toBeInTheDocument()
-    expect(screen.getByText("~R$ 1.350,00")).toBeInTheDocument()
+    expect(screen.getByText("≈ R$ 1.350")).toBeInTheDocument()
     const delta = screen.getByText("−20,0% vs junho")
     expect(delta).toHaveAttribute("data-tone", "success")
   })
@@ -65,9 +65,9 @@ describe("CenarioPagamentosMes (Seam 2)", () => {
     )
     expect(screen.getByText("nenhuma Conta em aberto")).toBeInTheDocument()
     expect(screen.getByText("R$ 0,00")).toBeInTheDocument()
-    // pago e projeção coincidem: tudo quitado, a projeção é exata (sem `~`)
+    // pago e projeção coincidem: tudo quitado, a projeção é exata (sem `≈`)
     expect(screen.getAllByText("R$ 1.350,00")).toHaveLength(2)
-    expect(screen.queryByText("~R$ 1.350,00")).not.toBeInTheDocument()
+    expect(screen.queryByText("≈ R$ 1.350")).not.toBeInTheDocument()
   })
 
   it("test_sem_historico_nao_inventa_estimativa_nem_delta", () => {

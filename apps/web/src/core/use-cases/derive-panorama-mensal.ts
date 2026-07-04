@@ -89,10 +89,12 @@ function fraseDaOcorrencia(estado: EstadoMes, dias: number, dataPagamento: strin
       ? `pago em ${formatarDataBr(dataPagamento).slice(0, 5)}`
       : "pago · sem data"
   }
+  // Frase única para todo estado em aberto, como o protótipo Final: "venceu há",
+  // "vence hoje", "vence amanhã", "vence em N dias" — a-vencer não abrevia.
   if (dias < 0) return `venceu há ${-dias} ${plural(-dias)}`
   if (dias === 0) return "vence hoje"
-  if (dias <= LIMIAR_VENCE_EM_BREVE_DIAS) return `vence em ${dias} ${plural(dias)}`
-  return `em ${dias} ${plural(dias)}`
+  if (dias === 1) return "vence amanhã"
+  return `vence em ${dias} dias`
 }
 
 /** A última baixa da Competência (por data de pagamento) — carrega autoria e "pago em". */

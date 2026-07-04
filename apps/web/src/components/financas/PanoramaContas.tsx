@@ -1,9 +1,8 @@
 import { Pencil } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ds/Button"
-import { Pill, type PillTone } from "@/components/ds/Pill"
 import { BillLogoTile } from "@/components/financas/BillLogoTile"
-import { formatBRL } from "@/core/domain/money"
+import { formatBRL, formatBRLSemCentavos } from "@/core/domain/money"
 import type { EstadoMes, ValorCard } from "@/core/use-cases/derive-panorama-mensal"
 
 /** Um bloco do Panorama: a Conta com ocorrência no mês vigente, já derivada (estado #93 + valor). */
@@ -22,17 +21,21 @@ export type BlocoPanorama = {
 }
 
 /**
- * A leitura de cada estado do mês vigente (#93): rótulo, tom da pílula, ponto e
- * cor da frase. `vencida` (vencimento consumado) é o único que veste `danger`
- * (vermelho); `vence-em-breve` é atenção (âmbar); `pago`/`a-vencer` repousam.
+ * A leitura de cada estado do mês vigente (#93): rótulo, pílula, ponto e cor da
+ * frase — a composição exata do protótipo Final: pílula com borda no próprio tom
+ * (32%) e ponto **sólido** em todos os estados (a distinção acessível vem do
+ * rótulo textual, sempre presente). `vencida` (vencimento consumado) é o único
+ * que veste `danger` (vermelho); `vence-em-breve` é atenção (âmbar);
+ * `pago`/`a-vencer` repousam.
  */
 const ESTADO: Record<
   EstadoMes,
-  { label: string; tone: PillTone; dot: string; frase: string; aria: string }
+  { label: string; tone: string; pill: string; dot: string; frase: string; aria: string }
 > = {
   pago: {
     label: "pago",
     tone: "success",
+    pill: "border-luc-success/[0.32] bg-luc-success/[0.09] text-luc-success",
     dot: "bg-luc-success",
     frase: "text-luc-muted",
     aria: "Conta paga no mês",
@@ -40,6 +43,7 @@ const ESTADO: Record<
   "a-vencer": {
     label: "a vencer",
     tone: "neutral",
+    pill: "border-white/[0.13] bg-white/[0.05] text-luc-text-2",
     dot: "bg-luc-text-3",
     frase: "text-luc-muted",
     aria: "Conta a vencer, vencimento distante",
@@ -47,14 +51,16 @@ const ESTADO: Record<
   "vence-em-breve": {
     label: "vence em breve",
     tone: "warn",
-    dot: "border-2 border-luc-warn bg-transparent",
+    pill: "border-luc-warn/[0.32] bg-luc-warn/[0.09] text-luc-warn",
+    dot: "bg-luc-warn",
     frase: "text-luc-warn",
     aria: "Conta vence em breve",
   },
   vencida: {
     label: "vencida",
     tone: "danger",
-    dot: "bg-luc-danger ring-2 ring-luc-danger/25",
+    pill: "border-luc-danger/[0.32] bg-luc-danger/[0.09] text-luc-danger",
+    dot: "bg-luc-danger",
     frase: "text-luc-danger",
     aria: "Conta vencida",
   },
@@ -71,7 +77,7 @@ function BlocoConta({ bloco }: { bloco: BlocoPanorama }) {
       </span>
     ) : (
       <span className="whitespace-nowrap font-mono text-[19px] font-semibold tracking-[-0.02em] text-luc-text-2">
-        {bloco.valor.estado === "estimativa" ? `≈ ${formatBRL(bloco.valor.media)}` : "—"}
+        {bloco.valor.estado === "estimativa" ? `≈ ${formatBRLSemCentavos(bloco.valor.media)}` : "—"}
       </span>
     )
 
@@ -90,10 +96,12 @@ function BlocoConta({ bloco }: { bloco: BlocoPanorama }) {
         <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-luc-text">
           {bloco.nome}
         </span>
+        {/* Box de ação do protótipo (27×27 com borda) com alvo de toque expandido
+            (~37px) via pseudo-elemento — o AC de #97 pede alvo seguro. */}
         <Link
           href={bloco.editarHref}
           aria-label={`Editar ${bloco.nome}`}
-          className="-mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-luc-md text-luc-text-3 transition-colors hover:bg-luc-surface-3 hover:text-luc-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent"
+          className="relative flex h-[27px] w-[27px] shrink-0 items-center justify-center rounded-[7px] border border-luc-border text-luc-text-3 transition-colors before:absolute before:-inset-[5px] before:content-[''] hover:border-luc-border-strong hover:bg-white/[0.05] hover:text-luc-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent"
         >
           <Pencil aria-hidden size={14} />
         </Link>
@@ -101,10 +109,15 @@ function BlocoConta({ bloco }: { bloco: BlocoPanorama }) {
 
       <div className="mt-3 flex items-center justify-between gap-2">
         {valorNode}
-        <Pill tone={leitura.tone} aria-label={leitura.aria}>
+        <span
+          role="img"
+          data-tone={leitura.tone}
+          aria-label={leitura.aria}
+          className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-luc-sm border px-[9px] py-[3px] text-[10.5px] font-bold tracking-[0.02em] ${leitura.pill}`}
+        >
           <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${leitura.dot}`} />
           {leitura.label}
-        </Pill>
+        </span>
       </div>
 
       <div className="mt-[5px] pb-[11px] font-mono text-[10.5px]">
@@ -137,8 +150,9 @@ function BlocoConta({ bloco }: { bloco: BlocoPanorama }) {
  * ocorrência no mês vigente, na ordem de urgência de `derivarPanoramaMensal`
  * (#93) — vencida na frente, paga apagando no fim. O bloco expõe estado, frase
  * e valor estado-dependente em formato de varredura: valor somado quando pago,
- * `≈ média` quando em aberto com histórico, `—` sem base (CONTEXT.md: o valor
- * exato só nasce no Lançamento — nunca zero disfarçado).
+ * `≈ média` (sem centavos — estimativa não finge fato) quando em aberto com
+ * histórico, `—` sem base (CONTEXT.md: o valor exato só nasce no Lançamento —
+ * nunca zero disfarçado).
  */
 export function PanoramaContas({ blocos }: { blocos: BlocoPanorama[] }) {
   return (

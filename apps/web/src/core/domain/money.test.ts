@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { centavosParaCampo, formatBRL, parseCentavos } from "./money"
+import { centavosParaCampo, formatBRL, formatBRLSemCentavos, parseCentavos } from "./money"
 
 describe("formatBRL", () => {
   it("test_zero_centavos_retorna_real_zerado", () => {
@@ -76,5 +76,22 @@ describe("centavosParaCampo", () => {
 
   it("test_round_trip_com_parseCentavos", () => {
     expect(parseCentavos(centavosParaCampo(123456))).toBe(123456)
+  })
+})
+
+describe("formatBRLSemCentavos", () => {
+  it("test_arredonda_estimativa_para_reais_inteiros", () => {
+    // Estimativa não finge precisão de fato (protótipo: "≈ R$ 1.240", nunca "≈ R$ 1.239,58").
+    expect(formatBRLSemCentavos(123958)).toBe("R$ 1.240")
+    expect(formatBRLSemCentavos(123901)).toBe("R$ 1.239")
+  })
+
+  it("test_milhar_com_ponto_e_sem_casa_decimal", () => {
+    expect(formatBRLSemCentavos(1234500)).toBe("R$ 12.345")
+    expect(formatBRLSemCentavos(9900)).toBe("R$ 99")
+  })
+
+  it("test_recusa_nao_inteiro_como_formatBRL", () => {
+    expect(() => formatBRLSemCentavos(10.5)).toThrow()
   })
 })

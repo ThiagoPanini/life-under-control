@@ -48,7 +48,7 @@ describe("PanoramaContas (Seam 2)", () => {
 
   it("test_bloco_em_aberto_estimativa_prefixada_com_cta_de_baixa", () => {
     render(<PanoramaContas blocos={[bloco()]} />)
-    expect(screen.getByText("≈ R$ 50,00")).toBeInTheDocument()
+    expect(screen.getByText("≈ R$ 50")).toBeInTheDocument()
     expect(screen.getByText("· valor estimado")).toBeInTheDocument()
     expect(screen.getByText("vence em breve")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "Registrar pagamento" })).toHaveAttribute(
@@ -83,10 +83,12 @@ describe("PanoramaContas — editar pelo card (#97)", () => {
     // nome acessível (não só um ícone mudo) e destino da edição rápida
     const editar = screen.getByRole("link", { name: "Editar Luz" })
     expect(editar).toHaveAttribute("href", "/areas/financas/pagamentos-recorrentes?editar=luz")
-    // foco visível + alvo de toque seguro (36px)
+    // foco visível + alvo de toque seguro: box visual 27px do protótipo com
+    // área de toque expandida (~37px) via pseudo-elemento
     expect(editar).toHaveClass("focus-visible:ring-2")
-    expect(editar).toHaveClass("h-9")
-    expect(editar).toHaveClass("w-9")
+    expect(editar).toHaveClass("h-[27px]")
+    expect(editar).toHaveClass("w-[27px]")
+    expect(editar).toHaveClass("before:-inset-[5px]")
   })
 
   it("test_bloco_pago_ainda_pode_ser_editado", () => {

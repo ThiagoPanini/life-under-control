@@ -21,6 +21,23 @@ export function formatBRL(cents: number): string {
 }
 
 /**
+ * Formata centavos como BRL **sem casa decimal** — "R$ 1.240" (arredonda ao real
+ * mais próximo). É a forma de exibir **estimativa** (`≈`): uma média não finge a
+ * precisão de um fato (protótipo Final). Fatos exatos continuam em `formatBRL`.
+ */
+export function formatBRLSemCentavos(cents: number): string {
+  if (!Number.isInteger(cents)) {
+    throw new Error(`valor monetário deve ser inteiro em centavos, recebido: ${cents}`)
+  }
+
+  const negativo = cents < 0
+  const reais = Math.round(Math.abs(cents) / 100)
+  const reaisComMilhar = String(reais).replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+
+  return `${negativo ? "-" : ""}R$ ${reaisComMilhar}`
+}
+
+/**
  * Lê um valor BRL digitado (a borda da baixa) em centavos inteiros — `null` se
  * não for dinheiro válido e positivo. Aceita o formato brasileiro com milhar
  * ("1.234,56" · "1.500"), a vírgula decimal sem milhar ("19,99") e o ponto

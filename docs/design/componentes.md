@@ -79,12 +79,14 @@ O Panorama de Contas deriva de `derivarPanoramaMensal` uma leitura única por Co
 
 | Estado | Regra derivada | Cor | Tratamento acessível |
 |---|---|---|---|
-| `pago` | há Lançamento na Competência (prevalece); o valor é a soma das baixas fracionadas | success | ponto preenchido, card apagado no repouso e rótulo |
-| `a vencer` | vencimento a cinco dias ou mais | text-3 neutro | ponto neutro e rótulo |
-| `vence em breve` | vencimento entre hoje e quatro dias (`vence hoje` incluso) | warn | ponto contornado e rótulo |
-| `vencida` | vencimento já passou — `vence hoje` nunca é atraso consumado | danger | ponto preenchido com anel e rótulo explícito |
+| `pago` | há Lançamento na Competência (prevalece); o valor é a soma das baixas fracionadas | success | ponto sólido, card apagado no repouso e rótulo |
+| `a vencer` | vencimento a cinco dias ou mais | text-3 neutro | ponto sólido neutro e rótulo |
+| `vence em breve` | vencimento entre hoje e quatro dias (`vence hoje` incluso) | warn | ponto sólido e rótulo |
+| `vencida` | vencimento já passou — `vence hoje` nunca é atraso consumado | danger | ponto sólido e rótulo explícito |
 
-O valor acompanha o estado: soma exata quando `pago`, `≈ média` quando em aberto com histórico, e `—` (ausência explícita) sem base — nunca `R$ 0,00` inventado.
+A pílula é a mesma composição em todos os estados — borda no próprio tom (32%), fundo a 9% e **ponto sólido**; a distinção acessível vem do rótulo textual sempre presente, nunca da forma do ponto (protótipo Final; ver reconciliação do farol na camada-app).
+
+O valor acompanha o estado: soma exata quando `pago`, `≈ média` **sem centavos** quando em aberto com histórico (estimativa não finge fato), e `—` (ausência explícita) sem base — nunca `R$ 0,00` inventado.
 
 ## Command palette
 

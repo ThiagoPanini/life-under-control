@@ -173,6 +173,27 @@ describe("derivarPanoramaMensal — estados (Seam 1)", () => {
   })
 })
 
+describe("derivarPanoramaMensal — frase (Seam 1)", () => {
+  it("test_frase_vence_amanha_quando_falta_um_dia", () => {
+    // hoje dia 9, vencimento dia 10 → "vence amanhã" (protótipo Final), não "vence em 1 dia".
+    const [card] = derivarPanoramaMensal(clock("2026-07-09"), fakeCalendar(), [billBase()], [])
+    expect(card.frase).toBe("vence amanhã")
+  })
+
+  it("test_frase_a_vencer_tambem_diz_vence_em", () => {
+    // hoje dia 5, vencimento dia 20 → a-vencer usa a MESMA frase "vence em N dias"
+    // do protótipo (nenhum estado aberto diz só "em N dias").
+    const [card] = derivarPanoramaMensal(
+      clock("2026-07-05"),
+      fakeCalendar(),
+      [billBase({ dueRule: { kind: "dia-fixo", day: 20 } })],
+      [],
+    )
+    expect(card.estado).toBe("a-vencer")
+    expect(card.frase).toBe("vence em 15 dias")
+  })
+})
+
 describe("derivarPanoramaMensal — escopo e ordem (Seam 1)", () => {
   it("test_apenas_contas_com_ocorrencia_vigente", () => {
     // Conta anual (âncora janeiro) não tem ocorrência em julho → fora do panorama.
