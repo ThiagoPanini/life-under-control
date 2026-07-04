@@ -37,6 +37,7 @@ function conta(over: Partial<Bill> = {}): Bill {
     recurrence: { intervalMonths: 1, anchorMonth: null },
     dueRule: { kind: "dia-fixo", day: 10 },
     dueMonthOffset: 0,
+    primeiraCompetencia: "2020-01",
     estado: "ativa",
     encerradaEm: null,
     logoKey: null,

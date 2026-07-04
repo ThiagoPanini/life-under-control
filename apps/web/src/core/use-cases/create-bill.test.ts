@@ -53,6 +53,7 @@ function brutoValido(over: Partial<BillBruto> = {}): BillBruto {
     dueRuleDay: 15,
     dueRuleNth: null,
     dueMonthOffset: 0,
+    primeiraCompetencia: "2026-06",
     ...over,
   }
 }

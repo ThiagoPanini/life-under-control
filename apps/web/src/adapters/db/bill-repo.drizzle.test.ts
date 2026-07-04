@@ -32,6 +32,7 @@ function nova(householdId: string, over: Partial<NovaBill> = {}): NovaBill {
     recurrence: { intervalMonths: 1, anchorMonth: null },
     dueRule: { kind: "dia-fixo", day: 10 },
     dueMonthOffset: 0,
+    primeiraCompetencia: "2020-01",
     ...over,
   }
 }
@@ -137,6 +138,7 @@ suite("drizzleBillRepo (Seam 2 — Postgres real)", () => {
       recurrence: { intervalMonths: 12, anchorMonth: 1 },
       dueRule: { kind: "ultimo-dia-util" },
       dueMonthOffset: 0,
+      primeiraCompetencia: "2020-01",
     })
 
     expect(editada?.id).toBe(criada.id)
@@ -157,6 +159,7 @@ suite("drizzleBillRepo (Seam 2 — Postgres real)", () => {
       recurrence: { intervalMonths: 1, anchorMonth: null },
       dueRule: { kind: "dia-fixo", day: 1 },
       dueMonthOffset: 0,
+      primeiraCompetencia: "2020-01",
     })
     expect(r).toBeNull()
   })

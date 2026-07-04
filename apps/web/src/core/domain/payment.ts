@@ -8,7 +8,17 @@
  * "hoje" entra como parâmetro (via `Clock`, injetado no use-case).
  */
 
-import { type ErroCampo, ehDataIsoValida, MESES, type Recurrence } from "./bill"
+import {
+  type ErroCampo,
+  ehCompetenciaValida,
+  ehDataIsoValida,
+  MESES,
+  type Recurrence,
+} from "./bill"
+
+// A Competência (`ano-mês`) é validada no módulo-base do domínio (`bill.ts`);
+// reexportada aqui para as bordas que já a importam de `payment`.
+export { ehCompetenciaValida }
 
 /** Os dados de um Lançamento já validados e normalizados. */
 export type DadosPayment = {
@@ -44,13 +54,6 @@ export type PaymentBruto = {
 }
 
 export type ValidacaoPayment = { ok: true; value: DadosPayment } | { ok: false; erros: ErroCampo[] }
-
-const COMPETENCIA_RE = /^\d{4}-(0[1-9]|1[0-2])$/
-
-/** É uma Competência `ano-mês` (YYYY-MM) com mês entre 01 e 12? */
-export function ehCompetenciaValida(s: string): boolean {
-  return COMPETENCIA_RE.test(s)
-}
 
 /**
  * Valida e normaliza uma baixa/edição de Lançamento. Fonte única da regra: os

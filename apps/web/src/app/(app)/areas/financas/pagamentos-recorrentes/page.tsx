@@ -23,6 +23,7 @@ import { ExcluirContaModal } from "@/components/financas/ExcluirContaModal"
 import { LancamentoRegistradoToast } from "@/components/financas/LancamentoRegistradoToast"
 import { LinhaConta } from "@/components/financas/LinhaConta"
 import { mensagemLancamentoRegistrado } from "@/components/financas/lancamento-toast"
+import { MapaDoAno } from "@/components/financas/MapaDoAno"
 import { NovaContaModal } from "@/components/financas/NovaContaModal"
 import { type BlocoPanorama, PanoramaContas } from "@/components/financas/PanoramaContas"
 import { PendenciasAnterioresChip } from "@/components/financas/PendenciasAnterioresChip"
@@ -36,6 +37,7 @@ import { derivarCenarioMes } from "@/core/use-cases/derive-cenario-mes"
 import { derivarDestaquesMes } from "@/core/use-cases/derive-destaques-mes"
 import { listarPendenciasAnteriores } from "@/core/use-cases/derive-forma-competencia"
 import { derivarLinhasContas } from "@/core/use-cases/derive-linha-conta"
+import { derivarMapaAno } from "@/core/use-cases/derive-mapa-ano"
 import { derivarPanoramaMensal } from "@/core/use-cases/derive-panorama-mensal"
 import { localAuthBypass } from "@/core/use-cases/gate"
 import { getLogoUrl } from "@/core/use-cases/get-logo-url"
@@ -107,6 +109,10 @@ export default async function FinancasPage({
   // Lançamento individual. Deriva de `bills` (inclui encerradas, para resolver o
   // nome) e do mesmo array de Lançamentos — sem query nova.
   const destaques = derivarDestaquesMes(systemClock(), bills, pagamentos)
+  // Mapa do Ano (#102): a matriz Conta × Competência das 12 Competências até a
+  // atual. Deriva de TODAS as Contas (encerradas incluídas — aparecem enquanto a
+  // vigência intercepta a janela) e do mesmo array de Lançamentos, sem query nova.
+  const mapaAno = derivarMapaAno(systemClock(), nationalBankCalendar(), bills, pagamentos)
   const pendenciasAnteriores = listarPendenciasAnteriores(
     nationalBankCalendar(),
     ativas,
@@ -258,6 +264,10 @@ export default async function FinancasPage({
 
         {/* Análise Histórica (#98): fora do gate `ativas>0` — a série vive só de fatos na janela. */}
         <TotalPagoPorMes serie={serieHistorica} destaques={destaques} hoje={hoje} />
+
+        {/* Mapa do Ano (#102): a matriz de vigência real das Contas — vive de vigência,
+            não do gate `ativas>0` (Contas encerradas na janela aparecem). */}
+        <MapaDoAno mapa={mapaAno} />
 
         {MOSTRAR_CONTAS_ATIVAS && (
           <section aria-labelledby="contas-ativas-heading" className="flex flex-col gap-5">

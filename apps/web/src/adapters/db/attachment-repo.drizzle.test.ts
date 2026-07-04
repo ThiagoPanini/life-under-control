@@ -37,6 +37,7 @@ function novaBill(householdId: string, over: Partial<NovaBill> = {}): NovaBill {
     recurrence: { intervalMonths: 1, anchorMonth: null },
     dueRule: { kind: "dia-fixo", day: 10 },
     dueMonthOffset: 0,
+    primeiraCompetencia: "2020-01",
     ...over,
   }
 }

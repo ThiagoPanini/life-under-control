@@ -45,6 +45,8 @@ export async function quickEditBill(
     intervalMonths: atual.recurrence.intervalMonths,
     anchorMonth: atual.recurrence.anchorMonth,
     dueMonthOffset: atual.dueMonthOffset,
+    // vigência preservada — a edição rápida nunca move a primeira Competência (#4)
+    primeiraCompetencia: atual.primeiraCompetencia,
     // vencimento: a regra simples escolhida, ou a atual preservada
     dueRuleKind: dueRule.kind,
     dueRuleDay: dueRule.kind === "dia-fixo" ? dueRule.day : null,

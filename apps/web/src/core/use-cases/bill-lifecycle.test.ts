@@ -89,6 +89,7 @@ const DADOS: DadosBill = {
   recurrence: { intervalMonths: 1, anchorMonth: null },
   dueRule: { kind: "dia-fixo", day: 15 },
   dueMonthOffset: 0,
+  primeiraCompetencia: "2020-01",
 }
 
 /** Semeia uma Conta ativa no Lar `h-1` e devolve repo + a Conta. */
@@ -311,6 +312,7 @@ const DADOS_AVANCADA: DadosBill = {
   recurrence: { intervalMonths: 12, anchorMonth: 1 },
   dueRule: { kind: "n-esimo-dia-util", nth: 5 },
   dueMonthOffset: 1,
+  primeiraCompetencia: "2020-01",
 }
 
 /** Semeia uma Conta com regra avançada no Lar `h-1` e devolve repo + a Conta. */

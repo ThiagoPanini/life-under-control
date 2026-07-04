@@ -19,6 +19,7 @@ import { confirmLogoUpload } from "@/core/use-cases/confirm-logo-upload"
 import { BillInvalidaError, createBill } from "@/core/use-cases/create-bill"
 import { deleteBill } from "@/core/use-cases/delete-bill"
 import { deletePayment } from "@/core/use-cases/delete-payment"
+import { mesDe } from "@/core/use-cases/derive-bill-card"
 import { BillNaoEncontradaError, editBill } from "@/core/use-cases/edit-bill"
 import { editPayment, PaymentNaoEncontradoError } from "@/core/use-cases/edit-payment"
 import { EncerramentoInvalidoError, encerrarBill } from "@/core/use-cases/encerrar-bill"
@@ -90,7 +91,12 @@ export async function criarConta(
   _prev: ContaFormState,
   formData: FormData,
 ): Promise<ContaFormState> {
-  const bruto = lerBrutoDoForm(formData)
+  // A vigência de uma Conta nova começa na Competência corrente (não há histórico
+  // ainda). O formulário não a coleta; a borda a injeta pelo Clock (#102).
+  const bruto: BillBruto = {
+    ...lerBrutoDoForm(formData),
+    primeiraCompetencia: mesDe(systemClock().hoje()),
+  }
 
   // Resolve o Lar pelo use-case (não o store direto): a borda fala com use-case
   // (ADR-0003), e LarNaoEncontradoError é a mesma falha que a página já trata.

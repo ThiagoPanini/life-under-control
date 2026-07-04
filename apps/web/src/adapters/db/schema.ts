@@ -73,6 +73,10 @@ export const bills = pgTable(
     dueRuleDay: integer("due_rule_day"),
     dueRuleNth: integer("due_rule_nth"),
     dueMonthOffset: integer("due_month_offset").notNull().default(0),
+    // Primeira Competência canônica (`YYYY-MM`) — onde a vigência da Conta começa
+    // (#102). Backfillada pela migração aditiva 0008 (menor Competência de
+    // Lançamento, ou a corrente sem histórico) antes de virar NOT NULL.
+    primeiraCompetencia: text("primeira_competencia").notNull(),
     estado: text("estado").notNull().default("ativa"),
     // Data civil de encerramento (sem hora — o domínio trabalha em datas, CONTEXT
     // #3). Nula enquanto `ativa`; presente sse `encerrada` (check abaixo).
@@ -94,6 +98,11 @@ export const bills = pgTable(
     ),
     check("bills_interval_months_check", sql`${t.intervalMonths} >= 1`),
     check("bills_due_month_offset_check", sql`${t.dueMonthOffset} >= 0`),
+    // Primeira Competência é `ano-mês` (YYYY-MM), mês 01–12 — fato íntegro no banco.
+    check(
+      "bills_primeira_competencia_check",
+      sql`${t.primeiraCompetencia} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`,
+    ),
     // Âncora: nula na mensal; 1–12 quando o intervalo é maior.
     check(
       "bills_recurrence_anchor_check",

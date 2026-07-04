@@ -98,6 +98,7 @@ describe("BillForm — modo edição (Seam 3)", () => {
     recurrence: { intervalMonths: 12, anchorMonth: 3 },
     dueRule: { kind: "n-esimo-dia-util", nth: 5 },
     dueMonthOffset: 1,
+    primeiraCompetencia: "2020-01",
     estado: "ativa",
     encerradaEm: null,
     logoKey: null,

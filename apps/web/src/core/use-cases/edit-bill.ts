@@ -23,7 +23,12 @@ export async function editBill(
   billId: string,
   bruto: BillBruto,
 ): Promise<Bill> {
-  const res = validarDadosBill(bruto)
+  // Relê a Conta para preservar a **primeira Competência**: a vigência começa nela
+  // e editar a *regra* nunca move o início da vigência (invariante #4 — reajustar
+  // recalcula o futuro, jamais reescreve o passado). O formulário não a expõe.
+  const atual = await repo.obterBill(householdId, billId)
+  if (!atual) throw new BillNaoEncontradaError()
+  const res = validarDadosBill({ ...bruto, primeiraCompetencia: atual.primeiraCompetencia })
   if (!res.ok) throw new BillInvalidaError(res.erros)
   const atualizada = await repo.editarBill(householdId, billId, res.value)
   if (!atualizada) throw new BillNaoEncontradaError()

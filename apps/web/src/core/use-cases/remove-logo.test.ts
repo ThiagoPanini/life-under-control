@@ -57,6 +57,7 @@ const DADOS: DadosBill = {
   recurrence: { intervalMonths: 1, anchorMonth: null },
   dueRule: { kind: "dia-fixo", day: 15 },
   dueMonthOffset: 0,
+  primeiraCompetencia: "2020-01",
 }
 
 describe("removeLogo (Seam 1)", () => {

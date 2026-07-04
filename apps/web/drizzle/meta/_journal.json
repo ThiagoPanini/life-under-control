@@ -57,6 +57,13 @@
       "when": 1783127160781,
       "tag": "0007_add_google_email",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1783204506260,
+      "tag": "0008_add_bill_primeira_competencia",
+      "breakpoints": true
     }
   ]
 }

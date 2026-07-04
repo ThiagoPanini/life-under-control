@@ -5,8 +5,11 @@ import { mesDe, ocorrenciasRecentes } from "./derive-bill-card"
 /** A janela da Análise Histórica: as doze Competências consecutivas até a atual (inclusive). */
 export const JANELA_HISTORICA_MESES = 12
 
-/** Recorrência mensal pura — enumera a janela de meses consecutivos (sem âncora). */
-const MENSAL = { intervalMonths: 1, anchorMonth: null } as const
+/**
+ * Recorrência mensal pura — enumera a janela de meses consecutivos (sem âncora).
+ * Compartilhada com o Mapa do Ano (#102), que usa a mesma janela (ADR-0011).
+ */
+export const MENSAL = { intervalMonths: 1, anchorMonth: null } as const
 
 /**
  * Estado de um ponto da série. `em-curso` é o mês corrente (parcial); `sem-dado`

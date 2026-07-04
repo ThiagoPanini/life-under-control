@@ -5,6 +5,7 @@ import {
   descreverRecorrencia,
   descreverVencimento,
   diaDaSemanaAbreviado,
+  ehCompetenciaValida,
   ehDataIsoValida,
   formatarDataBr,
   mesCurto,
@@ -25,6 +26,7 @@ function brutoValido(over: Partial<BillBruto> = {}): BillBruto {
     dueRuleDay: 10,
     dueRuleNth: null,
     dueMonthOffset: 0,
+    primeiraCompetencia: "2026-01",
     ...over,
   }
 }
@@ -44,7 +46,46 @@ describe("validarDadosBill (Seam 1)", () => {
       recurrence: { intervalMonths: 1, anchorMonth: null },
       dueRule: { kind: "dia-fixo", day: 10 },
       dueMonthOffset: 0,
+      primeiraCompetencia: "2026-01",
     })
+  })
+
+  it("test_primeira_competencia_valida_normaliza_e_passa", () => {
+    // given uma primeira Competência com espaços em volta
+    const res = validarDadosBill(brutoValido({ primeiraCompetencia: "  2025-03  " }))
+    // then passa com a Competência aparada
+    expect(res.ok && res.value.primeiraCompetencia).toBe("2025-03")
+  })
+
+  it("test_primeira_competencia_ausente_falha", () => {
+    // A vigência da Conta começa na primeira Competência (invariante #5): sem ela
+    // não há de quando projetar. Ausência é erro, não um default silencioso.
+    const res = validarDadosBill(brutoValido({ primeiraCompetencia: undefined }))
+    expect(res.ok).toBe(false)
+    if (res.ok) return
+    expect(res.erros.map((e) => e.campo)).toContain("primeiraCompetencia")
+  })
+
+  it("test_primeira_competencia_em_formato_torto_falha", () => {
+    // Precisa ser ano-mês canônico (YYYY-MM); "03/2025" ou mês fora de 1–12 falham.
+    expect(validarDadosBill(brutoValido({ primeiraCompetencia: "03/2025" })).ok).toBe(false)
+    expect(validarDadosBill(brutoValido({ primeiraCompetencia: "2025-13" })).ok).toBe(false)
+    const res = validarDadosBill(brutoValido({ primeiraCompetencia: "2025-00" }))
+    if (res.ok) return
+    expect(res.erros.map((e) => e.campo)).toContain("primeiraCompetencia")
+  })
+})
+
+describe("ehCompetenciaValida (Seam 1)", () => {
+  it("test_competencia_ano_mes_valida_passa", () => {
+    expect(ehCompetenciaValida("2026-01")).toBe(true)
+    expect(ehCompetenciaValida("2026-12")).toBe(true)
+  })
+  it("test_competencia_torta_falha", () => {
+    expect(ehCompetenciaValida("2026-13")).toBe(false)
+    expect(ehCompetenciaValida("2026-00")).toBe(false)
+    expect(ehCompetenciaValida("2026-6")).toBe(false)
+    expect(ehCompetenciaValida("")).toBe(false)
   })
 
   it("test_mensal_ignora_ancora_informada", () => {

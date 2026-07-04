@@ -44,6 +44,13 @@ export type DadosBill = {
   dueRule: DueRule
   /** Offset de mês: a ocorrência vence na competência + N meses (default 0; condomínio +1). */
   dueMonthOffset: number
+  /**
+   * Primeira Competência canônica (`YYYY-MM`): onde a vigência da Conta começa
+   * (invariante #5 — a Conta projeta o "quando"). Meses anteriores a ela estão
+   * fora da vigência, nunca "não pagos". Backfillada pela menor Competência de
+   * Lançamento (ou a corrente, sem histórico) na migração aditiva de #102.
+   */
+  primeiraCompetencia: string
 }
 
 /** Uma Conta persistida: os dados + identidade e dono (o Lar) + estado de vida. */
@@ -68,6 +75,7 @@ export type BillBruto = {
   dueRuleDay?: number | null
   dueRuleNth?: number | null
   dueMonthOffset?: number | null
+  primeiraCompetencia?: string
 }
 
 /** Erro de validação amarrado a um campo, para a borda destacar o input certo. */
@@ -200,6 +208,17 @@ function ehInteiroNoIntervalo(n: unknown, min: number, max: number): boolean {
   return typeof n === "number" && Number.isInteger(n) && n >= min && n <= max
 }
 
+const COMPETENCIA_RE = /^\d{4}-(0[1-9]|1[0-2])$/
+
+/**
+ * É uma Competência `ano-mês` (`YYYY-MM`) com mês entre 01 e 12? Vive aqui (o
+ * módulo-base do domínio) para servir tanto a Conta (`primeiraCompetencia`) quanto
+ * o Lançamento (`payment.ts` reexporta) sem ciclo de import.
+ */
+export function ehCompetenciaValida(s: string): boolean {
+  return COMPETENCIA_RE.test(s)
+}
+
 /**
  * Valida e normaliza o cadastro de uma Conta. Fonte única da regra: o use-case
  * `createBill` (o portão) e o wizard (a borda) consomem isto. Normaliza ao
@@ -257,6 +276,13 @@ export function validarDadosBill(bruto: BillBruto): ValidacaoBill {
   if (!ehInteiroNoIntervalo(dueMonthOffset, 0, OFFSET_MAX))
     erros.push({ campo: "dueMonthOffset", mensagem: `Offset de mês entre 0 e ${OFFSET_MAX}.` })
 
+  const primeiraCompetencia = (bruto.primeiraCompetencia ?? "").trim()
+  if (!ehCompetenciaValida(primeiraCompetencia))
+    erros.push({
+      campo: "primeiraCompetencia",
+      mensagem: "Primeira Competência inválida (ano-mês).",
+    })
+
   // dueRule só fica null quando a forma é desconhecida (o `default` já registrou
   // o erro) ou quando o parâmetro está fora de faixa (a `case` já registrou o
   // erro do campo). Logo, basta narrow + checar a lista — sem re-empurrar erro.
@@ -271,6 +297,7 @@ export function validarDadosBill(bruto: BillBruto): ValidacaoBill {
       recurrence: { intervalMonths, anchorMonth },
       dueRule,
       dueMonthOffset,
+      primeiraCompetencia,
     },
   }
 }

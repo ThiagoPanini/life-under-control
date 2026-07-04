@@ -158,6 +158,26 @@ export function resolverVencimento(
   }
 }
 
+/** O mês (1–12) casa a fase da âncora, dado o intervalo? Intervalo ≤ 1 ou âncora nula ocorre sempre. */
+function mesCasaAncora(mes: number, intervalMonths: number, anchorMonth: number | null): boolean {
+  if (intervalMonths <= 1 || anchorMonth == null) return true
+  return (((mes - anchorMonth) % intervalMonths) + intervalMonths) % intervalMonths === 0
+}
+
+/**
+ * A Competência `YYYY-MM` é uma ocorrência da Recorrência? Mensal (ou sem âncora)
+ * ocorre todo mês; com intervalo > 1 e âncora, só nos meses em fase com a âncora.
+ * Fonte única da regra de fase — o card, `ocorrenciasRecentes` e o Mapa do Ano a
+ * compartilham, para não divergirem sobre quando uma Conta não-mensal ocorre.
+ */
+export function ehOcorrenciaDaRecorrencia(recurrence: Recurrence, competencia: string): boolean {
+  return mesCasaAncora(
+    Number(competencia.slice(5, 7)),
+    recurrence.intervalMonths,
+    recurrence.anchorMonth,
+  )
+}
+
 /**
  * As últimas `n` competências de ocorrência ≤ `refCompetencia`, da mais antiga à
  * mais recente. Mensal devolve os últimos `n` meses; quando o intervalo > 1, recua
@@ -174,12 +194,7 @@ export function ocorrenciasRecentes(
 
   if (intervalMonths > 1 && anchorMonth != null) {
     // Recua mês a mês até o primeiro que casa com a fase da âncora.
-    while (
-      ((((idx % 12) + 1 - anchorMonth) % intervalMonths) + intervalMonths) % intervalMonths !==
-      0
-    ) {
-      idx -= 1
-    }
+    while (!mesCasaAncora((idx % 12) + 1, intervalMonths, anchorMonth)) idx -= 1
   }
 
   const out: string[] = []

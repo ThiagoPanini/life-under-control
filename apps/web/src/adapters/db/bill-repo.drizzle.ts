@@ -62,6 +62,7 @@ function paraDominio(row: BillRow): Bill {
     recurrence: { intervalMonths: row.intervalMonths, anchorMonth: row.anchorMonth },
     dueRule: montarDueRule(row),
     dueMonthOffset: row.dueMonthOffset,
+    primeiraCompetencia: row.primeiraCompetencia,
     estado: row.estado as BillEstado,
     encerradaEm: row.encerradaEm,
     logoKey: row.logoKey,
@@ -78,6 +79,7 @@ function colunasDosDados(dados: DadosBill) {
     anchorMonth: dados.recurrence.anchorMonth,
     ...colunasDaDueRule(dados.dueRule),
     dueMonthOffset: dados.dueMonthOffset,
+    primeiraCompetencia: dados.primeiraCompetencia,
   }
 }
 

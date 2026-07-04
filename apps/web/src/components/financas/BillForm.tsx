@@ -131,6 +131,10 @@ export function BillForm({
     dueRuleDay: dueRuleDay ? Number(dueRuleDay) : null,
     dueRuleNth: dueRuleNth ? Number(dueRuleNth) : null,
     dueMonthOffset: dueMonthOffset ? Number(dueMonthOffset) : 0,
+    // A primeira Competência não é campo do wizard — a borda a injeta (Competência
+    // corrente ao criar; preservada ao editar). Aqui o Resumo só valida/descreve a
+    // *regra*, então um valor válido de fachada basta para o preview passar.
+    primeiraCompetencia: "2000-01",
   })
 
   function selecionarLogo(file: File | null) {

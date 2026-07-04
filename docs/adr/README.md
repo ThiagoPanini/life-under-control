@@ -37,3 +37,4 @@ Para um **refinamento** (a decisão segue válida, muda um detalhe), edite o ADR
 - [0008 — Comprovantes (Anexos) em object storage S3-compatível (Cloudflare R2), via port](0008-anexos-object-storage-r2.md)
 - [0009 — Assunto: nível estrutural dentro da Área, unidade de especialização dos primitivos](0009-assunto-nivel-estrutural-especializacao.md)
 - [0010 — Gráficos financeiros em visx, revertendo a postura "SVG puro sem lib de chart"](0010-visx-para-graficos.md)
+- [0011 — Vigência da Conta: primeira Competência canônica e backfill aditivo](0011-vigencia-da-conta-primeira-competencia.md)
