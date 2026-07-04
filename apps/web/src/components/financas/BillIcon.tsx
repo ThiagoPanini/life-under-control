@@ -11,8 +11,10 @@ import {
   type LucideIcon,
   Receipt,
   Shield,
+  ShoppingCart,
   Smartphone,
   Tv,
+  Wallet,
   Wifi,
   Zap,
 } from "lucide-react"
@@ -34,6 +36,8 @@ const ICONS: Record<string, LucideIcon> = {
   "heart-pulse": HeartPulse,
   "graduation-cap": GraduationCap,
   dumbbell: Dumbbell,
+  wallet: Wallet,
+  "shopping-cart": ShoppingCart,
 }
 
 export function BillIcon({ name, size = 20 }: { name: string; size?: number }) {

@@ -3,7 +3,7 @@
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react"
 import { type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { systemClock } from "@/adapters/clock/system-clock"
-import { inputClass } from "@/components/ds/FormField"
+import { compactInputClass, inputClass } from "@/components/ds/FormField"
 import { descreverMesPorExtenso, formatarDataBr } from "@/core/domain/bill"
 
 const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
@@ -81,6 +81,7 @@ export function DatePicker({
   onChange,
   invalid = false,
   describedBy,
+  compact = false,
   hoje = systemClock().hoje(),
 }: {
   id: string
@@ -89,6 +90,8 @@ export function DatePicker({
   onChange: (value: string) => void
   invalid?: boolean
   describedBy?: string
+  /** Veste compacta dos modais (Final): caixa 38px, raio 9, borda strong, fundo translúcido. */
+  compact?: boolean
   hoje?: string
 }) {
   const [open, setOpen] = useState(false)
@@ -195,9 +198,13 @@ export function DatePicker({
         aria-invalid={invalid}
         aria-describedby={describedBy}
         onClick={() => setOpen((o) => !o)}
-        className={`${inputClass} flex items-center gap-2 font-mono`}
+        className={`${compact ? compactInputClass : inputClass} flex items-center gap-2 font-mono`}
       >
-        <Calendar aria-hidden size={16} className="shrink-0 text-luc-text-3" />
+        <Calendar
+          aria-hidden
+          size={compact ? 14 : 16}
+          className={`shrink-0 ${compact ? "text-luc-muted" : "text-luc-text-3"}`}
+        />
         <span className={value ? "" : "text-luc-faint"}>
           {value ? formatarDataBr(value) : "dd/mm/aaaa"}
         </span>

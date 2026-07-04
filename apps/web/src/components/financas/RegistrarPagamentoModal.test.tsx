@@ -60,6 +60,7 @@ describe("RegistrarPagamentoModal (Seam 2)", () => {
         billId="luz"
         billName="Luz"
         billIcon="zap"
+        logoUrl={null}
         action={async () => ({ erros: [] })}
         pessoas={PESSOAS}
         inicial={{
@@ -97,7 +98,8 @@ describe("RegistrarPagamentoModal (Seam 2)", () => {
         "estimativa pelo histórico: ~R$ 120,00 — o valor exato nasce agora, no Lançamento",
       ),
     ).toBeInTheDocument()
-    expect(screen.getByText("Escolher imagens ou PDFs")).toBeInTheDocument()
+    // CTA tracejado do protótipo (multi-arquivo é o AC6 de #100)
+    expect(screen.getByText(/Anexar comprovantes/)).toBeInTheDocument()
   })
 
   it("test_cancelar_navega_para_closeHref", async () => {
@@ -107,6 +109,7 @@ describe("RegistrarPagamentoModal (Seam 2)", () => {
         billId="luz"
         billName="Luz"
         billIcon="zap"
+        logoUrl={null}
         action={async () => ({ erros: [] })}
         pessoas={PESSOAS}
         inicial={{
@@ -139,6 +142,7 @@ function renderModal(
       billId="luz"
       billName="Luz"
       billIcon="zap"
+      logoUrl={null}
       action={action}
       pessoas={PESSOAS}
       inicial={{

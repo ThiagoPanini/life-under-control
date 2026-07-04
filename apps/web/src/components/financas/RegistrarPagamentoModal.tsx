@@ -3,7 +3,7 @@
 import { useState } from "react"
 import type { PaymentFormState } from "@/app/(app)/areas/financas/actions"
 import { Modal } from "@/components/ds/Modal"
-import { BillIcon } from "@/components/financas/BillIcon"
+import { BillHeaderChip } from "@/components/financas/BillHeaderChip"
 import { ConnectedPaymentForm } from "@/components/financas/ConnectedPaymentForm"
 import type { PaymentFormInicial } from "@/components/financas/payment-form-inicial"
 import type { PessoaComAvatar } from "@/core/use-cases/resolve-avatares"
@@ -19,6 +19,7 @@ export function RegistrarPagamentoModal({
   billId,
   billName,
   billIcon,
+  logoUrl,
   action,
   pessoas,
   inicial,
@@ -32,6 +33,8 @@ export function RegistrarPagamentoModal({
   billName: string
   /** Nome do ícone da Conta (catálogo `BILL_ICONS`) — chip do header do modal compacto. */
   billIcon: string
+  /** Logo da Conta (URL assinada); no header, substitui o ícone dentro do mesmo chip (AC1). */
+  logoUrl: string | null
   action: (prev: PaymentFormState, formData: FormData) => Promise<PaymentFormState>
   pessoas: PessoaComAvatar[]
   inicial: PaymentFormInicial
@@ -53,11 +56,7 @@ export function RegistrarPagamentoModal({
       eyebrow="Registrar Lançamento"
       description={contexto}
       descriptionMono
-      icon={
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-luc-md bg-luc-accent-12 text-luc-accent-bright">
-          <BillIcon name={billIcon} size={15} />
-        </span>
-      }
+      icon={<BillHeaderChip icon={billIcon} logoUrl={logoUrl} />}
       closeHref={closeHref}
       width="narrow"
       travado={travado}

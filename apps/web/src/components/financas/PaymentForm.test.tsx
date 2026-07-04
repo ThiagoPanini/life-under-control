@@ -309,7 +309,7 @@ describe("PaymentForm — modo compacto do modal (Final)", () => {
       />,
     )
     expect(screen.getByText("recibo.pdf")).toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: "Remover" }))
+    await user.click(screen.getByRole("button", { name: "Remover recibo.pdf" }))
     expect(onArquivosChange).toHaveBeenCalledWith([])
   })
 
