@@ -12,20 +12,33 @@ export function FieldError({ children, id }: { children: ReactNode; id?: string 
   )
 }
 
+/** Rótulo eyebrow dos formulários compactos (Final): 11px/700, uppercase, tracking .11em. */
+export const compactLabelClass = "text-[11px] font-bold uppercase tracking-[0.11em] text-luc-text-3"
+
+/** Caixa de campo dos formulários compactos (Final): 38px, raio 9, borda strong, fundo translúcido. */
+export const compactInputClass =
+  "min-h-[38px] w-full rounded-[9px] border border-luc-border-strong bg-white/[0.03] px-3 text-[14px] text-luc-text outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-luc-faint focus-visible:border-luc-accent focus-visible:ring-2 focus-visible:ring-luc-accent aria-[invalid=true]:border-luc-warn"
+
 export function Field({
   label,
   htmlFor,
   error,
+  labelClassName,
   children,
 }: {
   label: string
   htmlFor: string
   error?: string
+  /** Sobrescreve o estilo do rótulo (ex.: `compactLabelClass` nos modais compactos). */
+  labelClassName?: string
   children: ReactNode
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={htmlFor} className="text-[11.5px] font-semibold text-luc-text-3">
+      <label
+        htmlFor={htmlFor}
+        className={labelClassName ?? "text-[11.5px] font-semibold text-luc-text-3"}
+      >
         {label}
       </label>
       {children}

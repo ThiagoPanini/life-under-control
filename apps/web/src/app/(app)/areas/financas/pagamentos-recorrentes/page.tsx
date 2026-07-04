@@ -22,7 +22,7 @@ import { type BlocoPanorama, PanoramaContas } from "@/components/financas/Panora
 import { PendenciasAnterioresChip } from "@/components/financas/PendenciasAnterioresChip"
 import { RegistrarPagamentoModal } from "@/components/financas/RegistrarPagamentoModal"
 import { TotalPagoPorMes } from "@/components/financas/TotalPagoPorMes"
-import { formatarDataBr } from "@/core/domain/bill"
+import { formatarDataBr, RECORRENCIA_NOMES } from "@/core/domain/bill"
 import { centavosParaCampo, formatBRLSemCentavos } from "@/core/domain/money"
 import { descreverCompetencia, ehCompetenciaValida } from "@/core/domain/payment"
 import { derivarAnaliseHistorica } from "@/core/use-cases/derive-analise-historica"
@@ -276,6 +276,7 @@ export default async function FinancasPage({
           billName={billEditar.nome}
           billIcon={billEditar.icon}
           logoUrl={logoUrls.get(billEditar.id) ?? null}
+          contexto={`recorrência ${(RECORRENCIA_NOMES[billEditar.recurrence.intervalMonths] ?? `a cada ${billEditar.recurrence.intervalMonths} meses`).toLowerCase()} · o valor nasce em cada Lançamento`}
           inicial={{
             nome: billEditar.nome,
             icon: billEditar.icon,
@@ -293,6 +294,7 @@ export default async function FinancasPage({
           billId={billRegistrar.id}
           billName={billRegistrar.nome}
           billIcon={billRegistrar.icon}
+          logoUrl={logoUrls.get(billRegistrar.id) ?? null}
           action={criarLancamento.bind(null, billRegistrar.id)}
           pessoas={pessoasComAvatar}
           inicial={{

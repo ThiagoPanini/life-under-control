@@ -79,22 +79,26 @@ export type ValidacaoBill = { ok: true; value: DadosBill } | { ok: false; erros:
  * Catálogo de ícones de Conta (subconjunto Lucide; só os nomes — a borda resolve
  * o componente, o núcleo não conhece React). Cresce conforme a vida do Lar pedir.
  */
+// Ordem e elenco do protótipo Final; `home` é o id persistido (o protótipo diz
+// "house", mesmo glifo) — nunca renomear um id já gravado em Conta.
 export const BILL_ICONS = [
-  "home",
   "building-2",
+  "credit-card",
   "zap",
-  "flame",
   "droplet",
   "wifi",
-  "smartphone",
-  "tv",
-  "credit-card",
-  "receipt",
-  "car",
-  "shield",
+  "flame",
   "heart-pulse",
   "graduation-cap",
   "dumbbell",
+  "shield",
+  "receipt",
+  "car",
+  "home",
+  "smartphone",
+  "tv",
+  "wallet",
+  "shopping-cart",
 ] as const
 
 /** Meses em pt-BR (índice 0 = janeiro), para descrever Recorrência e âncora. */

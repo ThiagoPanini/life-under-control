@@ -1,11 +1,19 @@
 "use client"
 
-import { FileText, Upload } from "lucide-react"
+import { FileText, Paperclip, Receipt, X } from "lucide-react"
 import { useId, useState } from "react"
 import { Button } from "@/components/ds/Button"
 import { DatePicker } from "@/components/ds/DatePicker"
-import { Field, FieldError, getFieldError, inputClass } from "@/components/ds/FormField"
-import { PersonChip } from "@/components/ds/PersonChip"
+import {
+  compactLabelClass,
+  Field,
+  FieldError,
+  getFieldError,
+  inputClass,
+} from "@/components/ds/FormField"
+import { PersonAvatar } from "@/components/ds/PersonAvatar"
+import { PersonChip, personKey } from "@/components/ds/PersonChip"
+import { formatarTamanhoArquivo } from "@/components/financas/file-size"
 import type { PaymentFormInicial } from "@/components/financas/payment-form-inicial"
 import type { ErroCampo } from "@/core/domain/bill"
 import type { PessoaComAvatar } from "@/core/use-cases/resolve-avatares"
@@ -89,14 +97,17 @@ export function PaymentForm({
     <form action={formAction} className="flex flex-col gap-5" aria-busy={pending}>
       <Field
         label={competenciaOculta ? "Valor pago" : "Valor"}
+        labelClassName={competenciaOculta ? compactLabelClass : undefined}
         htmlFor={`${formId}-valor`}
         error={erroDe("valor")}
       >
         {competenciaOculta ? (
-          <div className="relative">
-            <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 font-mono text-[12px] text-luc-muted">
-              R$
-            </span>
+          <div
+            className={`flex min-h-[38px] items-center gap-2 rounded-[9px] border bg-white/[0.03] px-3 transition-[border-color,box-shadow] focus-within:border-luc-accent focus-within:ring-2 focus-within:ring-luc-accent ${
+              erroDe("valor") ? "border-luc-warn" : "border-luc-border-strong"
+            }`}
+          >
+            <span className="shrink-0 font-mono text-[13px] text-luc-muted">R$</span>
             <input
               id={`${formId}-valor`}
               name="valor"
@@ -106,7 +117,7 @@ export function PaymentForm({
               placeholder="0,00"
               value={valor}
               onChange={(e) => setValor(e.target.value)}
-              className={`${inputClass} pl-10 text-right font-mono`}
+              className="min-w-0 flex-1 border-none bg-transparent font-mono text-[14px] text-luc-text outline-none placeholder:text-luc-faint"
               aria-invalid={Boolean(erroDe("valor"))}
               aria-describedby={erroDe("valor") ? `${formId}-valor-error` : undefined}
             />
@@ -158,7 +169,12 @@ export function PaymentForm({
         </Field>
       )}
 
-      <Field label="Data de pagamento" htmlFor={`${formId}-data`} error={erroDe("dataPagamento")}>
+      <Field
+        label={competenciaOculta ? "Data do pagamento" : "Data de pagamento"}
+        labelClassName={competenciaOculta ? compactLabelClass : undefined}
+        htmlFor={`${formId}-data`}
+        error={erroDe("dataPagamento")}
+      >
         <DatePicker
           id={`${formId}-data`}
           name="dataPagamento"
@@ -166,6 +182,7 @@ export function PaymentForm({
           onChange={setDataPagamento}
           invalid={Boolean(erroDe("dataPagamento"))}
           describedBy={erroDe("dataPagamento") ? `${formId}-data-error` : undefined}
+          compact={competenciaOculta}
         />
       </Field>
 
@@ -181,13 +198,16 @@ export function PaymentForm({
             aria-invalid={Boolean(paidByErro)}
             aria-describedby={erroId}
           >
-            <legend className="p-0 text-[11.5px] font-semibold text-luc-text-3">
+            <legend
+              className={`p-0 ${competenciaOculta ? compactLabelClass : "text-[11.5px] font-semibold text-luc-text-3"}`}
+            >
               {competenciaOculta ? "Pago por" : "Quem pagou"}
             </legend>
             <input type="hidden" name="paidBy" value={paidBy} />
-            <div className={competenciaOculta ? "grid grid-cols-2 gap-2" : "flex flex-wrap gap-2"}>
+            <div className={competenciaOculta ? "flex gap-2" : "flex flex-wrap gap-2"}>
               {pessoas.map((p) => {
                 const pressionado = paidBy === p.id
+                const key = personKey(p)
                 return (
                   <button
                     key={p.id}
@@ -196,17 +216,37 @@ export function PaymentForm({
                     onClick={() => setPaidBy(p.id)}
                     className={
                       competenciaOculta
-                        ? `rounded-luc-md border p-2.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-luc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-luc-bg ${
+                        ? // Segmento do protótipo Final: 38px, raio 9, avatar 22px + nome;
+                          // selecionado veste accent 45% na borda e accent-06 no fundo.
+                          `flex min-h-[38px] flex-1 items-center justify-center gap-2 rounded-[9px] border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-luc-accent ${
                             pressionado
-                              ? "border-luc-accent bg-luc-accent-06"
-                              : "border-luc-border bg-luc-surface-2 hover:border-luc-border-strong"
+                              ? "border-luc-accent/45 bg-luc-accent-06"
+                              : "border-luc-border bg-transparent hover:border-luc-border-strong"
                           }`
                         : `rounded-luc-lg outline-none transition-[box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-luc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-luc-bg ${
                             pressionado ? "ring-2 ring-luc-accent" : "opacity-60 hover:opacity-100"
                           }`
                     }
                   >
-                    <PersonChip pessoa={p} />
+                    {competenciaOculta ? (
+                      <>
+                        <PersonAvatar
+                          avatarUrl={p.avatarUrl}
+                          inicial={p.inicial}
+                          nome={p.nome}
+                          size={22}
+                          colors={{
+                            color: `var(--luc-${key}-fg)`,
+                            backgroundColor: `var(--luc-${key}-bg)`,
+                          }}
+                          className="rounded-luc-sm"
+                          decorative
+                        />
+                        <span className="text-[12.5px] font-semibold text-luc-text">{p.nome}</span>
+                      </>
+                    ) : (
+                      <PersonChip pessoa={p} />
+                    )}
                   </button>
                 )
               })}
@@ -217,13 +257,56 @@ export function PaymentForm({
       })()}
 
       {onArquivosChange && (
-        <div className="flex flex-col gap-2">
-          <span className="text-[11.5px] font-semibold text-luc-text-3">
-            Comprovantes <span className="font-normal text-luc-faint">· opcional</span>
+        <div className="flex flex-col gap-1.5">
+          <span className={compactLabelClass}>
+            Comprovantes{" "}
+            <span className="font-semibold normal-case tracking-normal text-luc-faint">
+              · opcional
+            </span>
           </span>
-          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-luc-md border border-luc-border border-dashed bg-luc-surface-2 px-4 py-3 transition-colors hover:border-luc-border-strong focus-within:ring-2 focus-within:ring-luc-accent">
-            <Upload aria-hidden size={14} className="text-luc-accent" />
-            <span className="text-[11.5px] text-luc-text-2">Escolher imagens ou PDFs</span>
+          {arquivos.length > 0 && (
+            <ul className="flex flex-col gap-1.5">
+              {arquivos.map((file) => {
+                const pdf = /pdf$/i.test(file.type)
+                const IconeArquivo = pdf ? FileText : Receipt
+                return (
+                  <li
+                    key={chaveArquivo(file)}
+                    className="flex items-center gap-2.5 rounded-[9px] border border-luc-accent/[0.32] bg-luc-accent-06 px-[11px] py-[9px]"
+                  >
+                    <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[7px] bg-luc-accent-12 text-luc-accent-bright">
+                      <IconeArquivo aria-hidden size={15} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12.5px] font-semibold text-luc-text">
+                        {file.name}
+                      </span>
+                      <span className="block font-mono text-[10px] text-luc-muted">
+                        {formatarTamanhoArquivo(file.size)}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={`Remover ${file.name}`}
+                      onClick={() =>
+                        onArquivosChange(
+                          arquivos.filter((item) => chaveArquivo(item) !== chaveArquivo(file)),
+                        )
+                      }
+                      className="flex shrink-0 rounded-[7px] p-1 text-luc-text-3 transition-colors hover:text-luc-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent"
+                    >
+                      <X aria-hidden size={15} />
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+          <label className="flex cursor-pointer items-center gap-[9px] rounded-[9px] border border-luc-border-strong border-dashed bg-white/[0.02] px-3 py-[11px] transition-colors hover:border-luc-accent/45 hover:bg-white/[0.04] focus-within:ring-2 focus-within:ring-luc-accent">
+            <Paperclip aria-hidden size={15} className="shrink-0 text-luc-text-3" />
+            <span className="min-w-0 flex-1 text-[12.5px] text-luc-text-2">
+              Anexar comprovantes <span className="text-luc-faint">· imagem ou PDF</span>
+            </span>
             <input
               type="file"
               accept="image/*,application/pdf"
@@ -232,43 +315,30 @@ export function PaymentForm({
               onChange={(event) => adicionarArquivos(event.target.files)}
             />
           </label>
-          {arquivos.length > 0 && (
-            <ul className="flex flex-col gap-1.5">
-              {arquivos.map((file) => (
-                <li
-                  key={chaveArquivo(file)}
-                  className="flex items-center gap-2 rounded-luc-md border border-luc-row-line bg-luc-surface-1 px-3 py-2"
-                >
-                  <FileText aria-hidden size={14} className="shrink-0 text-luc-text-3" />
-                  <span className="min-w-0 flex-1 truncate text-[11.5px] text-luc-text-2">
-                    {file.name}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onArquivosChange(
-                        arquivos.filter((item) => chaveArquivo(item) !== chaveArquivo(file)),
-                      )
-                    }
-                    className="text-[10.5px] text-luc-text-3 hover:text-luc-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent"
-                  >
-                    Remover
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       )}
 
-      <div className="flex items-center justify-end gap-3 pt-1">
+      {/* Rodapé: no compacto, Cancelar estreito + primário de largura cheia (Final);
+          nas demais vestes, o par alinhado à direita de sempre. */}
+      <div
+        className={
+          competenciaOculta
+            ? "flex items-center gap-[9px] pt-0.5"
+            : "flex items-center justify-end gap-3 pt-1"
+        }
+      >
         {onCancelar && (
           <Button variant="secondary" type="button" onClick={onCancelar}>
             Cancelar
           </Button>
         )}
         {avisaCompetencia && !confirmando && (
-          <Button variant="primary" type="button" onClick={() => setConfirmando(true)}>
+          <Button
+            variant="primary"
+            type="button"
+            onClick={() => setConfirmando(true)}
+            className={competenciaOculta ? "flex-1" : undefined}
+          >
             {submitLabel}
           </Button>
         )}
@@ -280,13 +350,23 @@ export function PaymentForm({
             <Button variant="secondary" type="button" onClick={() => setConfirmando(false)}>
               Voltar
             </Button>
-            <Button variant="primary" type="submit" disabled={pending}>
+            <Button
+              variant="primary"
+              type="submit"
+              disabled={pending}
+              className={competenciaOculta ? "flex-1" : undefined}
+            >
               {pending ? submittingLabel : "Confirmar"}
             </Button>
           </>
         )}
         {!avisaCompetencia && (
-          <Button variant="primary" type="submit" disabled={pending}>
+          <Button
+            variant="primary"
+            type="submit"
+            disabled={pending}
+            className={competenciaOculta ? "flex-1" : undefined}
+          >
             {pending ? submittingLabel : submitLabel}
           </Button>
         )}

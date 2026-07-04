@@ -16,6 +16,7 @@ export function EditarContaModal({
   billName,
   billIcon,
   logoUrl,
+  contexto,
   inicial,
   action,
   closeHref,
@@ -25,6 +26,8 @@ export function EditarContaModal({
   /** Nome do ícone da Conta (catálogo `BILL_ICONS`) — chip do header do modal. */
   billIcon: string
   logoUrl: string | null
+  /** "recorrência mensal · o valor nasce em cada Lançamento" — a leitura mono do header (Final). */
+  contexto: string
   inicial: QuickBillInicial
   action: (prev: ContaFormState, formData: FormData) => Promise<ContaFormState>
   closeHref: string
@@ -33,22 +36,22 @@ export function EditarContaModal({
     <Modal
       title={billName}
       eyebrow="Editar Conta"
-      description="Ajuste o essencial. As regras avançadas seguem na edição completa."
+      description={contexto}
+      descriptionMono
       icon={
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-luc-md bg-luc-accent-12 text-luc-accent-bright">
-          <BillIcon name={billIcon} size={15} />
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-[8px] bg-luc-accent-12 text-luc-accent-bright">
+          {logoUrl ? (
+            // biome-ignore lint/performance/noImgElement: URL assinada volátil; sem domínio fixo pro next/image
+            <img src={logoUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <BillIcon name={billIcon} size={15} />
+          )}
         </span>
       }
       closeHref={closeHref}
       width="narrow"
     >
-      <QuickEditBillForm
-        billId={billId}
-        logoUrl={logoUrl}
-        inicial={inicial}
-        action={action}
-        closeHref={closeHref}
-      />
+      <QuickEditBillForm billId={billId} logoUrl={logoUrl} inicial={inicial} action={action} />
     </Modal>
   )
 }

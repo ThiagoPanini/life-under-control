@@ -42,6 +42,7 @@ function renderModal(
       billName="Luz"
       billIcon="zap"
       logoUrl={null}
+      contexto="recorrência mensal · o valor nasce em cada Lançamento"
       inicial={{ nome: "Luz", icon: "zap", dueRuleKind: "dia-fixo", dueRuleDay: "10", ...inicial }}
       action={action}
       closeHref={CLOSE}
@@ -55,13 +56,18 @@ describe("EditarContaModal (#97)", () => {
     // diálogo rotulado pelo nome da Conta + rótulo da edição rápida
     expect(screen.getByRole("dialog", { name: "Luz" })).toBeInTheDocument()
     expect(screen.getByText("Editar Conta")).toBeInTheDocument()
+    // contexto mono do header (Final): a recorrência + o invariante do valor
+    expect(
+      screen.getByText("recorrência mensal · o valor nasce em cada Lançamento"),
+    ).toBeInTheDocument()
     // preenchido com o estado atual
-    expect(screen.getByLabelText("Nome")).toHaveValue("Luz")
-    expect(screen.getByLabelText("Dia do mês")).toHaveValue(10)
-    // cartão do protótipo: até 400px + overlay com blur
+    expect(screen.getByLabelText("Nome da Conta")).toHaveValue("Luz")
+    expect(screen.getByLabelText("todo dia")).toHaveValue(10)
+    // cartão do protótipo: até 400px, central com margem, overlay com blur leve
     const dialog = screen.getByRole("dialog")
-    expect(dialog).toHaveClass("sm:max-w-[400px]")
-    expect(screen.getByLabelText("Fechar diálogo")).toHaveClass("backdrop-blur-[6px]")
+    expect(dialog).toHaveClass("max-w-[400px]")
+    expect(dialog).toHaveClass("max-h-[calc(100dvh-40px)]")
+    expect(screen.getByLabelText("Fechar diálogo")).toHaveClass("backdrop-blur-[3px]")
   })
 
   it("test_allowlist_nao_expoe_campos_avancados", () => {
@@ -82,22 +88,22 @@ describe("EditarContaModal (#97)", () => {
     const manter = screen.getByRole("radio", { name: /Manter regra atual/ })
     expect(manter).toBeChecked()
     // em "manter" não há dia a informar — o vencimento avançado fica intocado
-    expect(screen.queryByLabelText("Dia do mês")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("todo dia")).not.toBeInTheDocument()
   })
 
   it("test_logo_reutiliza_o_picker_existente", () => {
-    // Conta sem logo: o picker oferece enviar (progresso/recuperação são dele)
+    // Conta sem logo: o CTA tracejado do protótipo oferece enviar (progresso/
+    // recuperação seguem do picker)
     renderModal()
-    expect(screen.getByRole("button", { name: "Enviar logo" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /Enviar um logo/ })).toBeInTheDocument()
   })
 
-  it("test_cancelar_e_fechar_dispensam_o_modal_via_replace", async () => {
+  it("test_fechar_dispensa_o_modal_via_replace", async () => {
     // dismissal de modal usa replace (não push): o Back não reabre o overlay.
+    // O Final não tem Cancelar — o X é a única saída deliberada.
     const user = userEvent.setup()
     renderModal()
-    await user.click(screen.getByRole("button", { name: "Cancelar" }))
-    expect(replace).toHaveBeenCalledWith(CLOSE, { scroll: false })
-    replace.mockClear()
+    expect(screen.queryByRole("button", { name: "Cancelar" })).not.toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Fechar" }))
     expect(replace).toHaveBeenCalledWith(CLOSE, { scroll: false })
   })
@@ -106,7 +112,7 @@ describe("EditarContaModal (#97)", () => {
     const user = userEvent.setup()
     const action = vi.fn(async (): Promise<ContaFormState> => ({ erros: [] }))
     renderModal({}, action)
-    await user.click(screen.getByRole("button", { name: "Salvar" }))
+    await user.click(screen.getByRole("button", { name: "Salvar alterações" }))
     expect(action).toHaveBeenCalled()
   })
 })
