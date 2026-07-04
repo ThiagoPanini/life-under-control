@@ -18,9 +18,11 @@ import { NovaContaModal } from "@/components/financas/NovaContaModal"
 import { type BlocoPanorama, PanoramaContas } from "@/components/financas/PanoramaContas"
 import { PendenciasAnterioresChip } from "@/components/financas/PendenciasAnterioresChip"
 import { RegistrarPagamentoModal } from "@/components/financas/RegistrarPagamentoModal"
+import { TotalPagoPorMes } from "@/components/financas/TotalPagoPorMes"
 import { formatarDataBr } from "@/core/domain/bill"
 import { centavosParaCampo, formatBRL } from "@/core/domain/money"
 import { descreverCompetencia, ehCompetenciaValida } from "@/core/domain/payment"
+import { derivarAnaliseHistorica } from "@/core/use-cases/derive-analise-historica"
 import { derivarCenarioMes } from "@/core/use-cases/derive-cenario-mes"
 import { listarPendenciasAnteriores } from "@/core/use-cases/derive-forma-competencia"
 import { derivarLinhasContas } from "@/core/use-cases/derive-linha-conta"
@@ -69,6 +71,11 @@ export default async function FinancasPage({
   const pagamentos = await listAllPayments(drizzlePaymentRepo(), lar.id)
   const hoje = systemClock().hoje()
   const cenario = derivarCenarioMes(systemClock(), ativas, pagamentos)
+  // Análise Histórica (#98): 12 Competências de Total Pago sobre TODOS os
+  // Lançamentos do Lar (inclui splits e fatos de Contas encerradas) — a janela é
+  // aritmética de mês civil (só Clock, sem Calendar). Vive mesmo sem Conta ativa,
+  // desde que haja fato na janela.
+  const serieHistorica = derivarAnaliseHistorica(systemClock(), pagamentos)
   const pendenciasAnteriores = listarPendenciasAnteriores(
     nationalBankCalendar(),
     ativas,
@@ -185,6 +192,9 @@ export default async function FinancasPage({
             </div>
           </section>
         )}
+
+        {/* Análise Histórica (#98): fora do gate `ativas>0` — a série vive só de fatos na janela. */}
+        <TotalPagoPorMes serie={serieHistorica} />
 
         {MOSTRAR_CONTAS_ATIVAS && (
           <section aria-labelledby="contas-ativas-heading" className="flex flex-col gap-5">
