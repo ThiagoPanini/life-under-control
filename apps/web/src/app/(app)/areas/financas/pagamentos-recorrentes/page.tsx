@@ -23,7 +23,8 @@ import { centavosParaCampo, formatBRL } from "@/core/domain/money"
 import { descreverCompetencia, ehCompetenciaValida } from "@/core/domain/payment"
 import { derivarCenarioMes } from "@/core/use-cases/derive-cenario-mes"
 import { listarPendenciasAnteriores } from "@/core/use-cases/derive-forma-competencia"
-import { derivarLinhasContas, type LinhaConta as Linha } from "@/core/use-cases/derive-linha-conta"
+import { derivarLinhasContas } from "@/core/use-cases/derive-linha-conta"
+import { derivarPanoramaMensal } from "@/core/use-cases/derive-panorama-mensal"
 import { getLogoUrl } from "@/core/use-cases/get-logo-url"
 import { getPainel } from "@/core/use-cases/get-painel"
 import { listAllPayments } from "@/core/use-cases/list-all-payments"
@@ -43,12 +44,6 @@ const EYEBROW = (
 const MOSTRAR_PENDENCIAS_ANTERIORES = false
 const MOSTRAR_CONTAS_ATIVAS = false
 const MOSTRAR_ENCERRADAS = false
-
-/** "pago em dd/mm" quando quitada (fato do Lançamento); frase de urgência (#62) quando em aberto. */
-function fraseDoBloco(linha: Linha, dataPagamento: string | null | undefined): string {
-  if (linha.farol !== "verde") return linha.frase
-  return dataPagamento ? `pago em ${formatarDataBr(dataPagamento).slice(0, 5)}` : "pago · sem data"
-}
 
 /** Cockpit do Assunto Pagamentos Recorrentes: a Análise do mês vigente no topo + lista de Contas e cadastro. */
 export default async function FinancasPage({
@@ -91,42 +86,42 @@ export default async function FinancasPage({
   )
 
   // Linha híbrida (#56): urgência + grid + valor estado-dependente, já ordenada.
-  const linhas = derivarLinhasContas(systemClock(), nationalBankCalendar(), ativas, pagamentos)
+  // Só alimenta o bloco "Contas ativas", hoje desligado — não deriva à toa.
+  const linhas = MOSTRAR_CONTAS_ATIVAS
+    ? derivarLinhasContas(systemClock(), nationalBankCalendar(), ativas, pagamentos)
+    : []
   const pessoasComAvatar = await resolveAvatares(lar.pessoas, store)
   const billsPorId = new Map(ativas.map((bill) => [bill.id, bill]))
 
-  // Panorama (Final): só as ocorrências do mês vigente — o mesmo universo do
-  // Cenário. Conta fora de fase segue visível em "Contas ativas" e, se em
-  // aberto, no chip de pendências anteriores.
-  const blocos: BlocoPanorama[] = linhas
-    .filter((linha) => linha.competenciaVigente === cenario.competencia)
-    .map((linha) => {
-      const bill = billsPorId.get(linha.billId)
-      if (!bill) return null
-      const vigente = pagamentos.find(
-        (p) => p.billId === linha.billId && p.competencia === linha.competenciaVigente,
-      )
-      return {
-        billId: linha.billId,
+  // Panorama (Final): a derivação única (#93) já traz estado, valor somado
+  // (baixas fracionadas) e ordem de urgência — a borda só junta nome/logo e a
+  // rota da baixa, sem recalcular domínio nem varrer Lançamentos por Conta.
+  const cards = derivarPanoramaMensal(systemClock(), nationalBankCalendar(), ativas, pagamentos)
+  const blocos: BlocoPanorama[] = cards.flatMap((card) => {
+    const bill = billsPorId.get(card.billId)
+    if (!bill) return []
+    return [
+      {
+        billId: card.billId,
         nome: bill.nome,
         icon: bill.icon,
         logoUrl: logoUrls.get(bill.id) ?? null,
-        farol: linha.farol,
-        frase: fraseDoBloco(linha, vigente?.dataPagamento),
-        valor: linha.valor,
+        estado: card.estado,
+        frase: card.frase,
+        valor: card.valor,
         registrarHref:
-          linha.farol === "verde"
+          card.estado === "pago"
             ? null
             : `/areas/financas/pagamentos-recorrentes?registrar=${bill.id}`,
-      }
-    })
-    .filter((bloco): bloco is BlocoPanorama => bloco != null)
+      },
+    ]
+  })
 
   // Baixa direta do bloco (Final): modal compacto na própria página, com a
   // competência fixa da ocorrência vigente. Defaults iguais aos do detalhe —
   // valor do último Lançamento, hoje, Pessoa logada (casada por e-mail).
-  const linhaRegistrar = registrar ? linhas.find((linha) => linha.billId === registrar) : undefined
-  const billRegistrar = linhaRegistrar ? billsPorId.get(linhaRegistrar.billId) : undefined
+  const cardRegistrar = registrar ? cards.find((card) => card.billId === registrar) : undefined
+  const billRegistrar = cardRegistrar ? billsPorId.get(cardRegistrar.billId) : undefined
   const emailLogado = session?.user?.email?.toLowerCase()
   const pessoaLogada =
     (emailLogado && lar.pessoas.find((p) => p.email.toLowerCase() === emailLogado)) ||
@@ -225,7 +220,7 @@ export default async function FinancasPage({
         {MOSTRAR_ENCERRADAS && <EncerradasSection bills={encerradas} logoUrls={logoUrls} />}
       </div>
       {nova === "1" && <NovaContaModal closeHref="/areas/financas/pagamentos-recorrentes" />}
-      {billRegistrar && linhaRegistrar && (
+      {billRegistrar && cardRegistrar && (
         <RegistrarPagamentoModal
           key={`registro-${billRegistrar.id}-${lancamentosRegistrar.length}`}
           billId={billRegistrar.id}
@@ -236,14 +231,14 @@ export default async function FinancasPage({
           inicial={{
             valor: ultimoRegistrar ? centavosParaCampo(ultimoRegistrar.valor) : "",
             dataPagamento: hoje,
-            competencia: linhaRegistrar.competenciaVigente,
+            competencia: cardRegistrar.competencia,
             paidBy: pessoaLogada?.id ?? "",
           }}
           competenciasComLancamento={lancamentosRegistrar.map((p) => p.competencia)}
-          contexto={`competência ${descreverCompetencia(linhaRegistrar.competenciaVigente, billRegistrar.recurrence)} · ${linhaRegistrar.frase} (${formatarDataBr(linhaRegistrar.vencimento).slice(0, 5)})`}
+          contexto={`competência ${descreverCompetencia(cardRegistrar.competencia, billRegistrar.recurrence)} · ${cardRegistrar.frase} (${formatarDataBr(cardRegistrar.vencimento).slice(0, 5)})`}
           notaValor={
-            linhaRegistrar.media != null
-              ? `estimativa pelo histórico: ~${formatBRL(linhaRegistrar.media)} — o valor exato nasce agora, no Lançamento`
+            cardRegistrar.media != null
+              ? `estimativa pelo histórico: ≈ ${formatBRL(cardRegistrar.media)} — o valor exato nasce agora, no Lançamento`
               : undefined
           }
           closeHref="/areas/financas/pagamentos-recorrentes"

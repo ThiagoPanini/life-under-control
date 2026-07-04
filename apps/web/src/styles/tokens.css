@@ -28,6 +28,8 @@
   /* Semânticos — estado, nunca decoração */
   --luc-success: #5fd0a0;
   --luc-warn: #e0a05f;
+  /* danger: só vencimento consumado e ação destrutiva; âmbar segue sendo atenção (issue #93). */
+  --luc-danger: #e0655f;
 
   /* Pessoas · autoria (nunca permissão) */
   --luc-thiago-fg: hsl(211 76% 74%);
