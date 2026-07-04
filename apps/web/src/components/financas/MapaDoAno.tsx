@@ -40,10 +40,6 @@ const META: Record<EstadoCelula, { rotulo: string; glifo: string; cor: string; t
   "fora-vigencia": { rotulo: "fora da vigência", glifo: "", cor: "text-luc-faint", tint: "" },
 }
 
-/** A dica da barra de detalhe quando nenhuma célula está ativa. */
-const DICA =
-  "Passe o cursor ou navegue pelas células para ver Conta, Competência, estado, valor e desvio."
-
 /** Ordem da legenda — os estados na sequência em que fazem sentido explicar. */
 const LEGENDA: EstadoCelula[] = [
   "abaixo",
@@ -77,19 +73,37 @@ const ICONE = (
   </span>
 )
 
+/** Uma célula ativa (hover/foco) com a âncora para posicionar o tooltip flutuante. */
+type Alvo = { chave: string; ancora: DOMRect }
+
 /**
  * Mapa do Ano (issue #102): a matriz Conta × Competência das doze Competências até
  * a atual, distinguindo valor realizado, expectativa, recorrência e **vigência**.
  * Cada Conta é uma linha; cada mês, uma célula derivada pelo use-case `derivarMapaAno`
- * (nada é recalculado aqui — ADR-0010). Contas encerradas aparecem enquanto a
- * vigência intercepta a janela. No celular a matriz rola na horizontal com a coluna
- * da Conta fixa (legível). O detalhe da célula ativa aparece numa barra **fora** do
- * container de scroll — assim nenhum tooltip flutuante é cortado pelo overflow.
+ * (nada é recalculado aqui — ADR-0010). Contas encerradas existem no derivado enquanto
+ * a vigência intercepta a janela, mas o **toggle** filtra a exibição (default: só ativas).
+ * No celular a matriz rola na horizontal com a coluna da Conta fixa (legível). O detalhe
+ * da célula ativa aparece num **tooltip `position: fixed`** — assim escapa o `overflow`
+ * do container de scroll sem ser cortado.
  */
 export function MapaDoAno({ mapa }: { mapa: Mapa }) {
-  const [focado, setFocado] = useState<string | null>(null)
-  const [emHover, setEmHover] = useState<string | null>(null)
-  const ativo = focado ?? emHover
+  // Foco (teclado) e hover ficam separados para o mouse não apagar o foco do teclado;
+  // `focado` vence. O alvo também guarda a âncora (retângulo da célula) do tooltip.
+  const [focado, setFocado] = useState<Alvo | null>(null)
+  const [emHover, setEmHover] = useState<Alvo | null>(null)
+  const alvo = focado ?? emHover
+  // Default: só Contas ativas. O toggle revela também as encerradas cuja vigência
+  // intercepta a janela (elas já existem no derivado — aqui só entram/saem da vista).
+  const [mostrarEncerradas, setMostrarEncerradas] = useState(false)
+
+  const linhasVisiveis =
+    mapa.estado === "com-contas"
+      ? mostrarEncerradas
+        ? mapa.linhas
+        : mapa.linhas.filter((l) => l.estado === "ativa")
+      : []
+
+  const detalhe = alvoParaDetalhe(mapa, alvo)
 
   return (
     <section aria-labelledby="mapa-ano-heading" className="flex flex-col gap-[18px]">
@@ -100,8 +114,7 @@ export function MapaDoAno({ mapa }: { mapa: Mapa }) {
           Conta × Competência
         </span>
         <span className="text-xs text-luc-muted">
-          Cada Conta ao longo dos últimos 12 meses, comparada à própria média (±5%). Vigência,
-          recorrência e fatos, sem confundir ausência com atraso.
+          Cada Conta ao longo dos últimos 12 meses, comparada à própria média (±5%).
         </span>
       </div>
 
@@ -112,98 +125,148 @@ export function MapaDoAno({ mapa }: { mapa: Mapa }) {
           </p>
         </div>
       ) : (
-        <Matriz mapa={mapa} ativo={ativo} setFocado={setFocado} setEmHover={setEmHover} />
+        <div className="flex flex-col gap-3">
+          <FiltroContas
+            mostrarEncerradas={mostrarEncerradas}
+            setMostrarEncerradas={setMostrarEncerradas}
+          />
+          <Legenda />
+          {linhasVisiveis.length === 0 ? (
+            <div className="rounded-luc-lg border border-luc-border bg-luc-surface-2 px-4 pt-[15px] pb-[13px]">
+              <p className="text-xs text-luc-text-3">
+                Nenhuma Conta ativa nos últimos 12 meses. Inclua as encerradas para ver o histórico.
+              </p>
+            </div>
+          ) : (
+            <Matriz
+              competencias={mapa.competencias}
+              linhas={linhasVisiveis}
+              alvo={alvo}
+              setFocado={setFocado}
+              setEmHover={setEmHover}
+            />
+          )}
+        </div>
       )}
+
+      {detalhe && alvo && <Tooltip ancora={alvo.ancora} nome={detalhe.nome} cel={detalhe.cel} />}
     </section>
   )
 }
 
+/** Resolve o alvo ativo (`billId|competencia`) para a linha e a célula que o tooltip descreve. */
+function alvoParaDetalhe(mapa: Mapa, alvo: Alvo | null): { nome: string; cel: CelulaMapa } | null {
+  if (!alvo || mapa.estado !== "com-contas") return null
+  const [billId, competencia] = alvo.chave.split("|")
+  const linha = mapa.linhas.find((l) => l.billId === billId)
+  const cel = linha?.celulas.find((c) => c.competencia === competencia)
+  if (!linha || !cel) return null
+  return { nome: linha.nome, cel }
+}
+
+/** Toggle no topo da camada: só Contas ativas (default) ou também as encerradas. */
+function FiltroContas({
+  mostrarEncerradas,
+  setMostrarEncerradas,
+}: {
+  mostrarEncerradas: boolean
+  setMostrarEncerradas: (v: boolean) => void
+}) {
+  const opcoes: { valor: boolean; rotulo: string }[] = [
+    { valor: false, rotulo: "Ativas" },
+    { valor: true, rotulo: "Ativas + encerradas" },
+  ]
+  return (
+    <div className="flex items-center justify-end">
+      <fieldset className="inline-flex items-center gap-0.5 rounded-luc-md border border-luc-border bg-luc-surface-2 p-0.5">
+        <legend className="sr-only">Filtrar Contas do mapa</legend>
+        {opcoes.map((op) => {
+          const selecionado = mostrarEncerradas === op.valor
+          return (
+            <button
+              key={op.rotulo}
+              type="button"
+              aria-pressed={selecionado}
+              onClick={() => setMostrarEncerradas(op.valor)}
+              className={`rounded-[6px] px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                selecionado
+                  ? "bg-luc-surface-3 text-luc-text"
+                  : "text-luc-text-3 hover:text-luc-text-2"
+              }`}
+            >
+              {op.rotulo}
+            </button>
+          )
+        })}
+      </fieldset>
+    </div>
+  )
+}
+
 function Matriz({
-  mapa,
-  ativo,
+  competencias,
+  linhas,
+  alvo,
   setFocado,
   setEmHover,
 }: {
-  mapa: Extract<Mapa, { estado: "com-contas" }>
-  ativo: string | null
-  setFocado: (v: string | null) => void
-  setEmHover: (v: string | null) => void
+  competencias: string[]
+  linhas: LinhaMapa[]
+  alvo: Alvo | null
+  setFocado: (v: Alvo | null) => void
+  setEmHover: (v: Alvo | null) => void
 }) {
-  // A frase da célula ativa (Conta · Competência · estado · valor · desvio), lida
-  // fora do scroll. `ativo` é `billId|competencia` — indexa direto a linha e a
-  // célula (sem achatar a matriz inteira a cada render). Nada ativo → uma dica.
-  let detalhe = DICA
-  if (ativo) {
-    const [billId, competencia] = ativo.split("|")
-    const linha = mapa.linhas.find((l) => l.billId === billId)
-    const cel = linha?.celulas.find((c) => c.competencia === competencia)
-    if (linha && cel) detalhe = descreverCelula(linha.nome, cel)
-  }
-
   return (
-    <div className="flex flex-col gap-3">
-      <div
-        role="status"
-        aria-live="polite"
-        className="min-h-[34px] rounded-luc-md border border-luc-border bg-luc-surface-2 px-3 py-2 text-xs text-luc-text-2"
-      >
-        {detalhe}
-      </div>
-
-      {/* Container do scroll horizontal (celular): a coluna da Conta fica fixa e legível. */}
-      <div className="overflow-x-auto rounded-luc-lg border border-luc-border bg-luc-surface-2">
-        <table className="w-full border-separate border-spacing-0 text-left">
-          <caption className="sr-only">
-            Mapa do Ano: cada Conta por Competência, com estado, valor e desvio da média.
-          </caption>
-          <thead>
-            <tr>
+    <div className="overflow-x-auto rounded-luc-lg border border-luc-border bg-luc-surface-2">
+      <table className="w-full border-separate border-spacing-0 text-left">
+        <caption className="sr-only">
+          Mapa do Ano: cada Conta por Competência, com estado, valor e desvio da média.
+        </caption>
+        <thead>
+          <tr>
+            <th
+              scope="col"
+              className="sticky left-0 z-10 bg-luc-surface-2 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.11em] text-luc-text-3"
+            >
+              Conta
+            </th>
+            {competencias.map((competencia) => (
               <th
+                key={competencia}
                 scope="col"
-                className="sticky left-0 z-10 bg-luc-surface-2 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.11em] text-luc-text-3"
+                className="whitespace-nowrap px-2 py-2 text-center font-mono text-[10px] font-medium text-luc-faint"
               >
-                Conta
+                {mesAno(competencia)}
               </th>
-              {mapa.competencias.map((competencia) => (
-                <th
-                  key={competencia}
-                  scope="col"
-                  className="whitespace-nowrap px-2 py-2 text-center font-mono text-[10px] font-medium text-luc-faint"
-                >
-                  {mesAno(competencia)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {mapa.linhas.map((linha) => (
-              <LinhaMatriz
-                key={linha.billId}
-                linha={linha}
-                ativo={ativo}
-                setFocado={setFocado}
-                setEmHover={setEmHover}
-              />
             ))}
-          </tbody>
-        </table>
-      </div>
-
-      <Legenda />
+          </tr>
+        </thead>
+        <tbody>
+          {linhas.map((linha) => (
+            <LinhaMatriz
+              key={linha.billId}
+              linha={linha}
+              alvo={alvo}
+              setFocado={setFocado}
+              setEmHover={setEmHover}
+            />
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
 
 function LinhaMatriz({
   linha,
-  ativo,
+  alvo,
   setFocado,
   setEmHover,
 }: {
   linha: LinhaMapa
-  ativo: string | null
-  setFocado: (v: string | null) => void
-  setEmHover: (v: string | null) => void
+  alvo: Alvo | null
+  setFocado: (v: Alvo | null) => void
+  setEmHover: (v: Alvo | null) => void
 }) {
   return (
     <tr className="border-luc-border border-t">
@@ -239,7 +302,7 @@ function LinhaMatriz({
           nome={linha.nome}
           billId={linha.billId}
           cel={cel}
-          ativo={ativo}
+          alvo={alvo}
           setFocado={setFocado}
           setEmHover={setEmHover}
         />
@@ -252,20 +315,20 @@ function CelulaMatriz({
   nome,
   billId,
   cel,
-  ativo,
+  alvo,
   setFocado,
   setEmHover,
 }: {
   nome: string
   billId: string
   cel: CelulaMapa
-  ativo: string | null
-  setFocado: (v: string | null) => void
-  setEmHover: (v: string | null) => void
+  alvo: Alvo | null
+  setFocado: (v: Alvo | null) => void
+  setEmHover: (v: Alvo | null) => void
 }) {
   const chave = `${billId}|${cel.competencia}`
   const meta = META[cel.estado]
-  const estaAtivo = ativo === chave
+  const estaAtivo = alvo?.chave === chave
   return (
     <td className="border-luc-border border-t px-1 py-1 text-center align-middle">
       <button
@@ -273,15 +336,53 @@ function CelulaMatriz({
         data-testid="mapa-celula"
         data-estado={cel.estado}
         aria-label={descreverCelula(nome, cel)}
-        onMouseEnter={() => setEmHover(chave)}
+        onMouseEnter={(e) => setEmHover({ chave, ancora: e.currentTarget.getBoundingClientRect() })}
         onMouseLeave={() => setEmHover(null)}
-        onFocus={() => setFocado(chave)}
+        onFocus={(e) => setFocado({ chave, ancora: e.currentTarget.getBoundingClientRect() })}
         onBlur={() => setFocado(null)}
         className={`flex h-9 w-full min-w-[40px] items-center justify-center rounded-luc-md text-[13px] leading-none outline-none transition-shadow ${meta.tint} ${meta.cor} ${estaAtivo ? "ring-2 ring-luc-accent" : ""}`}
       >
         <span aria-hidden>{meta.glifo}</span>
       </button>
     </td>
+  )
+}
+
+/**
+ * Tooltip flutuante da célula ativa — mesma linguagem visual da tooltip do gráfico
+ * "Total Pago por Mês" (superfície elevada + borda forte + sombra). `position: fixed`
+ * ancorado ao retângulo da célula, então **escapa o `overflow` do scroll** da matriz
+ * sem recorte. Não recebe ponteiro (`pointer-events-none`) para não roubar o hover.
+ */
+function Tooltip({ ancora, nome, cel }: { ancora: DOMRect; nome: string; cel: CelulaMapa }) {
+  const meta = META[cel.estado]
+  const desvio = descreverDesvio(cel.desvio)
+  return (
+    <div
+      role="tooltip"
+      style={{
+        position: "fixed",
+        left: ancora.left + ancora.width / 2,
+        top: ancora.top - 8,
+        transform: "translate(-50%, -100%)",
+      }}
+      className="pointer-events-none z-50 whitespace-nowrap rounded-luc-md border border-luc-border-strong bg-luc-surface-3 px-2.5 py-[7px] shadow-[0_12px_30px_rgba(0,0,0,.45)]"
+    >
+      <div className="text-[11px] font-bold text-luc-text">{nome}</div>
+      <div className="mt-px text-[10px] text-luc-text-3">
+        {descreverMesPorExtenso(cel.competencia)}
+      </div>
+      <div className={`mt-1 flex items-center gap-1 text-[11px] ${meta.cor}`}>
+        {meta.glifo && <span aria-hidden>{meta.glifo}</span>}
+        <span>{meta.rotulo}</span>
+      </div>
+      {cel.valor != null && (
+        <div className="mt-0.5 font-mono text-[13px] font-semibold text-luc-text">
+          {formatBRL(cel.valor)}
+        </div>
+      )}
+      {desvio != null && <div className="text-[10px] text-luc-muted">desvio {desvio}</div>}
+    </div>
   )
 }
 
