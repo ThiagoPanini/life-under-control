@@ -32,6 +32,9 @@ function fakeBillRepo(): BillRepo & { bills: Bill[] } {
     async encerrarBill() {
       throw new Error("não usado neste teste")
     },
+    async reativarBill() {
+      throw new Error("não usado neste teste")
+    },
     async contarDependentes() {
       return { lancamentos: 0, anexos: 0 }
     },

@@ -27,6 +27,12 @@ export type BillRepo = {
   editarBill(householdId: string, billId: string, dados: DadosBill): Promise<Bill | null>
   /** Encerra a Conta: grava `encerrada` + a data civil; `null` se não achou. */
   encerrarBill(householdId: string, billId: string, encerradaEm: string): Promise<Bill | null>
+  /**
+   * Reativa a Conta **encerrada**: volta a `ativa` e limpa `encerradaEm`, de forma
+   * atômica (espelha o `WHERE estado='encerrada'`). `null` se não achou, é de outro
+   * Lar ou já está ativa — o Desfazer repetido falha seguro (#1, #4).
+   */
+  reativarBill(householdId: string, billId: string): Promise<Bill | null>
   /** Conta os dependentes (Lançamentos/Anexos) que a exclusão levaria junto. */
   contarDependentes(householdId: string, billId: string): Promise<DependentesBill>
   /** Apaga a Conta e seus dependentes; devolve quantos foram, ou `null` se não achou. */

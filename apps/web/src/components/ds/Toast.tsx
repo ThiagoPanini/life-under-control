@@ -23,6 +23,7 @@ export function Toast({
   onDismiss,
   icone,
   comFechar = false,
+  acao,
 }: {
   mensagem: string
   duracaoMs?: number
@@ -31,24 +32,43 @@ export function Toast({
   icone?: ReactNode
   /** Mostra o botão de fechar, que dispensa o toast na hora chamando `onDismiss`. */
   comFechar?: boolean
+  /**
+   * Ação em linha do toast (ex.: "Desfazer" da exclusão, #99). Clicar aciona o
+   * callback e some na hora — **sem** `onDismiss`: a ação costuma navegar (a
+   * reativação já leva a URL limpa), então não se pode limpar o parâmetro por
+   * baixo dela.
+   */
+  acao?: { rotulo: string; aoAcionar: () => void }
 }) {
   const [visivel, setVisivel] = useState(true)
   const onDismissRef = useRef(onDismiss)
   onDismissRef.current = onDismiss
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    timerRef.current = setTimeout(() => {
       setVisivel(false)
       onDismissRef.current?.()
     }, duracaoMs)
-    return () => clearTimeout(timer)
+    return () => clearTimeout(timerRef.current)
   }, [duracaoMs])
 
   if (!visivel) return null
 
   function fechar() {
+    clearTimeout(timerRef.current)
     setVisivel(false)
     onDismissRef.current?.()
+  }
+
+  function acionar() {
+    // Cancela o auto-dismiss: sem isso, o timer ainda dispararia `onDismiss`
+    // (limpar a URL) depois, correndo com a navegação da própria ação — ex.: a
+    // reativação do Desfazer voltaria pro `?excluido=` limpo antes do redirect da
+    // action commitar, sumindo com a Conta reativada até um refresh (#99).
+    clearTimeout(timerRef.current)
+    acao?.aoAcionar()
+    setVisivel(false)
   }
 
   return (
@@ -62,6 +82,15 @@ export function Toast({
           {icone ?? <Info size={17} />}
         </span>
         <p>{mensagem}</p>
+        {acao && (
+          <button
+            type="button"
+            onClick={acionar}
+            className="ml-1 shrink-0 rounded-[7px] border border-luc-border-strong bg-white/[0.04] px-[9px] py-1 text-[12px] font-semibold text-luc-accent-bright transition-colors hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent"
+          >
+            {acao.rotulo}
+          </button>
+        )}
         {comFechar && (
           <button
             type="button"

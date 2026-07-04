@@ -18,6 +18,7 @@ function bloco(over: Partial<BlocoPanorama> = {}): BlocoPanorama {
     valor: { estado: "estimativa", media: 5000 },
     registrarHref: "/areas/financas/pagamentos-recorrentes/luz?registrar=1&competencia=2026-07",
     editarHref: "/areas/financas/pagamentos-recorrentes?editar=luz",
+    excluirHref: "/areas/financas/pagamentos-recorrentes?excluir=luz",
     ...over,
   }
 }
@@ -110,6 +111,40 @@ describe("PanoramaContas — editar pelo card (#97)", () => {
     )
     expect(screen.queryByRole("link", { name: "Registrar pagamento" })).not.toBeInTheDocument()
     expect(screen.getByRole("link", { name: "Editar Água" })).toBeInTheDocument()
+  })
+})
+
+describe("PanoramaContas — excluir pelo card (#99)", () => {
+  it("test_cada_card_expoe_excluir_com_nome_acessivel_foco_e_alvo_seguro", () => {
+    render(<PanoramaContas blocos={[bloco()]} />)
+    // nome acessível distinto (não confunde com Editar) e destino da confirmação
+    const excluir = screen.getByRole("link", { name: "Excluir Luz" })
+    expect(excluir).toHaveAttribute("href", "/areas/financas/pagamentos-recorrentes?excluir=luz")
+    // foco visível + alvo de toque seguro, no mesmo box 27px do protótipo
+    expect(excluir).toHaveClass("focus-visible:ring-2")
+    expect(excluir).toHaveClass("h-[27px]")
+    expect(excluir).toHaveClass("w-[27px]")
+    expect(excluir).toHaveClass("before:-inset-[5px]")
+  })
+
+  it("test_bloco_pago_ainda_pode_ser_excluido", () => {
+    // paga sai da operação como qualquer outra: o gesto de excluir segue presente
+    render(
+      <PanoramaContas
+        blocos={[
+          bloco({
+            billId: "agua",
+            nome: "Água",
+            estado: "pago",
+            frase: "pago em 02/07",
+            valor: { estado: "pago", total: 12345 },
+            registrarHref: null,
+            excluirHref: "/areas/financas/pagamentos-recorrentes?excluir=agua",
+          }),
+        ]}
+      />,
+    )
+    expect(screen.getByRole("link", { name: "Excluir Água" })).toBeInTheDocument()
   })
 })
 

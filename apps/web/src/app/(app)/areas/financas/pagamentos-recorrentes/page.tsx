@@ -5,15 +5,21 @@ import { drizzleBillRepo } from "@/adapters/db/bill-repo.drizzle"
 import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
 import { drizzlePaymentRepo } from "@/adapters/db/payment-repo.drizzle"
 import { r2AttachmentStore } from "@/adapters/r2/r2-attachment-store"
-import { criarLancamento, edicaoRapidaConta } from "@/app/(app)/areas/financas/actions"
+import {
+  criarLancamento,
+  edicaoRapidaConta,
+  excluirConta,
+} from "@/app/(app)/areas/financas/actions"
 import { auth } from "@/auth"
 import { Button } from "@/components/ds/Button"
 import { PageHeader } from "@/components/ds/PageHeader"
 import { SectionHeading } from "@/components/ds/SectionHeading"
 import { CenarioPagamentosMes } from "@/components/financas/CenarioPagamentosMes"
 import { ContaEditadaToast } from "@/components/financas/ContaEditadaToast"
+import { ContaExcluidaToast } from "@/components/financas/ContaExcluidaToast"
 import { EditarContaModal } from "@/components/financas/EditarContaModal"
 import { EncerradasSection } from "@/components/financas/EncerradasSection"
+import { ExcluirContaModal } from "@/components/financas/ExcluirContaModal"
 import { LancamentoRegistradoToast } from "@/components/financas/LancamentoRegistradoToast"
 import { LinhaConta } from "@/components/financas/LinhaConta"
 import { mensagemLancamentoRegistrado } from "@/components/financas/lancamento-toast"
@@ -62,14 +68,26 @@ export default async function FinancasPage({
     registrar?: string
     editar?: string
     editado?: string
+    excluir?: string
+    excluido?: string
     lancado?: string
     lancadoConta?: string
     valor?: string
     comprovantes?: string
   }>
 }) {
-  const { nova, registrar, editar, editado, lancado, lancadoConta, valor, comprovantes } =
-    await searchParams
+  const {
+    nova,
+    registrar,
+    editar,
+    editado,
+    excluir,
+    excluido,
+    lancado,
+    lancadoConta,
+    valor,
+    comprovantes,
+  } = await searchParams
   const { lar } = await getPainel(drizzleHouseholdRepo())
   const [bills, session] = await Promise.all([listBills(drizzleBillRepo(), lar.id), auth()])
   const ativas = bills.filter((b) => b.estado === "ativa")
@@ -136,6 +154,7 @@ export default async function FinancasPage({
             ? null
             : `/areas/financas/pagamentos-recorrentes?registrar=${bill.id}`,
         editarHref: `/areas/financas/pagamentos-recorrentes?editar=${bill.id}`,
+        excluirHref: `/areas/financas/pagamentos-recorrentes?excluir=${bill.id}`,
       },
     ]
   })
@@ -146,6 +165,14 @@ export default async function FinancasPage({
   const billEditar = editar ? billsPorId.get(editar) : undefined
   // Toast pós-edição rápida: `?editado=<id>` de uma Conta ativa conhecida.
   const billEditado = editado ? billsPorId.get(editado) : undefined
+
+  // Exclusão pelo card (#99): `?excluir=<id>` abre a confirmação compacta (a
+  // Conta ainda está ativa). Após confirmar, `?excluido=<id>` levanta o toast com
+  // Desfazer — a Conta já é `encerrada`, então o nome vem de `encerradas` (e não
+  // de `bills`): assim um Back do navegador pra `?excluido=<id>` DEPOIS do Desfazer,
+  // com a Conta já reativada, não ressuscita um toast enganoso de "Conta excluída".
+  const billExcluir = excluir ? billsPorId.get(excluir) : undefined
+  const billExcluido = excluido ? encerradas.find((b) => b.id === excluido) : undefined
 
   // Baixa direta do bloco (Final): modal compacto na própria página, com a
   // competência fixa da ocorrência vigente. Defaults iguais aos do detalhe —
@@ -194,6 +221,12 @@ export default async function FinancasPage({
         />
       )}
       {billEditado && <ContaEditadaToast mensagem={`Conta atualizada — ${billEditado.nome}`} />}
+      {billExcluido && (
+        <ContaExcluidaToast
+          mensagem={`Conta excluída — ${billExcluido.nome}`}
+          billId={billExcluido.id}
+        />
+      )}
       <div className="mx-auto flex max-w-[1120px] flex-col gap-[26px]">
         <PageHeader
           eyebrow={EYEBROW}
@@ -285,6 +318,14 @@ export default async function FinancasPage({
               billEditar.dueRule.kind === "dia-fixo" ? String(billEditar.dueRule.day) : "10",
           }}
           action={edicaoRapidaConta.bind(null, billEditar.id)}
+          closeHref="/areas/financas/pagamentos-recorrentes"
+        />
+      )}
+      {billExcluir && (
+        <ExcluirContaModal
+          key={`excluir-${billExcluir.id}`}
+          billName={billExcluir.nome}
+          action={excluirConta.bind(null, billExcluir.id)}
           closeHref="/areas/financas/pagamentos-recorrentes"
         />
       )}

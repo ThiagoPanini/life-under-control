@@ -35,6 +35,7 @@ function fakeBillRepo(): BillRepo & { gravadas: NovaBill[] } {
     obterBill: () => Promise.reject(new Error("não usado")),
     editarBill: () => Promise.reject(new Error("não usado")),
     encerrarBill: () => Promise.reject(new Error("não usado")),
+    reativarBill: () => Promise.reject(new Error("não usado")),
     contarDependentes: () => Promise.reject(new Error("não usado")),
     deletarBill: () => Promise.reject(new Error("não usado")),
     definirLogo: () => Promise.reject(new Error("não usado")),

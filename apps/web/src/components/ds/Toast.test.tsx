@@ -63,6 +63,64 @@ describe("Toast (Seam 2, #63)", () => {
     expect(screen.queryByRole("status")).toBeNull()
   })
 
+  it("test_com_acao_mostra_botao_e_aciona_dispensando", () => {
+    // toast de exclusão (#99): duração 4,2s + ação Desfazer. Clicar aciona o
+    // callback (a reativação) e some na hora — a navegação desmonta o toast;
+    // não chama onDismiss (a reativação já leva a URL limpa, sem `?excluido=`).
+    const aoAcionar = vi.fn()
+    const onDismiss = vi.fn()
+    render(
+      <Toast
+        mensagem="Conta excluída — Luz"
+        duracaoMs={4200}
+        onDismiss={onDismiss}
+        comFechar
+        acao={{ rotulo: "Desfazer", aoAcionar }}
+      />,
+    )
+    act(() => {
+      screen.getByRole("button", { name: "Desfazer" }).click()
+    })
+    expect(aoAcionar).toHaveBeenCalledOnce()
+    expect(onDismiss).not.toHaveBeenCalled()
+    expect(screen.queryByRole("status")).toBeNull()
+  })
+
+  it("test_acao_cancela_o_timer_e_nao_dispara_onDismiss_depois", () => {
+    // clicar em Desfazer some com o toast, mas o timer de auto-dismiss NÃO pode
+    // sobreviver: senão dispararia onDismiss (limpar a URL) mais tarde, correndo
+    // com a navegação da reativação e sumindo com a Conta reativada (#99).
+    const aoAcionar = vi.fn()
+    const onDismiss = vi.fn()
+    render(
+      <Toast
+        mensagem="Conta excluída — Luz"
+        duracaoMs={4200}
+        onDismiss={onDismiss}
+        acao={{ rotulo: "Desfazer", aoAcionar }}
+      />,
+    )
+    act(() => {
+      screen.getByRole("button", { name: "Desfazer" }).click()
+    })
+    act(() => vi.advanceTimersByTime(5000))
+    expect(aoAcionar).toHaveBeenCalledOnce()
+    expect(onDismiss).not.toHaveBeenCalled()
+  })
+
+  it("test_fechar_cancela_o_timer_e_nao_dispara_onDismiss_duas_vezes", () => {
+    // o X chama onDismiss na hora; o timer não pode dispará-lo de novo depois
+    const onDismiss = vi.fn()
+    render(
+      <Toast mensagem="Conta atualizada — Luz" duracaoMs={4000} onDismiss={onDismiss} comFechar />,
+    )
+    act(() => {
+      screen.getByRole("button", { name: "Fechar" }).click()
+    })
+    act(() => vi.advanceTimersByTime(5000))
+    expect(onDismiss).toHaveBeenCalledOnce()
+  })
+
   it("test_reidentidade_do_onDismiss_nao_reinicia_o_timer", () => {
     // um onDismiss inline (identidade nova a cada render do pai) não pode
     // reiniciar a contagem — senão um pai que re-renderiza por outro motivo

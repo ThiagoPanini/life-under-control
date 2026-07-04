@@ -1,4 +1,4 @@
-import { Pencil } from "lucide-react"
+import { Pencil, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ds/Button"
 import { BillLogoTile } from "@/components/financas/BillLogoTile"
@@ -18,6 +18,8 @@ export type BlocoPanorama = {
   registrarHref: string | null
   /** Href da edição rápida (o lápis do card): abre o modal compacto (`?editar=`). */
   editarHref: string
+  /** Href da exclusão (a lixeira do card): abre a confirmação de encerramento (`?excluir=`). */
+  excluirHref: string
 }
 
 /**
@@ -96,15 +98,28 @@ function BlocoConta({ bloco }: { bloco: BlocoPanorama }) {
         <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-luc-text">
           {bloco.nome}
         </span>
-        {/* Box de ação do protótipo (27×27 com borda) com alvo de toque expandido
-            (~37px) via pseudo-elemento — o AC de #97 pede alvo seguro. */}
-        <Link
-          href={bloco.editarHref}
-          aria-label={`Editar ${bloco.nome}`}
-          className="relative flex h-[27px] w-[27px] shrink-0 items-center justify-center rounded-[7px] border border-luc-border text-luc-text-3 transition-colors before:absolute before:-inset-[5px] before:content-[''] hover:border-luc-border-strong hover:bg-white/[0.05] hover:text-luc-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent"
-        >
-          <Pencil aria-hidden size={14} />
-        </Link>
+        {/* Boxes de ação do protótipo (27×27 com borda) com alvo de toque expandido
+            (~37px) via pseudo-elemento — o AC pede alvo seguro (#97/#99). O gap de
+            10px faz os dois alvos ladrilharem sem sobrepor (5px+5px de expansão),
+            senão um toque na fresta entre os ícones cairia no vizinho de DOM. */}
+        <div className="flex shrink-0 items-center gap-2.5">
+          <Link
+            href={bloco.editarHref}
+            aria-label={`Editar ${bloco.nome}`}
+            className="relative flex h-[27px] w-[27px] shrink-0 items-center justify-center rounded-[7px] border border-luc-border text-luc-text-3 transition-colors before:absolute before:-inset-[5px] before:content-[''] hover:border-luc-border-strong hover:bg-white/[0.05] hover:text-luc-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent"
+          >
+            <Pencil aria-hidden size={14} />
+          </Link>
+          {/* A lixeira abre a confirmação de encerramento reversível (#99): danger
+              só no hover (o gesto é destrutivo à leitura, não aos fatos). */}
+          <Link
+            href={bloco.excluirHref}
+            aria-label={`Excluir ${bloco.nome}`}
+            className="relative flex h-[27px] w-[27px] shrink-0 items-center justify-center rounded-[7px] border border-luc-border text-luc-text-3 transition-colors before:absolute before:-inset-[5px] before:content-[''] hover:border-luc-danger/60 hover:bg-luc-danger/[0.09] hover:text-luc-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent"
+          >
+            <Trash2 aria-hidden size={14} />
+          </Link>
+        </div>
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-2">

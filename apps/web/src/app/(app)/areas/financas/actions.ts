@@ -35,6 +35,7 @@ import {
   type DueRuleSimples,
   quickEditBill,
 } from "@/core/use-cases/quick-edit-bill"
+import { reativarBill } from "@/core/use-cases/reativar-bill"
 import { PaymentInvalidoError, recordPayment } from "@/core/use-cases/record-payment"
 import { registerAttachment } from "@/core/use-cases/register-attachment"
 import { removeAttachment } from "@/core/use-cases/remove-attachment"
@@ -193,6 +194,48 @@ export async function encerrarConta(
   } catch (e) {
     if (e instanceof EncerramentoInvalidoError)
       return { erro: "Informe uma data de encerramento válida." }
+    if (e instanceof BillNaoEncontradaError) redirect(ROTA_FINANCAS)
+    throw e
+  }
+
+  voltarParaFinancas()
+}
+
+/**
+ * Server action do gesto rápido "Excluir Conta" pela lixeira do card (#99).
+ * Encerramento **reversível**: grava `encerrada` na data de hoje (Clock — o card
+ * não tem input de data), a Conta sai do panorama e cessa a projeção, mas
+ * Lançamentos/Anexos/logo permanecem (nada de destrutivo aqui — isso é da zona de
+ * risco). Redireciona com `?excluido=` para a lista levantar o toast com Desfazer.
+ * Conta já ausente/encerrada apenas volta à lista.
+ */
+export async function excluirConta(billId: string): Promise<void> {
+  const { lar } = await getPainel(drizzleHouseholdRepo())
+
+  try {
+    await encerrarBill(drizzleBillRepo(), lar.id, billId, systemClock().hoje())
+  } catch (e) {
+    if (e instanceof BillNaoEncontradaError) redirect(ROTA_FINANCAS)
+    throw e
+  }
+
+  revalidatePath(ROTA_FINANCAS)
+  redirect(`${ROTA_FINANCAS}?excluido=${billId}`)
+}
+
+/**
+ * Server action do Desfazer do toast de exclusão (#99). Reativa a Conta
+ * encerrada de forma atômica: volta a `ativa`, limpa a data e ela reaparece no
+ * panorama, sem tocar nenhum fato. Um Desfazer repetido — ou de outro Lar — não
+ * acha Conta encerrada e cai seguro na lista (`BillNaoEncontradaError`), nunca
+ * "des-desfaz".
+ */
+export async function reativarConta(billId: string): Promise<void> {
+  const { lar } = await getPainel(drizzleHouseholdRepo())
+
+  try {
+    await reativarBill(drizzleBillRepo(), lar.id, billId)
+  } catch (e) {
     if (e instanceof BillNaoEncontradaError) redirect(ROTA_FINANCAS)
     throw e
   }

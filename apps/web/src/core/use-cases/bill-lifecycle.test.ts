@@ -7,6 +7,7 @@ import { deleteBill, resumoDeExclusao } from "./delete-bill"
 import { BillNaoEncontradaError, editBill } from "./edit-bill"
 import { EncerramentoInvalidoError, encerrarBill } from "./encerrar-bill"
 import { quickEditBill } from "./quick-edit-bill"
+import { reativarBill } from "./reativar-bill"
 
 /**
  * Seam 1: o ciclo de vida da Conta (editar · encerrar · deletar) contra um fake
@@ -52,6 +53,15 @@ function fakeBillRepo(opts: { dependentes?: DependentesBill } = {}): BillRepo & 
       if (bill?.estado !== "ativa") return null
       bill.estado = "encerrada"
       bill.encerradaEm = encerradaEm
+      return bill
+    },
+    async reativarBill(householdId, billId) {
+      const bill = achar(householdId, billId)
+      // Só reativa quem está encerrada (espelha o WHERE estado='encerrada'): o
+      // Desfazer repetido não acha alvo encerrado e falha seguro, sem "des-desfazer".
+      if (bill?.estado !== "encerrada") return null
+      bill.estado = "ativa"
+      bill.encerradaEm = null
       return bill
     },
     async contarDependentes(householdId, billId) {
@@ -181,6 +191,64 @@ describe("encerrarBill (Seam 1)", () => {
       BillNaoEncontradaError,
     )
     expect(repo.bills[0]?.encerradaEm).toBe("2026-06-29")
+  })
+})
+
+describe("reativarBill (Seam 1)", () => {
+  /** Semeia uma Conta já encerrada no Lar `h-1` (o estado de onde o Desfazer parte). */
+  async function comContaEncerrada() {
+    const { repo, bill } = await comUmaConta({ dependentes: { lancamentos: 4, anexos: 2 } })
+    await encerrarBill(repo, "h-1", bill.id, "2026-06-29")
+    return { repo, bill }
+  }
+
+  it("test_reativar_volta_a_ativa_e_limpa_a_data", async () => {
+    const { repo, bill } = await comContaEncerrada()
+
+    const reativada = await reativarBill(repo, "h-1", bill.id)
+
+    // reativação atômica: volta a ativa e some a data (encerrada→ativa num passo)
+    expect(reativada.estado).toBe("ativa")
+    expect(reativada.encerradaEm).toBeNull()
+    // mesma Conta, nunca uma nova
+    expect(reativada.id).toBe(bill.id)
+    expect(repo.bills).toHaveLength(1)
+  })
+
+  it("test_reativar_preserva_os_dependentes", async () => {
+    const { repo, bill } = await comContaEncerrada()
+
+    // Desfazer é não-destrutivo: reativar não toca Lançamentos/Anexos (#4)
+    await reativarBill(repo, "h-1", bill.id)
+
+    expect(await repo.contarDependentes("h-1", bill.id)).toEqual({ lancamentos: 4, anexos: 2 })
+  })
+
+  it("test_dupla_reativacao_lanca_nao_encontrada", async () => {
+    // o toast de Desfazer some após 4,2s, mas um clique duplo / form obsoleto não
+    // pode reativar uma Conta que já voltou a ativa — o 2º Desfazer falha seguro
+    const { repo, bill } = await comContaEncerrada()
+    await reativarBill(repo, "h-1", bill.id)
+
+    await expect(reativarBill(repo, "h-1", bill.id)).rejects.toBeInstanceOf(BillNaoEncontradaError)
+    expect(repo.bills[0]?.estado).toBe("ativa")
+  })
+
+  it("test_reativar_conta_ativa_lanca_nao_encontrada", async () => {
+    // Conta nunca encerrada não tem o que desfazer (só reativa quem está encerrada)
+    const { repo, bill } = await comUmaConta()
+    await expect(reativarBill(repo, "h-1", bill.id)).rejects.toBeInstanceOf(BillNaoEncontradaError)
+  })
+
+  it("test_reativar_conta_inexistente_lanca_nao_encontrada", async () => {
+    const { repo } = await comContaEncerrada()
+    await expect(reativarBill(repo, "h-1", "sumida")).rejects.toBeInstanceOf(BillNaoEncontradaError)
+  })
+
+  it("test_reativar_conta_de_outro_lar_lanca_nao_encontrada", async () => {
+    // escopo por Lar: o Desfazer de outro Lar não enxerga a Conta (#1)
+    const { repo, bill } = await comContaEncerrada()
+    await expect(reativarBill(repo, "h-2", bill.id)).rejects.toBeInstanceOf(BillNaoEncontradaError)
   })
 })
 

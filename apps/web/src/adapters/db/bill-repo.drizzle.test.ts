@@ -190,6 +190,46 @@ suite("drizzleBillRepo (Seam 2 — Postgres real)", () => {
     expect(relida?.encerradaEm).toBe("2026-06-29")
   })
 
+  it("test_reativar_volta_a_ativa_e_limpa_a_data", async () => {
+    const repo = drizzleBillRepo(db)
+    const criada = await repo.criarBill(nova(larId, { nome: "Streaming", icon: "tv" }))
+    await repo.encerrarBill(larId, criada.id, "2026-06-29")
+
+    const reativada = await repo.reativarBill(larId, criada.id)
+
+    expect(reativada?.estado).toBe("ativa")
+    expect(reativada?.encerradaEm).toBeNull()
+    // relida do banco: o UPDATE limpou a data junto (o check estado⇔data passou)
+    const relida = await repo.obterBill(larId, criada.id)
+    expect(relida?.estado).toBe("ativa")
+    expect(relida?.encerradaEm).toBeNull()
+  })
+
+  it("test_reativar_conta_ativa_devolve_null", async () => {
+    const repo = drizzleBillRepo(db)
+    const criada = await repo.criarBill(nova(larId, { nome: "Jornal", icon: "receipt" }))
+
+    // nunca encerrada: não há linha 'encerrada' (WHERE estado='encerrada') → null
+    const reativada = await repo.reativarBill(larId, criada.id)
+
+    expect(reativada).toBeNull()
+    const relida = await repo.obterBill(larId, criada.id)
+    expect(relida?.estado).toBe("ativa")
+  })
+
+  it("test_reativar_de_outro_lar_devolve_null", async () => {
+    const repo = drizzleBillRepo(db)
+    const criada = await repo.criarBill(nova(larId, { nome: "Academia", icon: "dumbbell" }))
+    await repo.encerrarBill(larId, criada.id, "2026-06-29")
+
+    // escopo por Lar: outro Lar não enxerga a Conta encerrada → null (#1)
+    const reativada = await repo.reativarBill("00000000-0000-0000-0000-000000000000", criada.id)
+
+    expect(reativada).toBeNull()
+    const relida = await repo.obterBill(larId, criada.id)
+    expect(relida?.estado).toBe("encerrada")
+  })
+
   it("test_contar_dependentes_zero_sem_lancamentos", async () => {
     const repo = drizzleBillRepo(db)
     const criada = await repo.criarBill(nova(larId, { nome: "Seguro", icon: "shield" }))

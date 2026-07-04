@@ -153,6 +153,25 @@ export function drizzleBillRepo(db: Db = getDb()): BillRepo {
       return row ? paraDominio(row) : null
     },
 
+    async reativarBill(householdId: string, billId: string): Promise<Bill | null> {
+      // `estado = 'encerrada'` no WHERE torna o Desfazer atômico: só reativa quem
+      // está encerrada e, no mesmo UPDATE, limpa `encerradaEm` (o check
+      // `bills_encerramento_check` exige encerrada ⇔ data preenchida). Um Desfazer
+      // repetido não acha linha encerrada e devolve null — falha seguro (#99, #1).
+      const [row] = await db
+        .update(bills)
+        .set({ estado: "ativa", encerradaEm: null })
+        .where(
+          and(
+            eq(bills.householdId, householdId),
+            eq(bills.id, billId),
+            eq(bills.estado, "encerrada"),
+          ),
+        )
+        .returning()
+      return row ? paraDominio(row) : null
+    },
+
     async contarDependentes(householdId: string, billId: string): Promise<DependentesBill> {
       return contarDependentesDe(db, householdId, billId)
     },
