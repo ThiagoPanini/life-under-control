@@ -5,12 +5,14 @@ import { drizzleBillRepo } from "@/adapters/db/bill-repo.drizzle"
 import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
 import { drizzlePaymentRepo } from "@/adapters/db/payment-repo.drizzle"
 import { r2AttachmentStore } from "@/adapters/r2/r2-attachment-store"
-import { criarLancamento } from "@/app/(app)/areas/financas/actions"
+import { criarLancamento, edicaoRapidaConta } from "@/app/(app)/areas/financas/actions"
 import { auth } from "@/auth"
 import { Button } from "@/components/ds/Button"
 import { PageHeader } from "@/components/ds/PageHeader"
 import { SectionHeading } from "@/components/ds/SectionHeading"
 import { CenarioPagamentosMes } from "@/components/financas/CenarioPagamentosMes"
+import { ContaEditadaToast } from "@/components/financas/ContaEditadaToast"
+import { EditarContaModal } from "@/components/financas/EditarContaModal"
 import { EncerradasSection } from "@/components/financas/EncerradasSection"
 import { LancamentoRegistradoToast } from "@/components/financas/LancamentoRegistradoToast"
 import { LinhaConta } from "@/components/financas/LinhaConta"
@@ -56,11 +58,13 @@ export default async function FinancasPage({
   searchParams: Promise<{
     nova?: string
     registrar?: string
+    editar?: string
+    editado?: string
     lancado?: string
     lancadoConta?: string
   }>
 }) {
-  const { nova, registrar, lancado, lancadoConta } = await searchParams
+  const { nova, registrar, editar, editado, lancado, lancadoConta } = await searchParams
   const { lar } = await getPainel(drizzleHouseholdRepo())
   const [bills, session] = await Promise.all([listBills(drizzleBillRepo(), lar.id), auth()])
   const ativas = bills.filter((b) => b.estado === "ativa")
@@ -122,9 +126,17 @@ export default async function FinancasPage({
           card.estado === "pago"
             ? null
             : `/areas/financas/pagamentos-recorrentes?registrar=${bill.id}`,
+        editarHref: `/areas/financas/pagamentos-recorrentes?editar=${bill.id}`,
       },
     ]
   })
+
+  // Edição rápida pelo card (#97): o lápis abre `?editar=<id>` num modal
+  // compacto, preenchido com o estado atual da Conta (nome · ícone · vencimento
+  // simples · logo). A regra completa segue na página de edição.
+  const billEditar = editar ? billsPorId.get(editar) : undefined
+  // Toast pós-edição rápida: `?editado=<id>` de uma Conta ativa conhecida.
+  const billEditado = editado ? billsPorId.get(editado) : undefined
 
   // Baixa direta do bloco (Final): modal compacto na própria página, com a
   // competência fixa da ocorrência vigente. Defaults iguais aos do detalhe —
@@ -164,6 +176,7 @@ export default async function FinancasPage({
           mensagem={`Lançamento registrado — ${billLancado.nome} · ${descreverCompetencia(lancadoValido, billLancado.recurrence)}`}
         />
       )}
+      {billEditado && <ContaEditadaToast mensagem={`Conta atualizada — ${billEditado.nome}`} />}
       <div className="mx-auto flex max-w-[1120px] flex-col gap-[26px]">
         <PageHeader
           eyebrow={EYEBROW}
@@ -239,6 +252,24 @@ export default async function FinancasPage({
         {MOSTRAR_ENCERRADAS && <EncerradasSection bills={encerradas} logoUrls={logoUrls} />}
       </div>
       {nova === "1" && <NovaContaModal closeHref="/areas/financas/pagamentos-recorrentes" />}
+      {billEditar && (
+        <EditarContaModal
+          key={`editar-${billEditar.id}`}
+          billId={billEditar.id}
+          billName={billEditar.nome}
+          billIcon={billEditar.icon}
+          logoUrl={logoUrls.get(billEditar.id) ?? null}
+          inicial={{
+            nome: billEditar.nome,
+            icon: billEditar.icon,
+            dueRuleKind: billEditar.dueRule.kind,
+            dueRuleDay:
+              billEditar.dueRule.kind === "dia-fixo" ? String(billEditar.dueRule.day) : "10",
+          }}
+          action={edicaoRapidaConta.bind(null, billEditar.id)}
+          closeHref="/areas/financas/pagamentos-recorrentes"
+        />
+      )}
       {billRegistrar && cardRegistrar && (
         <RegistrarPagamentoModal
           key={`registro-${billRegistrar.id}-${lancamentosRegistrar.length}`}

@@ -1,3 +1,5 @@
+import { Pencil } from "lucide-react"
+import Link from "next/link"
 import { Button } from "@/components/ds/Button"
 import { Pill, type PillTone } from "@/components/ds/Pill"
 import { BillLogoTile } from "@/components/financas/BillLogoTile"
@@ -15,6 +17,8 @@ export type BlocoPanorama = {
   valor: ValorCard
   /** Href da baixa já preenchida; `null` quando paga (não há o que registrar). */
   registrarHref: string | null
+  /** Href da edição rápida (o lápis do card): abre o modal compacto (`?editar=`). */
+  editarHref: string
 }
 
 /**
@@ -86,6 +90,13 @@ function BlocoConta({ bloco }: { bloco: BlocoPanorama }) {
         <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-luc-text">
           {bloco.nome}
         </span>
+        <Link
+          href={bloco.editarHref}
+          aria-label={`Editar ${bloco.nome}`}
+          className="-mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-luc-md text-luc-text-3 transition-colors hover:bg-luc-surface-3 hover:text-luc-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent"
+        >
+          <Pencil aria-hidden size={14} />
+        </Link>
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-2">

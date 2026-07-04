@@ -17,6 +17,7 @@ function bloco(over: Partial<BlocoPanorama> = {}): BlocoPanorama {
     frase: "vence em 2 dias",
     valor: { estado: "estimativa", media: 5000 },
     registrarHref: "/areas/financas/pagamentos-recorrentes/luz?registrar=1&competencia=2026-07",
+    editarHref: "/areas/financas/pagamentos-recorrentes?editar=luz",
     ...over,
   }
 }
@@ -73,6 +74,40 @@ describe("PanoramaContas (Seam 2)", () => {
   it("test_sem_ocorrencias_no_mes_mensagem_honesta", () => {
     render(<PanoramaContas blocos={[]} />)
     expect(screen.getByText("Nenhuma Conta com ocorrência neste mês.")).toBeInTheDocument()
+  })
+})
+
+describe("PanoramaContas — editar pelo card (#97)", () => {
+  it("test_cada_card_expoe_editar_com_nome_acessivel_foco_e_alvo_seguro", () => {
+    render(<PanoramaContas blocos={[bloco()]} />)
+    // nome acessível (não só um ícone mudo) e destino da edição rápida
+    const editar = screen.getByRole("link", { name: "Editar Luz" })
+    expect(editar).toHaveAttribute("href", "/areas/financas/pagamentos-recorrentes?editar=luz")
+    // foco visível + alvo de toque seguro (36px)
+    expect(editar).toHaveClass("focus-visible:ring-2")
+    expect(editar).toHaveClass("h-9")
+    expect(editar).toHaveClass("w-9")
+  })
+
+  it("test_bloco_pago_ainda_pode_ser_editado", () => {
+    // paga não tem baixa a registrar, mas segue editável (nome, ícone, vencimento)
+    render(
+      <PanoramaContas
+        blocos={[
+          bloco({
+            billId: "agua",
+            nome: "Água",
+            estado: "pago",
+            frase: "pago em 02/07",
+            valor: { estado: "pago", total: 12345 },
+            registrarHref: null,
+            editarHref: "/areas/financas/pagamentos-recorrentes?editar=agua",
+          }),
+        ]}
+      />,
+    )
+    expect(screen.queryByRole("link", { name: "Registrar pagamento" })).not.toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Editar Água" })).toBeInTheDocument()
   })
 })
 

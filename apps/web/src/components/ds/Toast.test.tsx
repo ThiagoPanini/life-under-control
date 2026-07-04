@@ -41,6 +41,28 @@ describe("Toast (Seam 2, #63)", () => {
     expect(onDismiss).toHaveBeenCalledOnce()
   })
 
+  it("test_com_icone_e_fechar_dispensa_na_hora_chamando_onDismiss", () => {
+    // toast de confirmação (#97): ícone antes da mensagem + botão de fechar que
+    // dispensa antes do timer, chamando o mesmo onDismiss (ex.: limpar a URL).
+    const onDismiss = vi.fn()
+    render(
+      <Toast
+        mensagem="Conta atualizada — Luz"
+        duracaoMs={4000}
+        onDismiss={onDismiss}
+        icone={<svg aria-hidden role="img" />}
+        comFechar
+      />,
+    )
+    const status = screen.getByRole("status")
+    expect(status.querySelector("svg")).toBeInTheDocument()
+    act(() => {
+      screen.getByRole("button", { name: "Fechar" }).click()
+    })
+    expect(onDismiss).toHaveBeenCalledOnce()
+    expect(screen.queryByRole("status")).toBeNull()
+  })
+
   it("test_reidentidade_do_onDismiss_nao_reinicia_o_timer", () => {
     // um onDismiss inline (identidade nova a cada render do pai) não pode
     // reiniciar a contagem — senão um pai que re-renderiza por outro motivo

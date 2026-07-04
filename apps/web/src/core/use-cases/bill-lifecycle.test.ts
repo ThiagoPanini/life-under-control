@@ -6,6 +6,7 @@ import { BillInvalidaError } from "./create-bill"
 import { deleteBill, resumoDeExclusao } from "./delete-bill"
 import { BillNaoEncontradaError, editBill } from "./edit-bill"
 import { EncerramentoInvalidoError, encerrarBill } from "./encerrar-bill"
+import { quickEditBill } from "./quick-edit-bill"
 
 /**
  * Seam 1: o ciclo de vida da Conta (editar · encerrar · deletar) contra um fake
@@ -231,5 +232,99 @@ describe("deleteBill + resumoDeExclusao (Seam 1)", () => {
     await deleteBill(repo, store, "h-1", bill.id)
 
     expect(store.chaves()).toEqual(["finance/bills/h-1/outra-conta/up-1"])
+  })
+})
+
+/** Uma Conta com regra avançada: âncora anual, n-ésimo dia útil e deslocamento de mês. */
+const DADOS_AVANCADA: DadosBill = {
+  nome: "Condomínio",
+  descricao: "bloco B",
+  icon: "building-2",
+  recurrence: { intervalMonths: 12, anchorMonth: 1 },
+  dueRule: { kind: "n-esimo-dia-util", nth: 5 },
+  dueMonthOffset: 1,
+}
+
+/** Semeia uma Conta com regra avançada no Lar `h-1` e devolve repo + a Conta. */
+async function comContaAvancada() {
+  const repo = fakeBillRepo()
+  const bill = await repo.criarBill({ householdId: "h-1", ...DADOS_AVANCADA })
+  return { repo, bill }
+}
+
+describe("quickEditBill (Seam 1)", () => {
+  it("test_edicao_rapida_altera_nome_icone_e_vencimento", async () => {
+    const { repo, bill } = await comUmaConta()
+
+    const editada = await quickEditBill(repo, "h-1", bill.id, {
+      nome: "Net Fibra",
+      icon: "tv",
+      dueRule: { kind: "dia-fixo", day: 5 },
+    })
+
+    expect(editada.nome).toBe("Net Fibra")
+    expect(editada.icon).toBe("tv")
+    expect(editada.dueRule).toEqual({ kind: "dia-fixo", day: 5 })
+    // mesma Conta, nunca uma nova
+    expect(editada.id).toBe(bill.id)
+    expect(repo.bills).toHaveLength(1)
+  })
+
+  it("test_edicao_rapida_preserva_campos_avancados", async () => {
+    const { repo, bill } = await comContaAvancada()
+
+    // edição rápida sem tocar o vencimento: a regra avançada segue intacta
+    const editada = await quickEditBill(repo, "h-1", bill.id, {
+      nome: "Condomínio Torre B",
+      icon: "home",
+    })
+
+    expect(editada.nome).toBe("Condomínio Torre B")
+    expect(editada.icon).toBe("home")
+    // byte a byte: descrição, frequência, âncora, n-ésimo dia útil e deslocamento
+    expect(editada.descricao).toBe("bloco B")
+    expect(editada.recurrence).toEqual({ intervalMonths: 12, anchorMonth: 1 })
+    expect(editada.dueRule).toEqual({ kind: "n-esimo-dia-util", nth: 5 })
+    expect(editada.dueMonthOffset).toBe(1)
+  })
+
+  it("test_ultimo_dia_util_troca_a_regra_sem_perder_o_avancado", async () => {
+    const { repo, bill } = await comContaAvancada()
+
+    const editada = await quickEditBill(repo, "h-1", bill.id, {
+      nome: "Condomínio",
+      icon: "building-2",
+      dueRule: { kind: "ultimo-dia-util" },
+    })
+
+    expect(editada.dueRule).toEqual({ kind: "ultimo-dia-util" })
+    // o deslocamento e a periodicidade avançados sobrevivem à troca do vencimento
+    expect(editada.dueMonthOffset).toBe(1)
+    expect(editada.recurrence).toEqual({ intervalMonths: 12, anchorMonth: 1 })
+  })
+
+  it("test_nome_vazio_lanca_e_nao_persiste", async () => {
+    const { repo } = await comUmaConta()
+
+    await expect(
+      quickEditBill(repo, "h-1", repo.bills[0]?.id ?? "", { nome: "  ", icon: "wifi" }),
+    ).rejects.toBeInstanceOf(BillInvalidaError)
+    // a Conta segue com o nome original
+    expect(repo.bills[0]?.nome).toBe("Internet")
+  })
+
+  it("test_edicao_rapida_conta_inexistente_lanca_nao_encontrada", async () => {
+    const { repo } = await comUmaConta()
+    await expect(
+      quickEditBill(repo, "h-1", "sumida", { nome: "x", icon: "wifi" }),
+    ).rejects.toBeInstanceOf(BillNaoEncontradaError)
+  })
+
+  it("test_edicao_rapida_conta_de_outro_lar_lanca_nao_encontrada", async () => {
+    // escopo por Lar: a Conta existe, mas não para h-2 (acesso é do Lar dono, #1)
+    const { repo, bill } = await comUmaConta()
+    await expect(
+      quickEditBill(repo, "h-2", bill.id, { nome: "x", icon: "wifi" }),
+    ).rejects.toBeInstanceOf(BillNaoEncontradaError)
   })
 })
