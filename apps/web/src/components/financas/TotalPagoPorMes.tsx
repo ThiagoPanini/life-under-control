@@ -7,6 +7,8 @@ import { SectionHeading } from "@/components/ds/SectionHeading"
 import { mesAno, mesCurto } from "@/core/domain/bill"
 import { formatBRL } from "@/core/domain/money"
 import type { PontoTotalPagoMes, SerieHistorica } from "@/core/use-cases/derive-analise-historica"
+import type { DestaquesMes as Destaques } from "@/core/use-cases/derive-destaques-mes"
+import { DestaquesMes } from "./DestaquesMes"
 
 const WIDTH = 640
 const HEIGHT = 190
@@ -46,7 +48,13 @@ const ICONE = (
  * some: sem fatos na janela, mostra a limitação por extenso. Consome a série
  * pronta do use-case — nada de domínio é recalculado aqui (ADR-0010).
  */
-export function TotalPagoPorMes({ serie }: { serie: SerieHistorica }) {
+export function TotalPagoPorMes({
+  serie,
+  destaques,
+}: {
+  serie: SerieHistorica
+  destaques?: Destaques
+}) {
   return (
     <section aria-labelledby="historico-heading" className="flex flex-col gap-[18px]">
       <SectionHeading
@@ -68,7 +76,10 @@ export function TotalPagoPorMes({ serie }: { serie: SerieHistorica }) {
           <p className="text-xs text-luc-text-3">Sem Lançamentos na janela de 12 meses ainda.</p>
         </div>
       ) : (
-        <GraficoTotalPago pontos={serie.pontos} />
+        <>
+          <GraficoTotalPago pontos={serie.pontos} />
+          {destaques && <DestaquesMes destaques={destaques} />}
+        </>
       )}
     </section>
   )

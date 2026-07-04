@@ -26,6 +26,7 @@ import { centavosParaCampo, formatBRL } from "@/core/domain/money"
 import { descreverCompetencia, ehCompetenciaValida } from "@/core/domain/payment"
 import { derivarAnaliseHistorica } from "@/core/use-cases/derive-analise-historica"
 import { derivarCenarioMes } from "@/core/use-cases/derive-cenario-mes"
+import { derivarDestaquesMes } from "@/core/use-cases/derive-destaques-mes"
 import { listarPendenciasAnteriores } from "@/core/use-cases/derive-forma-competencia"
 import { derivarLinhasContas } from "@/core/use-cases/derive-linha-conta"
 import { derivarPanoramaMensal } from "@/core/use-cases/derive-panorama-mensal"
@@ -80,6 +81,10 @@ export default async function FinancasPage({
   // aritmética de mês civil (só Clock, sem Calendar). Vive mesmo sem Conta ativa,
   // desde que haja fato na janela.
   const serieHistorica = derivarAnaliseHistorica(systemClock(), pagamentos)
+  // Destaques do último mês fechado (#101): maior alta/queda por Conta e maior
+  // Lançamento individual. Deriva de `bills` (inclui encerradas, para resolver o
+  // nome) e do mesmo array de Lançamentos — sem query nova.
+  const destaques = derivarDestaquesMes(systemClock(), bills, pagamentos)
   const pendenciasAnteriores = listarPendenciasAnteriores(
     nationalBankCalendar(),
     ativas,
@@ -207,7 +212,7 @@ export default async function FinancasPage({
         )}
 
         {/* Análise Histórica (#98): fora do gate `ativas>0` — a série vive só de fatos na janela. */}
-        <TotalPagoPorMes serie={serieHistorica} />
+        <TotalPagoPorMes serie={serieHistorica} destaques={destaques} />
 
         {MOSTRAR_CONTAS_ATIVAS && (
           <section aria-labelledby="contas-ativas-heading" className="flex flex-col gap-5">
