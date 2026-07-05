@@ -8,6 +8,8 @@
  * #21): a planilha não guarda o dia de vencimento, só competência/valor/status.
  */
 
+import type { LinhaPlanilha } from "@/core/domain/backfill"
+
 /** O Lar "Casa Panini" (seed). */
 export const HOUSEHOLD = "00000000-0000-0000-0000-000000000001"
 /** Thiago (seed). */
@@ -18,6 +20,20 @@ export const JAKELINE = "00000000-0000-0000-0000-00000000000b"
 /** A raiz dos comprovantes no disco do operador (sobrescreve via env `RECIBOS_ROOT`). */
 export const RECIBOS_ROOT_DEFAULT =
   "/mnt/c/Users/panin/OneDrive/docs/ap/compra/apto-ideale-demarchi/7.pagamentos-recorrentes"
+
+/**
+ * Marcador da guarda anti-double-shift (#124) na raiz de comprovantes: presente,
+ * os nomes já são a competência-verdade e a leitura NÃO traduz pelo offset legado.
+ * A raiz do OneDrive nunca o terá (originais intocados, nomes defasados).
+ */
+export const MARCADOR_CORRECAO = ".competencia-corrigida.json"
+
+/**
+ * Marcador do `.backfill/` corrigido (#124): presente, controle.json e recibos já
+ * estão na competência-verdade — e, por tabela, o prod também (a correção grava as
+ * camadas na mesma passada).
+ */
+export const MARCADOR_BACKFILL = "correcao-aplicada.json"
 
 /** Uma Conta do catálogo: como cadastrá-la e o que a alimenta. */
 export type ContaCatalogo = {
@@ -35,6 +51,15 @@ export type ContaCatalogo = {
   paidBy: string
   /** A pasta de comprovantes que alimenta esta Conta; `null` quando não há recibos. */
   dirSlug: string | null
+  /**
+   * Defasagem **permanente** de nomenclatura da raiz legada (#124): o nome do
+   * arquivo gravou historicamente a competência −N (Competência = mês do
+   * vencimento — decisão de 04/07/2026). Os originais no OneDrive ficam
+   * intocados para sempre; toda leitura da raiz legada traduz nome→competência
+   * somando este offset. Raiz corrigida (marcador `.competencia-corrigida.json`
+   * presente) lê sem tradução — guarda anti-double-shift. Ausente = 0.
+   */
+  offsetNomeLegado?: number
 }
 
 /**
@@ -51,6 +76,9 @@ export const CATALOGO: ContaCatalogo[] = [
     dueMonthOffset: 1,
     paidBy: THIAGO,
     dirSlug: "condominio",
+    // Confirmado pela assinatura de timing (28/33 pagamentos no mês seguinte ao do
+    // nome): o boleto de julho sempre foi salvo como junho. Nome + 1 = competência.
+    offsetNomeLegado: 1,
   },
   {
     label: "Luz",
@@ -69,6 +97,8 @@ export const CATALOGO: ContaCatalogo[] = [
     dueMonthOffset: 0,
     paidBy: THIAGO,
     dirSlug: "gas",
+    // Suspeita de defasagem (16/29 pagamentos no mês seguinte) — o Gate 1 da #125
+    // decide pelo vencimento impresso; se shiftar, o offset legado entra aqui.
   },
   {
     label: "Internet",
@@ -142,6 +172,20 @@ export const CATALOGO: ContaCatalogo[] = [
  */
 export function chaveCategoria(categoria: string): string {
   return categoria.replace(/^[^\p{L}]+/u, "").trim()
+}
+
+/** Indexa as linhas da planilha de controle por chave de categoria (sem emoji). */
+export function planilhaPorCategoria(
+  linhas: { comp: string; cat: string; status: string; valorCents: number }[],
+): Map<string, LinhaPlanilha[]> {
+  const por = new Map<string, LinhaPlanilha[]>()
+  for (const l of linhas) {
+    const chave = chaveCategoria(l.cat)
+    const lista = por.get(chave) ?? []
+    lista.push({ competencia: l.comp, valorCentavos: l.valorCents, status: l.status })
+    por.set(chave, lista)
+  }
+  return por
 }
 
 /** Deriva o tipo MIME do comprovante pela extensão do arquivo. */

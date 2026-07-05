@@ -12,10 +12,21 @@
  * de valor entre os dois nunca entra calada — vira `revisar`.
  */
 
+import type { BillBruto } from "./bill"
+
 /** O que o nome de um comprovante revela: a Conta (pasta) e a competência. */
 export type NomeRecibo = { contaSlug: string; competencia: string }
 
 const SUFIXO_COMPETENCIA_RE = /(\d{4})(\d{2})\.[^.]+$/
+
+/** Soma `n` meses a uma competência `YYYY-MM` (aceita `n` negativo), virando o ano quando preciso. */
+export function somarMeses(competencia: string, n: number): string {
+  const [ano, mes] = competencia.split("-").map(Number)
+  const total = ano * 12 + (mes - 1) + n
+  const novoAno = Math.floor(total / 12)
+  const novoMes = (total % 12) + 1
+  return `${novoAno}-${String(novoMes).padStart(2, "0")}`
+}
 
 /**
  * Lê o nome de um comprovante organizado como `<conta>/<ano>/<...>-YYYYMM.ext` e
@@ -32,6 +43,65 @@ export function lerNomeRecibo(caminhoRelativo: string): NomeRecibo | null {
   const contaSlug = caminhoRelativo.split("/")[0]
   if (!contaSlug) return null
   return { contaSlug, competencia: `${ano}-${mes}` }
+}
+
+/**
+ * Lê o nome de um comprovante traduzindo a **defasagem legada de nomenclatura**:
+ * nas raízes antigas (OneDrive), algumas Contas gravaram no nome o mês anterior ao
+ * da Competência real (Competência = mês do vencimento — decisão de 04/07/2026), e
+ * esses originais ficam intocados para sempre. `offsetNomeLegado` é o deslocamento
+ * da Conta (nome + offset = competência real). A guarda anti-double-shift:
+ * `raizCorrigida = true` (raiz já renomeada para a verdade) lê o nome como está —
+ * traduzir de novo deslocaria duas vezes.
+ */
+export function competenciaDoRecibo(
+  caminhoRelativo: string,
+  offsetNomeLegado: number,
+  raizCorrigida: boolean,
+): NomeRecibo | null {
+  const nome = lerNomeRecibo(caminhoRelativo)
+  if (!nome) return null
+  if (raizCorrigida || offsetNomeLegado === 0) return nome
+  return { ...nome, competencia: somarMeses(nome.competencia, offsetNomeLegado) }
+}
+
+/** O que o catálogo da borda informa sobre uma Conta para o cadastro do backfill. */
+export type ContaBackfill = {
+  nome: string
+  icon: string
+  dueDay: number
+  dueMonthOffset: number
+}
+
+/**
+ * Monta o `BillBruto` do cadastro de uma Conta do backfill — **com** a
+ * `primeiraCompetencia`, obrigatória desde a migração 0008 (sem ela,
+ * `createBill` recusa o cadastro; o caminho idempotente de Conta já existente
+ * mascarava a omissão).
+ */
+export function billBrutoDeConta(conta: ContaBackfill, primeiraCompetencia: string): BillBruto {
+  return {
+    nome: conta.nome,
+    descricao: null,
+    icon: conta.icon,
+    intervalMonths: 1,
+    anchorMonth: null,
+    dueRuleKind: "dia-fixo",
+    dueRuleDay: conta.dueDay,
+    dueMonthOffset: conta.dueMonthOffset,
+    primeiraCompetencia,
+  }
+}
+
+/**
+ * Deriva a primeira Competência de uma Conta nova a partir da planilha: a menor
+ * linha **paga** (mesma regra do backfill da migração 0008). Sem linha paga, cai
+ * no mês corrente — a Conta nasce sem vigência retroativa.
+ */
+export function primeiraCompetenciaDe(planilha: LinhaPlanilha[], mesCorrente: string): string {
+  const pagas = planilha.filter((l) => l.status === "Pago").map((l) => l.competencia)
+  if (pagas.length === 0) return mesCorrente
+  return pagas.reduce((menor, c) => (c < menor ? c : menor))
 }
 
 /** Uma linha da planilha de controle para uma Conta: a competência e o valor esperados. */
@@ -56,6 +126,13 @@ export type ReciboExtraido = {
   valorRecibo: number | null
   /** Tipo MIME do arquivo (`image/jpeg`, `application/pdf`…), para o upload. */
   tipoMime: string
+  /**
+   * Vencimento estampado no documento (YYYY-MM-DD), quando legível — recibos v2
+   * (#124). É a evidência documental que decide offset de defasagem e dueDay real.
+   */
+  vencimentoImpresso?: string | null
+  /** Mês/período de referência estampado (YYYY-MM), quando o documento o traz — recibos v2. */
+  mesReferenciaImpresso?: string | null
 }
 
 /** As entradas de uma Conta para o cross-check: planilha + recibos + a quem atribuir. */
@@ -89,6 +166,8 @@ export type LinhaManifesto = {
   dataPagamento: string | null
   /** Valor a persistir, centavos — a verdade da planilha. */
   valor: number
+  /** Valor lido do comprovante (centavos); `null` sem recibo ou ilegível. Insumo da adjudicação. */
+  valorRecibo: number | null
   paidBy: string
   /** O comprovante a subir/anexar, se houver. */
   recibo: ReciboManifesto | null
@@ -140,6 +219,7 @@ export function construirManifesto(entrada: EntradaConta): LinhaManifesto[] {
       competencia: linha.competencia,
       dataPagamento,
       valor: linha.valorCentavos,
+      valorRecibo: recibo ? recibo.valorRecibo : null,
       paidBy,
       recibo: reciboRef,
       flags: flags.length > 0 ? flags : ["ok"],
@@ -157,6 +237,7 @@ export function construirManifesto(entrada: EntradaConta): LinhaManifesto[] {
       competencia: r.competencia,
       dataPagamento: r.dataPagamento,
       valor: r.valorRecibo ?? 0,
+      valorRecibo: r.valorRecibo,
       paidBy,
       recibo: { arquivo: r.arquivo, tipoMime: r.tipoMime },
       flags: ["sem-planilha"],
