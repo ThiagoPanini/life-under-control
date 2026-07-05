@@ -35,6 +35,15 @@ export type ContaCatalogo = {
   paidBy: string
   /** A pasta de comprovantes que alimenta esta Conta; `null` quando não há recibos. */
   dirSlug: string | null
+  /**
+   * Defasagem **permanente** de nomenclatura da raiz legada (#124): o nome do
+   * arquivo gravou historicamente a competência −N (Competência = mês do
+   * vencimento — decisão de 04/07/2026). Os originais no OneDrive ficam
+   * intocados para sempre; toda leitura da raiz legada traduz nome→competência
+   * somando este offset. Raiz corrigida (marcador `.competencia-corrigida.json`
+   * presente) lê sem tradução — guarda anti-double-shift. Ausente = 0.
+   */
+  offsetNomeLegado?: number
 }
 
 /**
@@ -51,6 +60,9 @@ export const CATALOGO: ContaCatalogo[] = [
     dueMonthOffset: 1,
     paidBy: THIAGO,
     dirSlug: "condominio",
+    // Confirmado pela assinatura de timing (28/33 pagamentos no mês seguinte ao do
+    // nome): o boleto de julho sempre foi salvo como junho. Nome + 1 = competência.
+    offsetNomeLegado: 1,
   },
   {
     label: "Luz",
@@ -69,6 +81,8 @@ export const CATALOGO: ContaCatalogo[] = [
     dueMonthOffset: 0,
     paidBy: THIAGO,
     dirSlug: "gas",
+    // Suspeita de defasagem (16/29 pagamentos no mês seguinte) — o Gate 1 da #125
+    // decide pelo vencimento impresso; se shiftar, o offset legado entra aqui.
   },
   {
     label: "Internet",

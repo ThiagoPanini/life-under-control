@@ -16,7 +16,7 @@
  * Os bytes dos comprovantes saem de `RECIBOS_ROOT` (env) ou do default do catálogo.
  */
 
-import { readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { readFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -26,18 +26,19 @@ import { getDb } from "@/adapters/db/client"
 import { drizzlePaymentRepo } from "@/adapters/db/payment-repo.drizzle"
 import { r2AttachmentStore } from "@/adapters/r2/r2-attachment-store"
 import {
+  billBrutoDeConta,
+  competenciaDoRecibo,
   construirManifesto,
   type LinhaManifesto,
   type LinhaPlanilha,
   lerNomeRecibo,
+  primeiraCompetenciaDe,
   type ReciboExtraido,
 } from "@/core/domain/backfill"
-import type { BillBruto } from "@/core/domain/bill"
 import { createBill } from "@/core/use-cases/create-bill"
 import { importBackfill } from "@/core/use-cases/import-backfill"
 import {
   CATALOGO,
-  type ContaCatalogo,
   chaveCategoria,
   HOUSEHOLD,
   RECIBOS_ROOT_DEFAULT,
@@ -49,13 +50,24 @@ const repoRoot = resolve(scriptsDir, "../../..")
 const dataDir = join(repoRoot, ".backfill")
 const RECIBOS_ROOT = process.env.RECIBOS_ROOT ?? RECIBOS_ROOT_DEFAULT
 
+/**
+ * Marcador da guarda anti-double-shift (#124): presente na raiz de comprovantes,
+ * os nomes já são a competência-verdade e a leitura NÃO traduz pelo offset legado.
+ * A raiz do OneDrive nunca o terá (originais intocados, nomes defasados).
+ */
+export const MARCADOR_CORRECAO = ".competencia-corrigida.json"
+
 /** Linha da planilha como exportada do xlsx. */
 type LinhaControle = { comp: string; cat: string; status: string; valorCents: number }
-/** Recibo como o passe de visão o emitiu. */
+/** Recibo como o passe de visão o emitiu (v2 soma os campos impressos, opcionais). */
 type ReciboVisao = {
   arquivo: string
   dataPagamento: string | null
   valorCentavos: number | null
+  /** Vencimento estampado no documento (YYYY-MM-DD), quando legível — recibos v2 (#124). */
+  vencimentoImpresso?: string | null
+  /** Mês/período de referência estampado (YYYY-MM), quando o documento o traz. */
+  mesReferenciaImpresso?: string | null
 }
 
 function lerJson<T>(caminho: string): T {
@@ -73,8 +85,20 @@ function lerRecibos(): ReciboVisao[] {
   return todos
 }
 
-/** Indexa os recibos por slug da pasta (a Conta de origem), já como `ReciboExtraido`. */
-function recibosPorConta(recibos: ReciboVisao[]): Map<string, ReciboExtraido[]> {
+/** O offset legado de nomenclatura de cada pasta de comprovantes (0 = nome já é a verdade). */
+const OFFSET_POR_SLUG = new Map(
+  CATALOGO.filter((c) => c.dirSlug).map((c) => [c.dirSlug as string, c.offsetNomeLegado ?? 0]),
+)
+
+/**
+ * Indexa os recibos por slug da pasta (a Conta de origem), já como `ReciboExtraido`
+ * — com a competência **traduzida** pelo offset legado da Conta quando a raiz é
+ * legada (`raizCorrigida` vem do marcador `.competencia-corrigida.json`).
+ */
+function recibosPorConta(
+  recibos: ReciboVisao[],
+  raizCorrigida: boolean,
+): Map<string, ReciboExtraido[]> {
   const por = new Map<string, ReciboExtraido[]>()
   for (const r of recibos) {
     const nome = lerNomeRecibo(r.arquivo)
@@ -82,12 +106,17 @@ function recibosPorConta(recibos: ReciboVisao[]): Map<string, ReciboExtraido[]> 
       console.warn(`  ⚠ recibo ignorado (nome sem competência): ${r.arquivo}`)
       continue
     }
+    const offset = OFFSET_POR_SLUG.get(nome.contaSlug) ?? 0
+    const traduzido = competenciaDoRecibo(r.arquivo, offset, raizCorrigida)
+    if (!traduzido) continue
     const extraido: ReciboExtraido = {
       arquivo: r.arquivo,
-      competencia: nome.competencia,
+      competencia: traduzido.competencia,
       dataPagamento: r.dataPagamento,
       valorRecibo: r.valorCentavos,
       tipoMime: tipoMimeDe(r.arquivo),
+      vencimentoImpresso: r.vencimentoImpresso ?? null,
+      mesReferenciaImpresso: r.mesReferenciaImpresso ?? null,
     }
     const lista = por.get(nome.contaSlug) ?? []
     lista.push(extraido)
@@ -108,20 +137,6 @@ function planilhaPorCategoria(linhas: LinhaControle[]): Map<string, LinhaPlanilh
   return por
 }
 
-/** Monta o `BillBruto` do cadastro a partir do catálogo. */
-function brutoDaConta(c: ContaCatalogo): BillBruto {
-  return {
-    nome: c.nome,
-    descricao: null,
-    icon: c.icon,
-    intervalMonths: 1,
-    anchorMonth: null,
-    dueRuleKind: "dia-fixo",
-    dueRuleDay: c.dueDay,
-    dueMonthOffset: c.dueMonthOffset,
-  }
-}
-
 /** Carrega os bytes de um comprovante do disco do operador (a fronteira de IO). */
 async function carregarRecibo(arquivo: string) {
   try {
@@ -137,8 +152,15 @@ async function main() {
   const commit = process.argv.includes("--commit")
   console.log(`\n=== Backfill Finanças (#24) — ${commit ? "COMMIT" : "DRY-RUN"} ===\n`)
 
+  const raizCorrigida = existsSync(join(RECIBOS_ROOT, MARCADOR_CORRECAO))
+  console.log(
+    raizCorrigida
+      ? "  Raiz corrigida (marcador presente): nomes lidos como estão, sem tradução.\n"
+      : "  Raiz legada: nome → competência traduzido pelo offset legado do catálogo.\n",
+  )
+
   const controle = lerJson<LinhaControle[]>(join(dataDir, "controle.json"))
-  const recibos = recibosPorConta(lerRecibos())
+  const recibos = recibosPorConta(lerRecibos(), raizCorrigida)
   const planilha = planilhaPorCategoria(controle)
 
   // Resolve o billId de cada Conta: em commit cadastra (idempotente por nome); em
@@ -154,7 +176,11 @@ async function main() {
         billIdPorLabel.set(c.label, jaTem)
         console.log(`  Conta já existe: ${c.nome} (${jaTem})`)
       } else {
-        const nova = await createBill(billRepo, HOUSEHOLD, brutoDaConta(c))
+        // Conta nova: a primeira competência sai da menor linha paga da planilha
+        // (mesma regra da migração 0008); sem histórico, o mês corrente.
+        const mesCorrente = new Date().toISOString().slice(0, 7)
+        const primeira = primeiraCompetenciaDe(planilha.get(c.label) ?? [], mesCorrente)
+        const nova = await createBill(billRepo, HOUSEHOLD, billBrutoDeConta(c, primeira))
         billIdPorLabel.set(c.label, nova.id)
         console.log(`  Conta cadastrada: ${c.nome} (${nova.id})`)
       }

@@ -12,6 +12,7 @@ function linha(over: Partial<LinhaManifesto> = {}): LinhaManifesto {
     competencia: "2024-03",
     dataPagamento: "2024-03-15",
     valor: 20390,
+    valorRecibo: 20390,
     paidBy: "p-thi",
     recibo: null,
     flags: ["ok"],

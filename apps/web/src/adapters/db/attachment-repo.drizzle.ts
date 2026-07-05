@@ -80,6 +80,19 @@ export function drizzleAttachmentRepo(db: Db = getDb()): AttachmentRepo {
       return row ? paraDominio(row) : null
     },
 
+    async renomearAttachment(
+      householdId: string,
+      attachmentId: string,
+      nomeOriginal: string,
+    ): Promise<Attachment | null> {
+      const [row] = await db
+        .update(attachments)
+        .set({ nomeOriginal })
+        .where(and(eq(attachments.householdId, householdId), eq(attachments.id, attachmentId)))
+        .returning()
+      return row ? paraDominio(row) : null
+    },
+
     async deletarAttachment(householdId: string, attachmentId: string): Promise<Attachment | null> {
       const [row] = await db
         .delete(attachments)

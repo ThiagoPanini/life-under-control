@@ -31,6 +31,13 @@ export function fakeAttachmentRepo(seed: Attachment[] = []): AttachmentRepo {
       const att = store.get(attachmentId)
       return att && att.householdId === householdId ? att : null
     },
+    async renomearAttachment(householdId, attachmentId, nomeOriginal) {
+      const att = store.get(attachmentId)
+      if (!att || att.householdId !== householdId) return null
+      const renomeado = { ...att, nomeOriginal }
+      store.set(attachmentId, renomeado)
+      return renomeado
+    },
     async deletarAttachment(householdId, attachmentId) {
       const att = store.get(attachmentId)
       if (!att || att.householdId !== householdId) return null
