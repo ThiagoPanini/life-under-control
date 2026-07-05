@@ -22,11 +22,13 @@ import { BillIcon } from "./BillIcon"
  */
 const META: Record<EstadoCelula, { rotulo: string; glifo: string; cor: string; tint: string }> = {
   acima: { rotulo: "acima da média", glifo: "▲", cor: "text-luc-warn", tint: "bg-luc-warn/15" },
+  // Neutro de propósito: "na média" é a linha-de-base sem novidade, não um estado de
+  // marca — o accent fica reservado à interação (ring da célula ativa, switch de encerradas).
   "na-media": {
     rotulo: "na média",
     glifo: "●",
-    cor: "text-luc-accent-bright",
-    tint: "bg-luc-accent-12",
+    cor: "text-luc-text-2",
+    tint: "bg-white/10",
   },
   abaixo: {
     rotulo: "abaixo da média",
