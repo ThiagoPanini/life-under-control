@@ -4,6 +4,7 @@ import { Button } from "@/components/ds/Button"
 import { BillLogoTile } from "@/components/financas/BillLogoTile"
 import { formatBRL, formatBRLSemCentavos } from "@/core/domain/money"
 import type { EstadoMes, ValorCard } from "@/core/use-cases/derive-panorama-mensal"
+import { ESTADO_MES } from "./estado-mes"
 
 /** Um bloco do Panorama: a Conta com ocorrência no mês vigente, já derivada (estado #93 + valor). */
 export type BlocoPanorama = {
@@ -22,54 +23,8 @@ export type BlocoPanorama = {
   excluirHref: string
 }
 
-/**
- * A leitura de cada estado do mês vigente (#93): rótulo, pílula, ponto e cor da
- * frase — a composição exata do protótipo Final: pílula com borda no próprio tom
- * (32%) e ponto **sólido** em todos os estados (a distinção acessível vem do
- * rótulo textual, sempre presente). `vencida` (vencimento consumado) é o único
- * que veste `danger` (vermelho); `vence-em-breve` é atenção (âmbar);
- * `pago`/`a-vencer` repousam.
- */
-const ESTADO: Record<
-  EstadoMes,
-  { label: string; tone: string; pill: string; dot: string; frase: string; aria: string }
-> = {
-  pago: {
-    label: "pago",
-    tone: "success",
-    pill: "border-luc-success/[0.32] bg-luc-success/[0.09] text-luc-success",
-    dot: "bg-luc-success",
-    frase: "text-luc-muted",
-    aria: "Conta paga no mês",
-  },
-  "a-vencer": {
-    label: "a vencer",
-    tone: "neutral",
-    pill: "border-white/[0.13] bg-white/[0.05] text-luc-text-2",
-    dot: "bg-luc-text-3",
-    frase: "text-luc-muted",
-    aria: "Conta a vencer, vencimento distante",
-  },
-  "vence-em-breve": {
-    label: "vence em breve",
-    tone: "warn",
-    pill: "border-luc-warn/[0.32] bg-luc-warn/[0.09] text-luc-warn",
-    dot: "bg-luc-warn",
-    frase: "text-luc-warn",
-    aria: "Conta vence em breve",
-  },
-  vencida: {
-    label: "vencida",
-    tone: "danger",
-    pill: "border-luc-danger/[0.32] bg-luc-danger/[0.09] text-luc-danger",
-    dot: "bg-luc-danger",
-    frase: "text-luc-danger",
-    aria: "Conta vencida",
-  },
-}
-
 function BlocoConta({ bloco }: { bloco: BlocoPanorama }) {
-  const leitura = ESTADO[bloco.estado]
+  const leitura = ESTADO_MES[bloco.estado]
   const pago = bloco.estado === "pago"
 
   const valorNode =

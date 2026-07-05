@@ -58,21 +58,21 @@ export const LIMIAR_VENCE_EM_BREVE_DIAS = 4
 const MS_DIA = 86_400_000
 
 /** Dias civis de `hoje` até `alvo` — negativo quando `alvo` já passou. */
-function diasAte(hoje: string, alvo: string): number {
+export function diasAte(hoje: string, alvo: string): number {
   const [a1, m1, d1] = hoje.split("-").map(Number)
   const [a2, m2, d2] = alvo.split("-").map(Number)
   return Math.round((Date.UTC(a2, m2 - 1, d2) - Date.UTC(a1, m1 - 1, d1)) / MS_DIA)
 }
 
 /** Rank de urgência: vencida na frente, pago no fim; empate pela proximidade do vencimento. */
-const RANK: Record<EstadoMes, number> = {
+export const RANK: Record<EstadoMes, number> = {
   vencida: 0,
   "vence-em-breve": 1,
   "a-vencer": 2,
   pago: 3,
 }
 
-function estadoDaOcorrencia(quitada: boolean, dias: number): EstadoMes {
+export function estadoDaOcorrencia(quitada: boolean, dias: number): EstadoMes {
   if (quitada) return "pago"
   if (dias < 0) return "vencida"
   if (dias <= LIMIAR_VENCE_EM_BREVE_DIAS) return "vence-em-breve"
@@ -83,7 +83,11 @@ function plural(dias: number): string {
   return dias === 1 ? "dia" : "dias"
 }
 
-function fraseDaOcorrencia(estado: EstadoMes, dias: number, dataPagamento: string | null): string {
+export function fraseDaOcorrencia(
+  estado: EstadoMes,
+  dias: number,
+  dataPagamento: string | null,
+): string {
   if (estado === "pago") {
     return dataPagamento
       ? `pago em ${formatarDataBr(dataPagamento).slice(0, 5)}`

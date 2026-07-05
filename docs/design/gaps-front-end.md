@@ -36,7 +36,7 @@ Auditoria feita em 01/07/2026 contra o contrato oficial e o protótipo. Priorida
 | `components/financas/BillCard.tsx` | exibe só nome, descrição, recorrência e vencimento; ainda anuncia trabalho futuro | card com farol, grid 12, média e sparkline | integrar `derivarCardConta`, já implementado e testado |
 | `core/use-cases/derive-bill-card.ts` + UI | estados existem no domínio, sem representação visual | farol e grid legíveis sem depender só de cor | mapear os quatro faróis e seis células conforme catálogo |
 | `components/financas/CockpitFinancas.tsx` | métricas ad-hoc | cards KPI e tendência comuns | migrar para primitivas DS e escala tipográfica oficial |
-| `app/(app)/areas/financas/page.tsx` | visão atual não reproduz faixa de métricas, tendência e leitura densa de Contas | cockpit instrumental | reordenar composição e manter ativas/encerradas sem perder função |
+| `app/(app)/areas/financas/page.tsx` | visão atual não reproduz faixa de métricas, tendência e leitura densa de Contas | cockpit instrumental | reordenar composição; a leitura densa de Contas é a Visão Analítica por Conta (#127), que substituiu as antigas seções ativas/encerradas |
 | `components/financas/LancamentosLista.tsx` | tabela/lista ad-hoc | row-line, valores/datas mono, autoria nominal | migrar linha, vazio e cabeçalho para DS |
 
 ## P2 — formulários, detalhe e acabamento
