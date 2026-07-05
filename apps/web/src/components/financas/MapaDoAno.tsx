@@ -40,16 +40,10 @@ const META: Record<EstadoCelula, { rotulo: string; glifo: string; cor: string; t
   "fora-vigencia": { rotulo: "fora da vigência", glifo: "", cor: "text-luc-faint", tint: "" },
 }
 
-/** Ordem da legenda — os estados na sequência em que fazem sentido explicar. */
-const LEGENDA: EstadoCelula[] = [
-  "abaixo",
-  "na-media",
-  "acima",
-  "por-vir",
-  "vencida",
-  "sem-ocorrencia",
-  "fora-vigencia",
-]
+/** Ordem da legenda — os estados na sequência em que fazem sentido explicar. As
+ * ausências honestas (`sem-ocorrencia`/`fora-vigencia`) ficam fora da legenda: são
+ * autoexplicativas na matriz e diluiriam os estados que pedem leitura. */
+const LEGENDA: EstadoCelula[] = ["abaixo", "na-media", "acima", "por-vir", "vencida"]
 
 /** Desvio com sinal por extenso (`+R$ 20,00` / `−R$ 12,00`); vazio quando não calculável. */
 function descreverDesvio(desvio: number | null): string | null {
@@ -116,9 +110,21 @@ export function MapaDoAno({ mapa }: { mapa: Mapa }) {
   const detalhe = alvoParaDetalhe(linhasVisiveis, alvo)
 
   return (
-    <section aria-labelledby="mapa-ano-heading" className="flex flex-col gap-[18px]">
+    <section aria-labelledby="mapa-ano-heading" className="flex flex-col gap-3">
       <div aria-hidden className="border-luc-border border-t" />
-      <SectionHeading id="mapa-ano-heading" title="Mapa do Ano" variant="destaque" icon={ICONE} />
+      {/* O switch fica na mesma linha do título (via `actions`) e só aparece quando
+          há Contas encerradas para revelar — senão seria um controle no-op. */}
+      <SectionHeading
+        id="mapa-ano-heading"
+        title="Mapa do Ano"
+        variant="destaque"
+        icon={ICONE}
+        actions={
+          temEncerradas ? (
+            <SwitchEncerradas mostrarEncerradas={mostrarEncerradas} onChange={alternarEncerradas} />
+          ) : undefined
+        }
+      />
       <div className="flex flex-col gap-1">
         <span className="text-[11px] font-bold uppercase tracking-[0.13em] text-luc-text-3">
           Conta × Competência
@@ -135,11 +141,7 @@ export function MapaDoAno({ mapa }: { mapa: Mapa }) {
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          {/* O toggle só aparece quando há encerradas para revelar — senão seria um no-op. */}
-          {temEncerradas && (
-            <FiltroContas mostrarEncerradas={mostrarEncerradas} onChange={alternarEncerradas} />
-          )}
+        <div className="flex flex-col gap-2">
           <Legenda />
           {linhasVisiveis.length === 0 ? (
             <div className="rounded-luc-lg border border-luc-border bg-luc-surface-2 px-4 pt-[15px] pb-[13px]">
@@ -179,42 +181,41 @@ function alvoParaDetalhe(
   return { nome: linha.nome, cel }
 }
 
-/** Toggle no topo da camada: só Contas ativas (default) ou também as encerradas. */
-function FiltroContas({
+/** Interruptor liga/desliga para incluir as Contas encerradas na matriz (off por
+ * padrão). Um `role="switch"` de verdade — o rótulo visível é o nome acessível. */
+function SwitchEncerradas({
   mostrarEncerradas,
   onChange,
 }: {
   mostrarEncerradas: boolean
   onChange: (v: boolean) => void
 }) {
-  const opcoes: { valor: boolean; rotulo: string }[] = [
-    { valor: false, rotulo: "Ativas" },
-    { valor: true, rotulo: "Ativas + encerradas" },
-  ]
   return (
-    <div className="flex items-center justify-end">
-      <fieldset className="inline-flex items-center gap-0.5 rounded-luc-md border border-luc-border bg-luc-surface-2 p-0.5">
-        <legend className="sr-only">Filtrar Contas do mapa</legend>
-        {opcoes.map((op) => {
-          const selecionado = mostrarEncerradas === op.valor
-          return (
-            <button
-              key={op.rotulo}
-              type="button"
-              aria-pressed={selecionado}
-              onClick={() => onChange(op.valor)}
-              className={`rounded-[6px] px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                selecionado
-                  ? "bg-luc-surface-3 text-luc-text"
-                  : "text-luc-text-3 hover:text-luc-text-2"
-              }`}
-            >
-              {op.rotulo}
-            </button>
-          )
-        })}
-      </fieldset>
-    </div>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={mostrarEncerradas}
+      onClick={() => onChange(!mostrarEncerradas)}
+      className="group flex items-center gap-2 outline-none"
+    >
+      <span className="text-[11px] font-medium text-luc-text-3 transition-colors group-hover:text-luc-text-2">
+        Incluir encerradas
+      </span>
+      <span
+        aria-hidden
+        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors ${
+          mostrarEncerradas
+            ? "border-luc-accent bg-luc-accent"
+            : "border-luc-border bg-luc-surface-3"
+        }`}
+      >
+        <span
+          className={`h-4 w-4 rounded-full bg-luc-text shadow-sm transition-transform ${
+            mostrarEncerradas ? "translate-x-[18px]" : "translate-x-[2px]"
+          }`}
+        />
+      </span>
+    </button>
   )
 }
 
@@ -443,7 +444,7 @@ function Tooltip({ el, nome, cel }: { el: HTMLElement; nome: string; cel: Celula
 /** A legenda dos estados — forma + palavra, para ler sem depender de cor. */
 function Legenda() {
   return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1.5">
+    <ul className="flex flex-wrap justify-end gap-x-4 gap-y-1.5">
       {LEGENDA.map((estado) => {
         const meta = META[estado]
         return (
