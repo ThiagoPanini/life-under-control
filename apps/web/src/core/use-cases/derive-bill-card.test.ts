@@ -180,6 +180,30 @@ describe("gridOcorrencias (Seam 1)", () => {
     expect(celula(grid, "2026-05").estado).toBe("pago-sem-data")
   })
 
+  it("test_baixa_partida_soma_o_valor_e_estado_da_baixa_que_completa", () => {
+    // Baixa partida em maio (vence 10/05): parte em-dia (08/05), o restante em
+    // atraso (20/05). A célula soma as duas baixas (10000) e a pontualidade
+    // reflete a baixa que completa o pagamento — a mais recente, em atraso.
+    const pagos = [
+      pagamento({ id: "p-a", competencia: "2026-05", valor: 4000, dataPagamento: "2026-05-08" }),
+      pagamento({ id: "p-b", competencia: "2026-05", valor: 6000, dataPagamento: "2026-05-20" }),
+    ]
+    const grid = gridOcorrencias(billBase(), pagos, "2026-06-15", cal)
+    expect(celula(grid, "2026-05").valor).toBe(10000)
+    expect(celula(grid, "2026-05").estado).toBe("atraso")
+  })
+
+  it("test_baixa_partida_toda_em_dia_fica_em_dia", () => {
+    // As duas baixas de maio caem antes do vencimento (10/05): soma 10000, em-dia.
+    const pagos = [
+      pagamento({ id: "p-a", competencia: "2026-05", valor: 3000, dataPagamento: "2026-05-06" }),
+      pagamento({ id: "p-b", competencia: "2026-05", valor: 7000, dataPagamento: "2026-05-09" }),
+    ]
+    const grid = gridOcorrencias(billBase(), pagos, "2026-06-15", cal)
+    expect(celula(grid, "2026-05").valor).toBe(10000)
+    expect(celula(grid, "2026-05").estado).toBe("em-dia")
+  })
+
   it("test_ocorrencia_anterior_a_primeira_competencia_fica_fora_da_vigencia", () => {
     // Conta que só passou a vigorar em março: fevereiro é anterior à vigência —
     // fora-vigencia, nunca em-aberto (buraco falso). Valor é lacuna (null).

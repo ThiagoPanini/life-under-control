@@ -220,6 +220,22 @@ function estadoGrid(pagamento: Payment | undefined, vencimento: string, hoje: st
   return diffEmDias(hoje, vencimento) > 0 ? "aguardando" : "em-aberto"
 }
 
+/**
+ * A baixa que representa a Competência para efeito de estado/pontualidade: a que
+ * **completa** o pagamento — a mais recente por `dataPagamento`. Numa baixa partida
+ * (mais de um Lançamento no mês, schema permitido), a pontualidade reflete quando a
+ * obrigação foi de fato quitada; se a última parcela atrasa, o mês conta como atraso.
+ * Uma baixa com data vence uma sem data (backfill sem recibo) na disputa.
+ */
+function baixaRepresentativa(baixas: Payment[]): Payment | undefined {
+  if (baixas.length === 0) return undefined
+  return baixas.reduce((rep, p) => {
+    if (rep.dataPagamento == null) return p
+    if (p.dataPagamento == null) return rep
+    return p.dataPagamento > rep.dataPagamento ? p : rep
+  })
+}
+
 /** O farol do mês vigente (a ocorrência mais recente ≤ hoje) nos 4 estados. */
 export function farolDoMes(
   bill: Bill,
@@ -252,12 +268,14 @@ export function gridOcorrencias(
     if (competencia < bill.primeiraCompetencia) {
       return { competencia, vencimento, estado: "fora-vigencia" as const, valor: null }
     }
-    const pagamento = payments.find((p) => p.competencia === competencia)
+    // Baixa partida (CONTEXT.md #6): o valor da célula soma **todas** as baixas da
+    // Competência; o estado sai da baixa representativa (a que completa o pagamento).
+    const doMes = payments.filter((p) => p.competencia === competencia)
     return {
       competencia,
       vencimento,
-      estado: estadoGrid(pagamento, vencimento, hoje),
-      valor: pagamento ? pagamento.valor : null,
+      estado: estadoGrid(baixaRepresentativa(doMes), vencimento, hoje),
+      valor: doMes.length > 0 ? doMes.reduce((soma, p) => soma + p.valor, 0) : null,
     }
   })
 }
