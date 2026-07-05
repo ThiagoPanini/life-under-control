@@ -57,7 +57,7 @@ describe("MapaDoAno (Seam 2)", () => {
 
   it("test_ausencia_de_media_e_encerrada_ditas_por_extenso", () => {
     // Histórico insuficiente: "sem média" explícito; Conta encerrada ganha o selo.
-    // Encerradas ficam ocultas por padrão — é preciso incluí-las pelo toggle.
+    // Encerradas ficam ocultas por padrão — é preciso ligar o switch para incluí-las.
     render(
       <MapaDoAno
         mapa={comContas([
@@ -65,7 +65,7 @@ describe("MapaDoAno (Seam 2)", () => {
         ])}
       />,
     )
-    fireEvent.click(screen.getByRole("button", { name: "Ativas + encerradas" }))
+    fireEvent.click(screen.getByRole("switch", { name: /incluir encerradas/i }))
     expect(screen.getByText("sem média")).toBeInTheDocument()
     expect(screen.getByText("encerrada")).toBeInTheDocument()
   })
@@ -158,7 +158,10 @@ describe("MapaDoAno (Seam 2)", () => {
         ])}
       />,
     )
-    fireEvent.click(screen.getByRole("button", { name: "Ativas + encerradas" }))
+    const sw = screen.getByRole("switch", { name: /incluir encerradas/i })
+    expect(sw).toHaveAttribute("aria-checked", "false")
+    fireEvent.click(sw)
+    expect(sw).toHaveAttribute("aria-checked", "true")
     expect(screen.getByText("Academia")).toBeInTheDocument()
   })
 
@@ -174,12 +177,15 @@ describe("MapaDoAno (Seam 2)", () => {
     expect(screen.getByText(/Nenhuma Conta ativa nos últimos 12 meses/i)).toBeInTheDocument()
   })
 
-  it("test_legenda_explica_os_estados_por_extenso", () => {
+  it("test_legenda_explica_os_estados_de_leitura_sem_as_ausencias", () => {
     render(<MapaDoAno mapa={comContas([linha()])} />)
     const legenda = screen.getByRole("list")
-    expect(within(legenda).getByText("fora da vigência")).toBeInTheDocument()
+    expect(within(legenda).getByText("abaixo da média")).toBeInTheDocument()
     expect(within(legenda).getByText("vencida")).toBeInTheDocument()
-    expect(within(legenda).getByText("sem ocorrência")).toBeInTheDocument()
+    expect(within(legenda).getByText("por vir")).toBeInTheDocument()
+    // As ausências honestas saem da legenda (autoexplicativas na matriz).
+    expect(within(legenda).queryByText("fora da vigência")).toBeNull()
+    expect(within(legenda).queryByText("sem ocorrência")).toBeNull()
   })
 
   it("test_matriz_tem_container_de_scroll_horizontal", () => {
