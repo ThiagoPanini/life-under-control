@@ -35,6 +35,10 @@ const GRID_ESTADO: Record<GridEstado, { label: string; className: string }> = {
   "em-aberto": { label: "em aberto", className: "border-2 border-luc-warn bg-transparent" },
   aguardando: { label: "aguardando", className: "border border-luc-border bg-white/[0.06]" },
   "pago-sem-data": { label: "pago sem data", className: "bg-luc-disabled" },
+  "fora-vigencia": {
+    label: "fora da vigência",
+    className: "border border-luc-border/50 bg-transparent",
+  },
 }
 
 function competenciaAcessivel(competencia: string) {

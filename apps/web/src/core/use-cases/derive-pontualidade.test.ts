@@ -94,6 +94,20 @@ describe("calcularPontualidade12m (Seam 1)", () => {
       percentual: 50, // 3 em-dia / (3 em-dia + 3 em-aberto)
     })
   })
+
+  it("test_conta_jovem_com_tudo_no_prazo_marca_100_excluindo_fora_da_vigencia", () => {
+    // vigente só desde março: as oito ocorrências anteriores são fora-vigencia e
+    // não entram no denominador. As quatro na vigência, todas no prazo → 100%.
+    const bill = billBase({ primeiraCompetencia: "2026-03" })
+    const naVigencia = JANELA.filter((c) => c >= "2026-03")
+    const pagos = naVigencia.map((c, i) =>
+      pagamento({ id: `p-${i}`, competencia: c, dataPagamento: `${c}-08` }),
+    )
+    expect(calcularPontualidade12m([bill], pagos, "2026-06-12", fakeCalendar())).toEqual({
+      estado: "calculada",
+      percentual: 100,
+    })
+  })
 })
 
 function celula(over: Partial<GridCelula> = {}): GridCelula {
@@ -135,6 +149,22 @@ describe("calcularPontualidadeDaConta (Seam 1)", () => {
       celula({ competencia: "d", estado: "pago-sem-data" }),
     ]
     expect(calcularPontualidadeDaConta(grid)).toEqual({ estado: "calculada", percentual: 50 })
+  })
+
+  it("test_fora_da_vigencia_fica_fora_do_denominador", () => {
+    const grid = [
+      celula({ competencia: "a", estado: "fora-vigencia", valor: null }),
+      celula({ competencia: "b", estado: "fora-vigencia", valor: null }),
+      celula({ competencia: "c", estado: "em-dia" }),
+      celula({ competencia: "d", estado: "em-dia" }),
+    ]
+    expect(detalharPontualidadeDaConta(grid)).toEqual({
+      estado: "calculada",
+      percentual: 100,
+      noPrazo: 2,
+      total: 2,
+      frase: "2/2 no prazo",
+    })
   })
 
   it("test_conta_encerrada_ainda_conta_pontualidade_da_propria_conta", () => {

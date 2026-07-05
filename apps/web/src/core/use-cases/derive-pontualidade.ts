@@ -39,7 +39,14 @@ export function detalharPontualidadeDaConta(grid: GridCelula[]): PontualidadeDet
   let noPrazo = 0
   let total = 0
   for (const celula of grid) {
-    if (celula.estado === "aguardando" || celula.estado === "pago-sem-data") continue
+    // fora-vigencia é anterior à vigência da Conta (ADR-0011) — nunca teve chance
+    // de atrasar, então não rebaixa a pontualidade de uma Conta jovem.
+    if (
+      celula.estado === "aguardando" ||
+      celula.estado === "pago-sem-data" ||
+      celula.estado === "fora-vigencia"
+    )
+      continue
     total += 1
     if (celula.estado === "em-dia") noPrazo += 1
   }

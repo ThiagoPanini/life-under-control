@@ -23,6 +23,7 @@ const CAP_COLOR: Record<GridEstado, string> = {
   "em-aberto": "var(--luc-warn)",
   aguardando: "var(--luc-border-strong)",
   "pago-sem-data": "var(--luc-disabled)",
+  "fora-vigencia": "var(--luc-faint)",
 }
 
 const CAP_OPACITY: Partial<Record<GridEstado, number>> = {
@@ -30,6 +31,10 @@ const CAP_OPACITY: Partial<Record<GridEstado, number>> = {
 }
 
 function rotuloAcessivel(celula: GridCelula): string {
+  // Anterior à vigência da Conta: não é lacuna de Lançamento, é fora do período.
+  if (celula.estado === "fora-vigencia") {
+    return `${mesAno(celula.competencia)} · ${GRID[celula.estado].label}`
+  }
   const valorTexto = celula.valor == null ? "sem Lançamento" : formatBRL(celula.valor)
   return `${mesAno(celula.competencia)} · ${valorTexto} · ${GRID[celula.estado].label}`
 }
@@ -127,6 +132,23 @@ export function HistoriaConta({ grid }: { grid: GridCelula[] }) {
                     />
                   )
                 }
+                if (celula.estado === "fora-vigencia") {
+                  // Fora da vigência da Conta: um tique apagado, nunca uma barra
+                  // (não houve ocorrência a pagar). Segue focável pelo rótulo.
+                  return (
+                    <rect
+                      key={celula.competencia}
+                      {...compartilhado}
+                      x={barX}
+                      y={stubY}
+                      width={barWidth}
+                      height={STUB_H}
+                      fill={capColor}
+                      fillOpacity={0.4}
+                      rx={1}
+                    />
+                  )
+                }
                 return (
                   <rect
                     key={celula.competencia}
@@ -186,20 +208,22 @@ export function HistoriaConta({ grid }: { grid: GridCelula[] }) {
       </div>
 
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 border-luc-row-line border-t pt-3">
-        {(Object.keys(GRID) as GridEstado[]).map((estado) => (
-          <span key={estado} className="flex items-center gap-1.5 text-[10.5px] text-luc-text-3">
-            <span
-              aria-hidden
-              className="h-2 w-2 shrink-0 rounded-[2px]"
-              style={{
-                backgroundColor: estado === "em-aberto" ? "transparent" : CAP_COLOR[estado],
-                opacity: CAP_OPACITY[estado] ?? 1,
-                border: estado === "em-aberto" ? `1.5px dashed ${CAP_COLOR[estado]}` : undefined,
-              }}
-            />
-            {GRID[estado].label}
-          </span>
-        ))}
+        {(Object.keys(GRID) as GridEstado[])
+          .filter((estado) => estado !== "fora-vigencia")
+          .map((estado) => (
+            <span key={estado} className="flex items-center gap-1.5 text-[10.5px] text-luc-text-3">
+              <span
+                aria-hidden
+                className="h-2 w-2 shrink-0 rounded-[2px]"
+                style={{
+                  backgroundColor: estado === "em-aberto" ? "transparent" : CAP_COLOR[estado],
+                  opacity: CAP_OPACITY[estado] ?? 1,
+                  border: estado === "em-aberto" ? `1.5px dashed ${CAP_COLOR[estado]}` : undefined,
+                }}
+              />
+              {GRID[estado].label}
+            </span>
+          ))}
       </div>
     </section>
   )
