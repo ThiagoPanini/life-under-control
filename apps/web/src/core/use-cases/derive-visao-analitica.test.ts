@@ -97,6 +97,20 @@ describe("derivarVisaoAnaliticaContas (Seam 1)", () => {
     expect(linha(linhas, "bill-1").autoria).toBe("p-1")
   })
 
+  it("test_desvio_do_valor_pago_usa_mesma_regra_do_mapa_do_ano", () => {
+    const pagos = [
+      pagamento({ id: "p-06", competencia: "2026-06", valor: 7000 }),
+      pagamento({ id: "p-07", competencia: "2026-07", valor: 13000, dataPagamento: "2026-07-10" }),
+    ]
+    const l = linha(
+      derivarVisaoAnaliticaContas(clock("2026-07-10"), cal, [billBase()], pagos),
+      "bill-1",
+    )
+
+    expect(l.media).toBe(10000)
+    expect(l.desvioValor).toEqual({ centavos: 3000, estado: "acima" })
+  })
+
   it("test_valor_estimativa_media_quando_em_aberto", () => {
     // dia 10, hoje 10: a ocorrência vigente (07) venceu hoje sem Lançamento — em aberto.
     const pagos = [

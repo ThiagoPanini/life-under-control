@@ -84,7 +84,9 @@ export type MapaDoAno =
   | { estado: "com-contas"; competencias: string[]; linhas: LinhaMapa[] }
 
 /** Classifica um fato contra a média da Conta com tolerância de ±5% (centavos inteiros). */
-export function classificarValor(valor: number, media: number): "acima" | "na-media" | "abaixo" {
+export type ClassificacaoValor = "acima" | "na-media" | "abaixo"
+
+export function classificarValor(valor: number, media: number): ClassificacaoValor {
   const desvio = valor - media
   if (Math.abs(desvio) * TOLERANCIA_DIVISOR <= media) return "na-media"
   return desvio > 0 ? "acima" : "abaixo"

@@ -10,6 +10,7 @@ import {
   resolverVencimento,
   resumoPagamentos,
 } from "./derive-bill-card"
+import { type ClassificacaoValor, classificarValor } from "./derive-mapa-ano"
 import {
   diasAte,
   type EstadoMes,
@@ -21,7 +22,7 @@ import {
 import { detalharPontualidadeDaConta, type PontualidadeDetalhada } from "./derive-pontualidade"
 
 /**
- * **Visão Analítica por Conta** (issue #127): a última seção do cockpit de
+ * **Visão Analítica por Conta** (issue #127): uma seção do cockpit de
  * Pagamentos Recorrentes — uma linha por Conta com o sinaleiro histórico (grid
  * #21), Pontualidade 12 (#58/#59), sparkline + Média 12 da janela e o valor/
  * estado da ocorrência vigente. Reaproveita o estado e o rank do Panorama (#93)
@@ -49,6 +50,8 @@ export type LinhaAnalitica = {
   sparkline: (number | null)[]
   /** Média (centavos) dos valores pagos da janela; `null` sem histórico. */
   media: number | null
+  /** Desvio do valor vigente pago contra a média, classificado pela mesma regra do Mapa do Ano. */
+  desvioValor: { centavos: number; estado: ClassificacaoValor } | null
   pontualidade: PontualidadeDetalhada
 }
 
@@ -92,6 +95,10 @@ function montarLinha(
 
   const grid = gridOcorrencias(bill, seus, hoje, calendar)
   const { media, sparkline } = resumoPagamentos(grid)
+  const desvioValor =
+    total != null && media != null
+      ? { centavos: total - media, estado: classificarValor(total, media) }
+      : null
 
   // Em aberto: estimativa pela média da janela do sinaleiro (mesma da coluna
   // Média 12 — colunas adjacentes concordam), nunca R$ 0,00 (CONTEXT.md #4/#5).
@@ -114,6 +121,7 @@ function montarLinha(
     grid,
     sparkline,
     media,
+    desvioValor,
     pontualidade: detalharPontualidadeDaConta(grid),
   }
 }
