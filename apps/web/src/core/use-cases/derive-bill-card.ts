@@ -37,7 +37,9 @@ export type FarolEstado = "verde" | "cinza" | "amarelo" | "vermelho"
 /**
  * Estado de uma ocorrência no grid Airflow. "em-aberto" (venceu, nunca pago) é o
  * "buraco" — distinto do vermelho sólido do farol; "aguardando" ainda não venceu;
- * "pago-sem-data" é histórico neutro (backfill sem recibo).
+ * "pago-sem-data" é histórico neutro (backfill sem recibo); "fora-vigencia" é
+ * anterior à primeira Competência da Conta (fora do período de vigência —
+ * ADR-0011), nunca um buraco: célula vazia e apagada, fora da pontualidade.
  */
 export type GridEstado =
   | "em-dia"
@@ -46,6 +48,7 @@ export type GridEstado =
   | "em-aberto"
   | "aguardando"
   | "pago-sem-data"
+  | "fora-vigencia"
 
 /** Uma célula do grid: a ocorrência (competência), seu vencimento esperado, estado e valor pago. */
 export type GridCelula = {
@@ -244,6 +247,11 @@ export function gridOcorrencias(
   const comps = ocorrenciasRecentes(bill.recurrence, mesDe(hoje), OCORRENCIAS_NA_JANELA)
   return comps.map((competencia) => {
     const vencimento = resolverVencimento(bill.dueRule, bill.dueMonthOffset, competencia, calendar)
+    // Ocorrência anterior à vigência da Conta (ADR-0011): fora-vigencia, nunca um
+    // buraco em aberto. Lacuna de valor — a média/sparkline já a ignoram.
+    if (competencia < bill.primeiraCompetencia) {
+      return { competencia, vencimento, estado: "fora-vigencia" as const, valor: null }
+    }
     const pagamento = payments.find((p) => p.competencia === competencia)
     return {
       competencia,

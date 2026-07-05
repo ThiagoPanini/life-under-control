@@ -179,6 +179,44 @@ describe("gridOcorrencias (Seam 1)", () => {
     const grid = gridOcorrencias(billBase(), pagos, "2026-06-15", cal)
     expect(celula(grid, "2026-05").estado).toBe("pago-sem-data")
   })
+
+  it("test_ocorrencia_anterior_a_primeira_competencia_fica_fora_da_vigencia", () => {
+    // Conta que só passou a vigorar em março: fevereiro é anterior à vigência —
+    // fora-vigencia, nunca em-aberto (buraco falso). Valor é lacuna (null).
+    const bill = billBase({ primeiraCompetencia: "2026-03" })
+    const grid = gridOcorrencias(bill, [], "2026-06-15", cal)
+    expect(celula(grid, "2026-02").estado).toBe("fora-vigencia")
+    expect(celula(grid, "2026-02").valor).toBeNull()
+    // março (a primeira competência) já está na vigência — venceu sem pagar → em-aberto
+    expect(celula(grid, "2026-03").estado).toBe("em-aberto")
+  })
+
+  it("test_grid_mantem_doze_celulas_com_fora_da_vigencia", () => {
+    const bill = billBase({ primeiraCompetencia: "2026-03" })
+    const grid = gridOcorrencias(bill, [], "2026-06-15", cal)
+    expect(grid).toHaveLength(OCORRENCIAS_NA_JANELA)
+    // as oito ocorrências anteriores a março são fora-vigencia; as quatro de março a junho não
+    expect(grid.filter((c) => c.estado === "fora-vigencia")).toHaveLength(8)
+  })
+
+  it("test_recorrencia_nao_mensal_respeita_a_vigencia", () => {
+    // bimestral ancorado em janeiro, vigente desde 2026-01: as ocorrências de 2025
+    // e antes ficam fora-vigencia; 2026-01 (a primeira competência) já vale.
+    const bill = billBase({
+      recurrence: { intervalMonths: 2, anchorMonth: 1 },
+      primeiraCompetencia: "2026-01",
+    })
+    const grid = gridOcorrencias(bill, [], "2026-06-15", cal)
+    expect(celula(grid, "2025-11").estado).toBe("fora-vigencia")
+    // 2026-01 é a primeira competência: já vale e venceu sem pagar → em-aberto
+    expect(celula(grid, "2026-01").estado).toBe("em-aberto")
+  })
+
+  it("test_conta_com_historico_completo_nao_tem_fora_da_vigencia", () => {
+    // vigente desde 2020: nenhuma ocorrência da janela é anterior à vigência
+    const grid = gridOcorrencias(billBase(), [], "2026-06-15", cal)
+    expect(grid.some((c) => c.estado === "fora-vigencia")).toBe(false)
+  })
 })
 
 describe("resumoPagamentos (Seam 1)", () => {
@@ -195,6 +233,27 @@ describe("resumoPagamentos (Seam 1)", () => {
     // o slot de maio (sem pagamento) é lacuna, não zero
     const idxMaio = grid.findIndex((g) => g.competencia === "2026-05")
     expect(sparkline[idxMaio]).toBeNull()
+    const idxAbril = grid.findIndex((g) => g.competencia === "2026-04")
+    expect(sparkline[idxAbril]).toBe(10000)
+  })
+
+  it("test_fora_da_vigencia_nao_altera_media_nem_sparkline", () => {
+    // Conta jovem (vigente desde março) com dois pagos: as células fora-vigencia
+    // são lacuna (null), nunca zero — média e sparkline ficam idênticas ao caso
+    // sem vigência recortada (aceite #126: média 12/sparkline não mudam).
+    const bill = billBase({ primeiraCompetencia: "2026-03" })
+    const pagos = [
+      pagamento({ id: "p-a", competencia: "2026-04", valor: 10000 }),
+      pagamento({ id: "p-b", competencia: "2026-06", valor: 20000 }),
+    ]
+    const grid = gridOcorrencias(bill, pagos, "2026-06-15", cal)
+    const { media, sparkline } = resumoPagamentos(grid)
+    expect(media).toBe(15000) // só os dois pagos; nenhuma fora-vigencia entrou
+    expect(sparkline).toHaveLength(OCORRENCIAS_NA_JANELA)
+    // um mês fora-vigencia é lacuna no sparkline, nunca zero
+    const idxJan = grid.findIndex((g) => g.competencia === "2026-01")
+    expect(grid[idxJan].estado).toBe("fora-vigencia")
+    expect(sparkline[idxJan]).toBeNull()
     const idxAbril = grid.findIndex((g) => g.competencia === "2026-04")
     expect(sparkline[idxAbril]).toBe(10000)
   })
