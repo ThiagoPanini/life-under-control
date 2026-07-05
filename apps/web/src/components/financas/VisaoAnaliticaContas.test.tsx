@@ -46,6 +46,7 @@ function linhaAnalitica(over: Partial<LinhaAnalitica> = {}): LinhaAnalitica {
     grid: gridCheio(),
     sparkline: COMPS.map(() => 10000),
     media: 10000,
+    desvioValor: null,
     pontualidade: {
       estado: "calculada",
       percentual: 92,
@@ -115,6 +116,30 @@ describe("VisaoAnaliticaContas (Seam 2)", () => {
     expect(screen.getByText("R$ 123,45")).toBeInTheDocument()
   })
 
+  it.each([
+    ["acima", 2500, "+R$ 25,00 da média"],
+    ["na-media", 0, "+R$ 0,00 da média"],
+    ["abaixo", -1200, "−R$ 12,00 da média"],
+  ] as const)("test_valor_pago_mostra_delta_%s_abaixo_do_total", (estado, centavos, texto) => {
+    render(
+      <VisaoAnaliticaContas
+        itens={[
+          item(
+            {},
+            {
+              estado: "pago",
+              valor: { estado: "pago", total: 12345 },
+              desvioValor: { estado, centavos },
+            },
+          ),
+        ]}
+      />,
+    )
+    const desvio = screen.getByTestId("desvio-valor")
+    expect(desvio).toHaveAttribute("data-estado", estado)
+    expect(desvio).toHaveTextContent(texto)
+  })
+
   it("test_valor_em_aberto_estimativa_prefixada_e_rotulada", () => {
     render(<VisaoAnaliticaContas itens={[item()]} />)
     expect(screen.getByText("≈ R$ 50")).toBeInTheDocument()
@@ -169,5 +194,32 @@ describe("VisaoAnaliticaContas (Seam 2)", () => {
   it("test_switch_ausente_quando_nao_ha_encerradas", () => {
     render(<VisaoAnaliticaContas itens={[item()]} />)
     expect(screen.queryByRole("switch")).not.toBeInTheDocument()
+  })
+
+  it("test_cabecalho_e_switch_ficam_fora_do_bloco_da_tabela", () => {
+    const encerrada = item(
+      { nome: "TV a Cabo" },
+      { billId: "tv", encerrada: true, valor: { estado: "ausente" } },
+    )
+    render(<VisaoAnaliticaContas itens={[item(), encerrada]} />)
+
+    const blocoTabela = screen.getByRole("table").closest(".rounded-luc-lg")
+    expect(blocoTabela).not.toContainElement(screen.getByText("Detalhes das Contas"))
+    expect(blocoTabela).not.toContainElement(
+      screen.getByText("Visão detalhada de cada conta registrada."),
+    )
+    expect(blocoTabela).not.toContainElement(screen.getByRole("switch"))
+  })
+
+  it("test_sparkline_oculta_dots_e_revela_apenas_o_ponto_em_hover", () => {
+    render(<VisaoAnaliticaContas itens={[item()]} />)
+    expect(screen.queryByTestId("sparkline-dot")).not.toBeInTheDocument()
+
+    const primeiroPonto = screen.getAllByTestId("sparkline-hit-area")[0]
+    fireEvent.mouseEnter(primeiroPonto)
+    expect(screen.getAllByTestId("sparkline-dot")).toHaveLength(1)
+
+    fireEvent.mouseLeave(primeiroPonto)
+    expect(screen.queryByTestId("sparkline-dot")).not.toBeInTheDocument()
   })
 })

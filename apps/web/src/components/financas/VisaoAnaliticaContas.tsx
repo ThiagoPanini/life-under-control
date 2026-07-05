@@ -7,6 +7,7 @@ import { SectionHeading } from "@/components/ds/SectionHeading"
 import { mesAno } from "@/core/domain/bill"
 import { formatBRL, formatBRLSemCentavos } from "@/core/domain/money"
 import type { GridCelula } from "@/core/use-cases/derive-bill-card"
+import type { ClassificacaoValor } from "@/core/use-cases/derive-mapa-ano"
 import type { LinhaAnalitica } from "@/core/use-cases/derive-visao-analitica"
 import { GRID } from "./BillCard"
 import { BillIcon } from "./BillIcon"
@@ -29,6 +30,12 @@ export type ItemAnalitico = {
 const SPARK_W = 108
 const SPARK_H = 30
 
+const DESVIO_COR: Record<ClassificacaoValor, string> = {
+  acima: "text-luc-warn",
+  "na-media": "text-luc-faint",
+  abaixo: "text-luc-success",
+}
+
 /** Alvo do tooltip único da tabela: a chave, o nó âncora e o conteúdo (título + linhas). */
 type Alvo = { chave: string; el: Element; titulo: string; linhas: string[] }
 
@@ -45,7 +52,7 @@ type LigarTooltip = (
 }
 
 /**
- * **Visão Analítica por Conta** (issue #127): a última seção do cockpit — uma
+ * **Visão Analítica por Conta** (issue #127): uma seção do cockpit — uma
  * tabela real, uma linha por Conta ativa na ordem de urgência do Panorama (#93),
  * com o sinaleiro histórico (#21), Pontualidade 12 (#58/#59), sparkline + Média
  * da janela e o valor/estado da ocorrência vigente. O switch "Incluir encerradas"
@@ -90,21 +97,19 @@ export function VisaoAnaliticaContas({ itens }: { itens: ItemAnalitico[] }) {
         }
       />
 
-      <div className="flex flex-col gap-3 rounded-luc-lg border border-luc-border bg-luc-surface-2 p-4 sm:p-[18px]">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-bold uppercase tracking-[0.13em] text-luc-text-3">
-              Detalhes das Contas
-            </span>
-            <span className="text-xs text-luc-muted">
-              Visão detalhada de cada conta registrada.
-            </span>
-          </div>
-          {temEncerradas && (
-            <SwitchEncerradas mostrarEncerradas={mostrarEncerradas} onChange={alternarEncerradas} />
-          )}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-[11px] font-bold uppercase tracking-[0.13em] text-luc-text-3">
+            Detalhes das Contas
+          </h3>
+          <p className="text-xs text-luc-muted">Visão detalhada de cada conta registrada.</p>
         </div>
+        {temEncerradas && (
+          <SwitchEncerradas mostrarEncerradas={mostrarEncerradas} onChange={alternarEncerradas} />
+        )}
+      </div>
 
+      <div className="rounded-luc-lg border border-luc-border bg-luc-surface-2 p-4 sm:p-[18px]">
         <div className="-mx-4 overflow-x-auto sm:mx-0">
           <table className="w-full border-separate border-spacing-0 text-left">
             <caption className="sr-only">
@@ -236,9 +241,23 @@ function LinhaTabela({
   const valorNode = () => {
     if (encerrada) return <span className="font-mono text-[12.5px] text-luc-faint">—</span>
     if (linha.valor.estado === "pago") {
+      const desvio = linha.desvioValor
+      const sinal = desvio && desvio.centavos >= 0 ? "+" : "−"
       return (
-        <span className="whitespace-nowrap font-mono text-[12.5px] font-semibold text-luc-text-strong">
-          {formatBRL(linha.valor.total)}
+        <span className="whitespace-nowrap">
+          <span className="block font-mono text-[12.5px] font-semibold text-luc-text-strong">
+            {formatBRL(linha.valor.total)}
+          </span>
+          {desvio && (
+            <span
+              data-testid="desvio-valor"
+              data-estado={desvio.estado}
+              className={`block text-[9.5px] ${DESVIO_COR[desvio.estado]}`}
+            >
+              {sinal}
+              {formatBRL(Math.abs(desvio.centavos))} da média
+            </span>
+          )}
         </span>
       )
     }
@@ -355,8 +374,8 @@ function PillEstado({ estado }: { estado: LinhaAnalitica["estado"] }) {
 /**
  * Sparkline compacta dos valores pagos da janela do sinaleiro — a linha **quebra
  * na lacuna** (mês sem pagamento nunca vira zero, CONTEXT.md #3). Cada ponto pago
- * é um alvo (hover/foco) com tooltip Competência · valor, na linguagem do Total
- * Pago por Mês. Alinhada célula a célula ao sinaleiro (mesma janela de 12).
+ * tem uma área de hover invisível com tooltip Competência · valor; o dot aparece
+ * apenas para o ponto ativo. Alinhada célula a célula ao sinaleiro (mesma janela de 12).
  */
 function MiniSparkline({
   billId,
@@ -421,18 +440,30 @@ function MiniSparkline({
           formatBRL(v),
         ])
         return (
-          // biome-ignore lint/a11y/noStaticElementInteractions: ponto é enfeite de hover (mouse); a leitura por teclado/leitor de tela vem da célula do sinaleiro e do aria-label do svg
-          <circle
-            // biome-ignore lint/suspicious/noArrayIndexKey: índice É a posição temporal na janela
-            key={i}
-            onMouseEnter={onMouseEnter}
-            onMouseLeave={onMouseLeave}
-            cx={px(i)}
-            cy={py(v)}
-            r={ativo ? 3.4 : 2.2}
-            fill="var(--luc-accent-bright)"
-            className="cursor-pointer"
-          />
+          <g key={competencia}>
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: área é enfeite de hover; a leitura por teclado/leitor de tela vem da célula do sinaleiro e do aria-label do svg */}
+            <circle
+              data-testid="sparkline-hit-area"
+              onMouseEnter={onMouseEnter}
+              onMouseLeave={onMouseLeave}
+              cx={px(i)}
+              cy={py(v)}
+              r={5}
+              fill="transparent"
+              className="cursor-pointer"
+            />
+            {ativo && (
+              <circle
+                data-testid="sparkline-dot"
+                aria-hidden
+                cx={px(i)}
+                cy={py(v)}
+                r={3.4}
+                fill="var(--luc-accent-bright)"
+                className="pointer-events-none"
+              />
+            )}
+          </g>
         )
       })}
     </svg>

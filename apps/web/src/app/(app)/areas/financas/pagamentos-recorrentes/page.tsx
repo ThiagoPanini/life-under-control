@@ -299,13 +299,13 @@ export default async function FinancasPage({
         {/* Análise Histórica (#98): fora do gate `ativas>0` — a série vive só de fatos na janela. */}
         <TotalPagoPorMes serie={serieHistorica} destaques={destaques} hoje={hoje} />
 
+        {/* Visão Analítica por Conta (#127): vive de
+            vigência (encerradas entram com o switch), some quando não há Conta. */}
+        <VisaoAnaliticaContas itens={itensAnaliticos} />
+
         {/* Mapa do Ano (#102): a matriz de vigência real das Contas — vive de vigência,
             não do gate `ativas>0` (Contas encerradas na janela aparecem). */}
         <MapaDoAno mapa={mapaAno} />
-
-        {/* Visão Analítica por Conta (#127): a seção que fecha o cockpit. Vive de
-            vigência (encerradas entram com o switch), some quando não há Conta. */}
-        <VisaoAnaliticaContas itens={itensAnaliticos} />
 
         {bills.length === 0 && (
           <div className="flex flex-col items-start gap-4 rounded-luc-lg border border-luc-border border-dashed bg-luc-surface-1 p-8">
