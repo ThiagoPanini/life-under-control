@@ -59,7 +59,7 @@ As formas recorrentes descobertas até aqui. Dois grupos: **itens** (o que você
 
 **Lançamento** (`Payment`) — A especialização de Registro em Pagamentos Recorrentes: o registro de um pagamento efetuado; nasce na quitação, com o valor real do momento e a data de pagamento, e ganha Competência. Todo Lançamento nasce de uma Conta — o LUC não registra gasto avulso (um lanche de fim de semana não entra; a conta de luz do mês, sim). É a vida-administrativa *recorrente* da Fronteira de escopo. _Evite_: pagamento previsto, fatura, parcela, gasto avulso.
 
-**Competência** (`ReferencePeriod`) — O período a que um Lançamento se refere (o condomínio "de julho"), independente da data em que foi pago. _Evite_: mês de pagamento, vencimento.
+**Competência** (`ReferencePeriod`) — O período a que um Lançamento se refere, definido pelo **mês do vencimento esperado**, uniforme para toda Conta: o boleto que vence em 8 de julho é o condomínio "de julho", mesmo que o consumo seja de junho ou o pagamento caia em agosto. _Evite_: mês de pagamento, mês de consumo, vencimento.
 
 **Estado do mês** (`EstadoMes`) — A leitura derivada de uma Conta no mês vigente, em quatro nomes: **pago** (há Lançamento na Competência — prevalece, e o valor é a soma das baixas fracionadas), **a vencer** (vencimento a cinco dias ou mais), **vence em breve** (vencimento entre hoje e quatro dias — `vence hoje` incluso) e **vencida** (vencimento já passou). Derivado do `Clock`, nunca coluna (invariante #3); `vence hoje` não é atraso consumado. O semântico **danger** (vermelho) é reservado a **vencida** e a ações destrutivas; âmbar continua sendo atenção (`vence em breve`). _Evite_: pendente, atrasado como rótulo persistido.
 
