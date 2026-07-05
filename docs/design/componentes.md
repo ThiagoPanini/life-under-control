@@ -90,6 +90,25 @@ O valor acompanha o estado: soma exata quando `pago`, `≈ média` **sem centavo
 
 O card `pago` repousa **atenuado** (opacidade .62 + dessaturação, protótipo Final) e recupera contraste pleno no hover; a atenuação nunca é o único sinal — a pílula e o rótulo textual do estado permanecem presentes mesmo em repouso. Se a legibilidade do repouso incomodar em tela real, o ajuste é decisão do operador (nota de acessibilidade da rodada de fidelidade, issue #103).
 
+### Visão Analítica por Conta (#127)
+
+A última seção do cockpit de Pagamentos Recorrentes fecha o ciclo (Análise do mês, Análise Histórica, Mapa do Ano) com uma tabela real: uma linha por Conta, derivada por `derivarVisaoAnaliticaContas` a partir da **ocorrência vigente** de cada Conta (a mais recente até hoje — recorrência-ciente, não o mês civil); a UI não recalcula domínio. O cabeçalho espelha o Mapa do Ano — heading destaque "Visão Analítica por Conta" com chip de ícone; dentro do card, o título `DETALHES DAS CONTAS`, o subtítulo "Visão detalhada de cada conta registrada" e o switch **Incluir encerradas** (padrão desligado, só aparece quando há encerradas). A seção some quando o Lar não tem Conta registrada.
+
+As Contas ativas vêm na **mesma ordem de urgência do Panorama** (rank de `derivarPanoramaMensal`: vencida na frente, paga no fim); as encerradas, só com o switch ligado, vão ao fim (encerramento mais recente na frente), atenuadas.
+
+| Coluna | Regra derivada | Tratamento acessível |
+|---|---|---|
+| Identificação | nome (link para o detalhe) + vencimento descrito abaixo | texto; foco visível no link |
+| Sinaleiro | as últimas 12 ocorrências no vocabulário do grid do card + `fora-vigência` vazio à esquerda para Conta jovem (#126) | célula focável com rótulo Competência · estado · data da baixa; forma e texto, nunca só cor |
+| Pontualidade 12 | percentual em dia de `detalharPontualidadeDaConta` | número + tooltip `N/M no prazo`, focável |
+| Sparkline | valores pagos da mesma janela de 12; a linha **quebra na lacuna** (ausência nunca vira zero) | ponto focável com tooltip Competência · valor, na linguagem do Total Pago por Mês; `aria-label` resume a série |
+| Média 12 | média dos valores pagos da janela | mono; `—` sem histórico |
+| Valor | soma das baixas quando a ocorrência vigente está paga; `≈ média` (estimado) quando em aberto; `—` sem base | mono; rótulo `estimado` textual, nunca `R$ 0,00` inventado |
+| Status | a **mesma pílula** de estado do mês do Panorama — fonte única `ESTADO_MES`, sem mapa de apresentação duplicado | pílula com ponto sólido + rótulo; encerrada troca a pílula por badge `encerrada` |
+| Registrar | abre o modal existente com a Competência da ocorrência vigente | some quando pago ou encerrada |
+
+Sinaleiro e sparkline usam a **mesma janela** de 12 ocorrências e concordam célula a célula. Os tooltips são um único elemento `position: fixed` (linguagem do Mapa do Ano), com foco de teclado e hover independentes, escapando o `overflow` do scroll sem recorte. No celular a tabela rola na horizontal com a coluna de identificação fixa e legível. Nenhum estado é comunicado só por cor; a linha encerrada soma opacidade reduzida + badge + traço no valor, nunca a atenuação sozinha.
+
 ## Modal compacto (`narrow`)
 
 Cartão de gesto curto do protótipo Final (edição rápida de Conta, Registrar Lançamento em contexto). Difere da casca clássica de modal e **não** vira tela cheia no mobile:

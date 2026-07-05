@@ -18,10 +18,8 @@ import { CenarioPagamentosMes } from "@/components/financas/CenarioPagamentosMes
 import { ContaEditadaToast } from "@/components/financas/ContaEditadaToast"
 import { ContaExcluidaToast } from "@/components/financas/ContaExcluidaToast"
 import { EditarContaModal } from "@/components/financas/EditarContaModal"
-import { EncerradasSection } from "@/components/financas/EncerradasSection"
 import { ExcluirContaModal } from "@/components/financas/ExcluirContaModal"
 import { LancamentoRegistradoToast } from "@/components/financas/LancamentoRegistradoToast"
-import { LinhaConta } from "@/components/financas/LinhaConta"
 import { mensagemLancamentoRegistrado } from "@/components/financas/lancamento-toast"
 import { MapaDoAno } from "@/components/financas/MapaDoAno"
 import { NovaContaModal } from "@/components/financas/NovaContaModal"
@@ -29,16 +27,20 @@ import { type BlocoPanorama, PanoramaContas } from "@/components/financas/Panora
 import { PendenciasAnterioresChip } from "@/components/financas/PendenciasAnterioresChip"
 import { RegistrarPagamentoModal } from "@/components/financas/RegistrarPagamentoModal"
 import { TotalPagoPorMes } from "@/components/financas/TotalPagoPorMes"
-import { descreverRecorrencia, formatarDataBr } from "@/core/domain/bill"
+import {
+  type ItemAnalitico,
+  VisaoAnaliticaContas,
+} from "@/components/financas/VisaoAnaliticaContas"
+import { descreverRecorrencia, descreverVencimento, formatarDataBr } from "@/core/domain/bill"
 import { centavosParaCampo, formatBRLSemCentavos } from "@/core/domain/money"
 import { descreverCompetencia, ehCompetenciaValida } from "@/core/domain/payment"
 import { derivarAnaliseHistorica } from "@/core/use-cases/derive-analise-historica"
 import { derivarCenarioMes } from "@/core/use-cases/derive-cenario-mes"
 import { derivarDestaquesMes } from "@/core/use-cases/derive-destaques-mes"
 import { listarPendenciasAnteriores } from "@/core/use-cases/derive-forma-competencia"
-import { derivarLinhasContas } from "@/core/use-cases/derive-linha-conta"
 import { derivarMapaAno } from "@/core/use-cases/derive-mapa-ano"
 import { derivarPanoramaMensal } from "@/core/use-cases/derive-panorama-mensal"
+import { derivarVisaoAnaliticaContas } from "@/core/use-cases/derive-visao-analitica"
 import { localAuthBypass } from "@/core/use-cases/gate"
 import { getLogoUrl } from "@/core/use-cases/get-logo-url"
 import { getPainel } from "@/core/use-cases/get-painel"
@@ -56,10 +58,8 @@ const EYEBROW = (
   </span>
 )
 
-// Ocultos por #86 — componentes preservados no código para reprototipagem futura.
+// Oculto por #86 — o chip de pendências anteriores segue guardado para reprototipagem.
 const MOSTRAR_PENDENCIAS_ANTERIORES = false
-const MOSTRAR_CONTAS_ATIVAS = false
-const MOSTRAR_ENCERRADAS = false
 
 /** Cockpit do Assunto Pagamentos Recorrentes: a Análise do mês vigente no topo + lista de Contas e cadastro. */
 export default async function FinancasPage({
@@ -131,13 +131,42 @@ export default async function FinancasPage({
     ),
   )
 
-  // Linha híbrida (#56): urgência + grid + valor estado-dependente, já ordenada.
-  // Só alimenta o bloco "Contas ativas", hoje desligado — não deriva à toa.
-  const linhas = MOSTRAR_CONTAS_ATIVAS
-    ? derivarLinhasContas(systemClock(), nationalBankCalendar(), ativas, pagamentos)
-    : []
   const pessoasComAvatar = await resolveAvatares(lar.pessoas, store)
   const billsPorId = new Map(ativas.map((bill) => [bill.id, bill]))
+
+  // Visão Analítica por Conta (#127): uma linha por Conta (ativas na ordem de
+  // urgência do Panorama; encerradas ao fim), com sinaleiro + pontualidade +
+  // sparkline + valor/estado da ocorrência vigente. Deriva com `incluirEncerradas`
+  // — o switch da seção filtra a exibição na borda (default: só ativas). A borda
+  // junta nome/logo/vencimento e a data de baixa por Competência (tooltip).
+  const linhasAnaliticas = derivarVisaoAnaliticaContas(
+    systemClock(),
+    nationalBankCalendar(),
+    bills,
+    pagamentos,
+    { incluirEncerradas: true },
+  )
+  const billsPorIdTodas = new Map(bills.map((bill) => [bill.id, bill]))
+  const itensAnaliticos: ItemAnalitico[] = linhasAnaliticas.flatMap((linha) => {
+    const bill = billsPorIdTodas.get(linha.billId)
+    if (!bill) return []
+    const datasPagamento: Record<string, string> = {}
+    for (const p of pagamentos) {
+      if (p.billId !== bill.id || !p.dataPagamento) continue
+      const atual = datasPagamento[p.competencia]
+      if (atual == null || p.dataPagamento > atual) datasPagamento[p.competencia] = p.dataPagamento
+    }
+    return [
+      {
+        linha,
+        nome: bill.nome,
+        icon: bill.icon,
+        logoUrl: logoUrls.get(bill.id) ?? null,
+        vencimentoDesc: descreverVencimento(bill.dueRule, bill.dueMonthOffset),
+        datasPagamento,
+      },
+    ]
+  })
 
   // Panorama (Final): a derivação única (#93) já traz estado, valor somado
   // (baixas fracionadas) e ordem de urgência — a borda só junta nome/logo e a
@@ -183,8 +212,13 @@ export default async function FinancasPage({
   // Baixa direta do bloco (Final): modal compacto na própria página, com a
   // competência fixa da ocorrência vigente. Defaults iguais aos do detalhe —
   // valor do último Lançamento, hoje, Pessoa logada (casada por e-mail).
-  const cardRegistrar = registrar ? cards.find((card) => card.billId === registrar) : undefined
-  const billRegistrar = cardRegistrar ? billsPorId.get(cardRegistrar.billId) : undefined
+  // O registro nasce da ocorrência **vigente** de qualquer Conta ativa (inclusive
+  // não mensal fora de fase, que o Panorama não lista) — resolve pela Visão
+  // Analítica, não só pelo Panorama. Encerrada não registra.
+  const linhaRegistrar = registrar
+    ? linhasAnaliticas.find((l) => l.billId === registrar && !l.encerrada)
+    : undefined
+  const billRegistrar = linhaRegistrar ? billsPorId.get(linhaRegistrar.billId) : undefined
   // Autoria default: a Pessoa da sessão, resolvida pelo MESMO use-case da casca
   // (issue #94) — casa pelo e-mail Google vinculado, nunca pela posição no Lar.
   // Sob bypass, ignora a sessão real (como a layout) pra operar contra o seed.
@@ -269,47 +303,21 @@ export default async function FinancasPage({
             não do gate `ativas>0` (Contas encerradas na janela aparecem). */}
         <MapaDoAno mapa={mapaAno} />
 
-        {MOSTRAR_CONTAS_ATIVAS && (
-          <section aria-labelledby="contas-ativas-heading" className="flex flex-col gap-5">
-            <SectionHeading
-              id="contas-ativas-heading"
-              title="Contas ativas"
-              suffix={ativas.length > 0 ? `· ${ativas.length}` : undefined}
-              subtitle="Estado de cada Conta neste mês · o valor real nasce na quitação"
-            />
+        {/* Visão Analítica por Conta (#127): a seção que fecha o cockpit. Vive de
+            vigência (encerradas entram com o switch), some quando não há Conta. */}
+        <VisaoAnaliticaContas itens={itensAnaliticos} />
 
-            {ativas.length === 0 ? (
-              <div className="flex flex-col items-start gap-4 rounded-luc-lg border border-luc-border border-dashed bg-luc-surface-1 p-8">
-                <p className="text-luc-text-2 leading-relaxed">
-                  Nenhuma Conta ativa. Cadastre a primeira regra de pagamento recorrente — a Conta
-                  guarda o <em>quando</em>, nunca o <em>quanto</em>.
-                </p>
-                <Button href="/areas/financas/pagamentos-recorrentes/nova" variant="secondary">
-                  Cadastrar Conta
-                </Button>
-              </div>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {linhas.map((linha) => {
-                  const bill = billsPorId.get(linha.billId)
-                  if (!bill) return null
-                  return (
-                    <LinhaConta
-                      key={linha.billId}
-                      bill={bill}
-                      linha={linha}
-                      logoUrl={logoUrls.get(bill.id)}
-                      pessoas={pessoasComAvatar}
-                      lancamentos={pagamentos.filter((payment) => payment.billId === bill.id)}
-                    />
-                  )
-                })}
-              </ul>
-            )}
-          </section>
+        {bills.length === 0 && (
+          <div className="flex flex-col items-start gap-4 rounded-luc-lg border border-luc-border border-dashed bg-luc-surface-1 p-8">
+            <p className="text-luc-text-2 leading-relaxed">
+              Nenhuma Conta cadastrada. Cadastre a primeira regra de pagamento recorrente — a Conta
+              guarda o <em>quando</em>, nunca o <em>quanto</em>.
+            </p>
+            <Button href="/areas/financas/pagamentos-recorrentes/nova" variant="secondary">
+              Cadastrar Conta
+            </Button>
+          </div>
         )}
-
-        {MOSTRAR_ENCERRADAS && <EncerradasSection bills={encerradas} logoUrls={logoUrls} />}
       </div>
       {nova === "1" && <NovaContaModal closeHref="/areas/financas/pagamentos-recorrentes" />}
       {billEditar && (
@@ -339,7 +347,7 @@ export default async function FinancasPage({
           closeHref="/areas/financas/pagamentos-recorrentes"
         />
       )}
-      {billRegistrar && cardRegistrar && (
+      {billRegistrar && linhaRegistrar && (
         <RegistrarPagamentoModal
           key={`registro-${billRegistrar.id}-${lancamentosRegistrar.length}`}
           billId={billRegistrar.id}
@@ -351,14 +359,14 @@ export default async function FinancasPage({
           inicial={{
             valor: ultimoRegistrar ? centavosParaCampo(ultimoRegistrar.valor) : "",
             dataPagamento: hoje,
-            competencia: cardRegistrar.competencia,
+            competencia: linhaRegistrar.competenciaVigente,
             paidBy: pessoaLogada?.id ?? "",
           }}
           competenciasComLancamento={lancamentosRegistrar.map((p) => p.competencia)}
-          contexto={`competência ${descreverCompetencia(cardRegistrar.competencia, billRegistrar.recurrence)} · ${cardRegistrar.frase} (${formatarDataBr(cardRegistrar.vencimento).slice(0, 5)})`}
+          contexto={`competência ${descreverCompetencia(linhaRegistrar.competenciaVigente, billRegistrar.recurrence)} · ${linhaRegistrar.frase} (${formatarDataBr(linhaRegistrar.vencimento).slice(0, 5)})`}
           notaValor={
-            cardRegistrar.media != null
-              ? `estimativa pelo histórico: ≈ ${formatBRLSemCentavos(cardRegistrar.media)} — o valor exato nasce agora, no Lançamento`
+            linhaRegistrar.media != null
+              ? `estimativa pelo histórico: ≈ ${formatBRLSemCentavos(linhaRegistrar.media)} — o valor exato nasce agora, no Lançamento`
               : undefined
           }
           closeHref="/areas/financas/pagamentos-recorrentes"
