@@ -100,6 +100,16 @@ describe("MapaDoAno (Seam 2)", () => {
     expect(screen.queryByRole("tooltip")).toBeNull()
   })
 
+  it("test_hover_apos_foco_atualiza_o_tooltip", () => {
+    // Um clique dá foco à célula; depois o cursor precisa assumir. O hover zera o
+    // foco, então mover o mouse a outra célula troca o tooltip (não fica travado).
+    render(<MapaDoAno mapa={comContas([linha()])} />)
+    fireEvent.focus(screen.getByLabelText(/maio de 2026 · na média/i))
+    expect(within(screen.getByRole("tooltip")).getByText("na média")).toBeInTheDocument()
+    fireEvent.mouseEnter(screen.getByLabelText(/junho de 2026 · acima da média/i))
+    expect(within(screen.getByRole("tooltip")).getByText("acima da média")).toBeInTheDocument()
+  })
+
   it("test_celulas_expõem_o_estado_derivado", () => {
     render(
       <MapaDoAno

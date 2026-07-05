@@ -1,7 +1,7 @@
 "use client"
 
 import { CalendarRange } from "lucide-react"
-import { useState } from "react"
+import { useLayoutEffect, useRef, useState } from "react"
 import { SectionHeading } from "@/components/ds/SectionHeading"
 import { descreverMesPorExtenso, mesAno } from "@/core/domain/bill"
 import { formatBRL } from "@/core/domain/money"
@@ -73,8 +73,10 @@ const ICONE = (
   </span>
 )
 
-/** Uma célula ativa (hover/foco) com a âncora para posicionar o tooltip flutuante. */
-type Alvo = { chave: string; ancora: DOMRect }
+/** Célula ativa (hover/foco): a chave `billId|competencia` e o **elemento** que a
+ * ancora — guardamos o nó (não um retângulo congelado) para reler a posição a cada
+ * scroll/resize, senão o tooltip `fixed` fica preso em coordenadas velhas. */
+type Alvo = { chave: string; el: HTMLElement }
 
 /**
  * Mapa do Ano (issue #102): a matriz Conta × Competência das doze Competências até
@@ -88,7 +90,8 @@ type Alvo = { chave: string; ancora: DOMRect }
  */
 export function MapaDoAno({ mapa }: { mapa: Mapa }) {
   // Foco (teclado) e hover ficam separados para o mouse não apagar o foco do teclado;
-  // `focado` vence. O alvo também guarda a âncora (retângulo da célula) do tooltip.
+  // `focado` vence. Mas o hover **zera o foco** (`onMouseEnter`) para o cursor assumir —
+  // senão um clique fixa o foco e trava o tooltip na célula clicada.
   const [focado, setFocado] = useState<Alvo | null>(null)
   const [emHover, setEmHover] = useState<Alvo | null>(null)
   const alvo = focado ?? emHover
@@ -96,14 +99,21 @@ export function MapaDoAno({ mapa }: { mapa: Mapa }) {
   // intercepta a janela (elas já existem no derivado — aqui só entram/saem da vista).
   const [mostrarEncerradas, setMostrarEncerradas] = useState(false)
 
-  const linhasVisiveis =
-    mapa.estado === "com-contas"
-      ? mostrarEncerradas
-        ? mapa.linhas
-        : mapa.linhas.filter((l) => l.estado === "ativa")
-      : []
+  const linhas = mapa.estado === "com-contas" ? mapa.linhas : []
+  const temEncerradas = linhas.some((l) => l.estado === "encerrada")
+  const linhasVisiveis = mostrarEncerradas ? linhas : linhas.filter((l) => l.estado === "ativa")
 
-  const detalhe = alvoParaDetalhe(mapa, alvo)
+  // Trocar o filtro pode esconder a linha do alvo — some com o tooltip para ele não
+  // ficar flutuando sobre um nó desmontado (rect zerado) nem descrever linha invisível.
+  function alternarEncerradas(v: boolean) {
+    setMostrarEncerradas(v)
+    setFocado(null)
+    setEmHover(null)
+  }
+
+  // Resolve o alvo **só entre as linhas visíveis**: se o toggle esconde a linha, o
+  // tooltip cai fora (null) em vez de descrever uma Conta que não está na tela.
+  const detalhe = alvoParaDetalhe(linhasVisiveis, alvo)
 
   return (
     <section aria-labelledby="mapa-ano-heading" className="flex flex-col gap-[18px]">
@@ -126,10 +136,10 @@ export function MapaDoAno({ mapa }: { mapa: Mapa }) {
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          <FiltroContas
-            mostrarEncerradas={mostrarEncerradas}
-            setMostrarEncerradas={setMostrarEncerradas}
-          />
+          {/* O toggle só aparece quando há encerradas para revelar — senão seria um no-op. */}
+          {temEncerradas && (
+            <FiltroContas mostrarEncerradas={mostrarEncerradas} onChange={alternarEncerradas} />
+          )}
           <Legenda />
           {linhasVisiveis.length === 0 ? (
             <div className="rounded-luc-lg border border-luc-border bg-luc-surface-2 px-4 pt-[15px] pb-[13px]">
@@ -139,7 +149,7 @@ export function MapaDoAno({ mapa }: { mapa: Mapa }) {
             </div>
           ) : (
             <Matriz
-              competencias={mapa.competencias}
+              competencias={mapa.estado === "com-contas" ? mapa.competencias : []}
               linhas={linhasVisiveis}
               alvo={alvo}
               setFocado={setFocado}
@@ -149,16 +159,21 @@ export function MapaDoAno({ mapa }: { mapa: Mapa }) {
         </div>
       )}
 
-      {detalhe && alvo && <Tooltip ancora={alvo.ancora} nome={detalhe.nome} cel={detalhe.cel} />}
+      {detalhe && alvo && (
+        <Tooltip key={alvo.chave} el={alvo.el} nome={detalhe.nome} cel={detalhe.cel} />
+      )}
     </section>
   )
 }
 
 /** Resolve o alvo ativo (`billId|competencia`) para a linha e a célula que o tooltip descreve. */
-function alvoParaDetalhe(mapa: Mapa, alvo: Alvo | null): { nome: string; cel: CelulaMapa } | null {
-  if (!alvo || mapa.estado !== "com-contas") return null
+function alvoParaDetalhe(
+  linhas: LinhaMapa[],
+  alvo: Alvo | null,
+): { nome: string; cel: CelulaMapa } | null {
+  if (!alvo) return null
   const [billId, competencia] = alvo.chave.split("|")
-  const linha = mapa.linhas.find((l) => l.billId === billId)
+  const linha = linhas.find((l) => l.billId === billId)
   const cel = linha?.celulas.find((c) => c.competencia === competencia)
   if (!linha || !cel) return null
   return { nome: linha.nome, cel }
@@ -167,10 +182,10 @@ function alvoParaDetalhe(mapa: Mapa, alvo: Alvo | null): { nome: string; cel: Ce
 /** Toggle no topo da camada: só Contas ativas (default) ou também as encerradas. */
 function FiltroContas({
   mostrarEncerradas,
-  setMostrarEncerradas,
+  onChange,
 }: {
   mostrarEncerradas: boolean
-  setMostrarEncerradas: (v: boolean) => void
+  onChange: (v: boolean) => void
 }) {
   const opcoes: { valor: boolean; rotulo: string }[] = [
     { valor: false, rotulo: "Ativas" },
@@ -187,7 +202,7 @@ function FiltroContas({
               key={op.rotulo}
               type="button"
               aria-pressed={selecionado}
-              onClick={() => setMostrarEncerradas(op.valor)}
+              onClick={() => onChange(op.valor)}
               className={`rounded-[6px] px-2.5 py-1 text-[11px] font-medium transition-colors ${
                 selecionado
                   ? "bg-luc-surface-3 text-luc-text"
@@ -336,9 +351,13 @@ function CelulaMatriz({
         data-testid="mapa-celula"
         data-estado={cel.estado}
         aria-label={descreverCelula(nome, cel)}
-        onMouseEnter={(e) => setEmHover({ chave, ancora: e.currentTarget.getBoundingClientRect() })}
+        onMouseEnter={(e) => {
+          // Hover assume: zera o foco para um clique anterior não travar o tooltip.
+          setFocado(null)
+          setEmHover({ chave, el: e.currentTarget })
+        }}
         onMouseLeave={() => setEmHover(null)}
-        onFocus={(e) => setFocado({ chave, ancora: e.currentTarget.getBoundingClientRect() })}
+        onFocus={(e) => setFocado({ chave, el: e.currentTarget })}
         onBlur={() => setFocado(null)}
         className={`flex h-9 w-full min-w-[40px] items-center justify-center rounded-luc-md text-[13px] leading-none outline-none transition-shadow ${meta.tint} ${meta.cor} ${estaAtivo ? "ring-2 ring-luc-accent" : ""}`}
       >
@@ -351,20 +370,55 @@ function CelulaMatriz({
 /**
  * Tooltip flutuante da célula ativa — mesma linguagem visual da tooltip do gráfico
  * "Total Pago por Mês" (superfície elevada + borda forte + sombra). `position: fixed`
- * ancorado ao retângulo da célula, então **escapa o `overflow` do scroll** da matriz
- * sem recorte. Não recebe ponteiro (`pointer-events-none`) para não roubar o hover.
+ * ancorado ao **elemento** da célula, então escapa o `overflow` do scroll da matriz
+ * sem recorte. Relê a posição do nó a cada `scroll`/`resize` (capturando também o
+ * scroll do container interno) e **clampa ao viewport** — vira para baixo quando não
+ * cabe acima e nunca sai pelas bordas. Não recebe ponteiro para não roubar o hover.
  */
-function Tooltip({ ancora, nome, cel }: { ancora: DOMRect; nome: string; cel: CelulaMapa }) {
+function Tooltip({ el, nome, cel }: { el: HTMLElement; nome: string; cel: CelulaMapa }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ left: number; top: number; abaixo: boolean } | null>(null)
+
+  useLayoutEffect(() => {
+    const posicionar = () => {
+      const celula = el.getBoundingClientRect()
+      const largura = ref.current?.offsetWidth ?? 0
+      const altura = ref.current?.offsetHeight ?? 0
+      const margem = 8
+      const centro = Math.min(
+        window.innerWidth - margem - largura / 2,
+        Math.max(margem + largura / 2, celula.left + celula.width / 2),
+      )
+      const cabeAcima = celula.top - altura - margem >= 0
+      setPos({
+        left: centro,
+        top: cabeAcima ? celula.top - margem : celula.bottom + margem,
+        abaixo: !cabeAcima,
+      })
+    }
+    posicionar()
+    // `true` = fase de captura, para pegar o scroll do container interno da matriz também.
+    window.addEventListener("scroll", posicionar, true)
+    window.addEventListener("resize", posicionar)
+    return () => {
+      window.removeEventListener("scroll", posicionar, true)
+      window.removeEventListener("resize", posicionar)
+    }
+  }, [el])
+
   const meta = META[cel.estado]
   const desvio = descreverDesvio(cel.desvio)
   return (
     <div
+      ref={ref}
       role="tooltip"
       style={{
         position: "fixed",
-        left: ancora.left + ancora.width / 2,
-        top: ancora.top - 8,
-        transform: "translate(-50%, -100%)",
+        left: pos?.left ?? 0,
+        top: pos?.top ?? 0,
+        transform: pos?.abaixo ? "translate(-50%, 0)" : "translate(-50%, -100%)",
+        // Fica oculto no primeiro paint (antes de medir e posicionar) — sem salto visível.
+        visibility: pos ? "visible" : "hidden",
       }}
       className="pointer-events-none z-50 whitespace-nowrap rounded-luc-md border border-luc-border-strong bg-luc-surface-3 px-2.5 py-[7px] shadow-[0_12px_30px_rgba(0,0,0,.45)]"
     >
