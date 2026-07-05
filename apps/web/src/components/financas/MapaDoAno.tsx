@@ -114,26 +114,20 @@ export function MapaDoAno({ mapa }: { mapa: Mapa }) {
   return (
     <section aria-labelledby="mapa-ano-heading" className="flex flex-col gap-3">
       <div aria-hidden className="border-luc-border border-t" />
-      {/* O switch fica na mesma linha do título (via `actions`) e só aparece quando
-          há Contas encerradas para revelar — senão seria um controle no-op. */}
-      <SectionHeading
-        id="mapa-ano-heading"
-        title="Mapa do Ano"
-        variant="destaque"
-        icon={ICONE}
-        actions={
-          temEncerradas ? (
-            <SwitchEncerradas mostrarEncerradas={mostrarEncerradas} onChange={alternarEncerradas} />
-          ) : undefined
-        }
-      />
-      <div className="flex flex-col gap-1">
-        <span className="text-[11px] font-bold uppercase tracking-[0.13em] text-luc-text-3">
-          Conta × Competência
-        </span>
-        <span className="text-xs text-luc-muted">
-          Cada Conta ao longo dos últimos 12 meses, comparada à própria média (±5%).
-        </span>
+      <SectionHeading id="mapa-ano-heading" title="Mapa do Ano" variant="destaque" icon={ICONE} />
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-[11px] font-bold uppercase tracking-[0.13em] text-luc-text-3">
+            Conta × Competência
+          </h3>
+          <p className="text-xs text-luc-muted">
+            Cada Conta ao longo dos últimos 12 meses, comparada à própria média (±5%).
+          </p>
+        </div>
+        {/* Só aparece quando há Contas encerradas para revelar — senão seria um controle no-op. */}
+        {temEncerradas && (
+          <SwitchEncerradas mostrarEncerradas={mostrarEncerradas} onChange={alternarEncerradas} />
+        )}
       </div>
 
       {mapa.estado === "sem-contas" ? (

@@ -165,6 +165,26 @@ describe("MapaDoAno (Seam 2)", () => {
     expect(screen.getByText("Academia")).toBeInTheDocument()
   })
 
+  it("test_toggle_alinha_com_o_cabecalho_do_grafico_nao_com_o_titulo_da_secao", () => {
+    render(
+      <MapaDoAno
+        mapa={comContas([
+          linha({ billId: "b-1", estado: "ativa" }),
+          linha({ billId: "b-2", estado: "encerrada" }),
+        ])}
+      />,
+    )
+    const sw = screen.getByRole("switch", { name: /incluir encerradas/i })
+    const linhaTituloSecao = screen.getByRole("heading", { name: "Mapa do Ano" }).parentElement
+      ?.parentElement
+    const linhaCabecalhoGrafico = screen.getByRole("heading", {
+      name: "Conta × Competência",
+    }).parentElement?.parentElement
+
+    expect(linhaTituloSecao).not.toContainElement(sw)
+    expect(linhaCabecalhoGrafico).toContainElement(sw)
+  })
+
   it("test_so_encerradas_e_default_ativas_mostra_nota", () => {
     // Todas encerradas + default (ativas) → nota textual, não a matriz vazia.
     render(
