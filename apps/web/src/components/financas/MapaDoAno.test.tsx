@@ -57,6 +57,7 @@ describe("MapaDoAno (Seam 2)", () => {
 
   it("test_ausencia_de_media_e_encerrada_ditas_por_extenso", () => {
     // Histórico insuficiente: "sem média" explícito; Conta encerrada ganha o selo.
+    // Encerradas ficam ocultas por padrão — é preciso incluí-las pelo toggle.
     render(
       <MapaDoAno
         mapa={comContas([
@@ -64,6 +65,7 @@ describe("MapaDoAno (Seam 2)", () => {
         ])}
       />,
     )
+    fireEvent.click(screen.getByRole("button", { name: "Ativas + encerradas" }))
     expect(screen.getByText("sem média")).toBeInTheDocument()
     expect(screen.getByText("encerrada")).toBeInTheDocument()
   })
@@ -76,13 +78,36 @@ describe("MapaDoAno (Seam 2)", () => {
     expect(acima.getAttribute("aria-label")).toContain("desvio +R$ 20,00")
   })
 
-  it("test_foco_na_celula_atualiza_a_barra_de_detalhe", () => {
+  it("test_foco_na_celula_abre_tooltip_com_detalhe", () => {
     render(<MapaDoAno mapa={comContas([linha()])} />)
-    const detalhe = screen.getByRole("status")
-    // Antes do foco: a dica genérica.
-    expect(detalhe).toHaveTextContent(/Passe o cursor ou navegue/i)
+    // Sem célula ativa: nenhum tooltip.
+    expect(screen.queryByRole("tooltip")).toBeNull()
     fireEvent.focus(screen.getByLabelText(/junho de 2026 · acima da média/i))
-    expect(detalhe).toHaveTextContent("Internet · junho de 2026 · acima da média · R$ 120,00")
+    const tooltip = screen.getByRole("tooltip")
+    expect(within(tooltip).getByText("Internet")).toBeInTheDocument()
+    expect(within(tooltip).getByText("junho de 2026")).toBeInTheDocument()
+    expect(within(tooltip).getByText("acima da média")).toBeInTheDocument()
+    expect(within(tooltip).getByText("R$ 120,00")).toBeInTheDocument()
+    expect(within(tooltip).getByText("desvio +R$ 20,00")).toBeInTheDocument()
+  })
+
+  it("test_blur_fecha_o_tooltip", () => {
+    render(<MapaDoAno mapa={comContas([linha()])} />)
+    const alvo = screen.getByLabelText(/junho de 2026 · acima da média/i)
+    fireEvent.focus(alvo)
+    expect(screen.getByRole("tooltip")).toBeInTheDocument()
+    fireEvent.blur(alvo)
+    expect(screen.queryByRole("tooltip")).toBeNull()
+  })
+
+  it("test_hover_apos_foco_atualiza_o_tooltip", () => {
+    // Um clique dá foco à célula; depois o cursor precisa assumir. O hover zera o
+    // foco, então mover o mouse a outra célula troca o tooltip (não fica travado).
+    render(<MapaDoAno mapa={comContas([linha()])} />)
+    fireEvent.focus(screen.getByLabelText(/maio de 2026 · na média/i))
+    expect(within(screen.getByRole("tooltip")).getByText("na média")).toBeInTheDocument()
+    fireEvent.mouseEnter(screen.getByLabelText(/junho de 2026 · acima da média/i))
+    expect(within(screen.getByRole("tooltip")).getByText("acima da média")).toBeInTheDocument()
   })
 
   it("test_celulas_expõem_o_estado_derivado", () => {
@@ -98,6 +123,55 @@ describe("MapaDoAno (Seam 2)", () => {
     const estados = screen.getAllByTestId("mapa-celula").map((b) => b.getAttribute("data-estado"))
     expect(estados).toContain("fora-vigencia")
     expect(estados).toContain("vencida")
+  })
+
+  it("test_toggle_esconde_contas_encerradas_por_padrao", () => {
+    render(
+      <MapaDoAno
+        mapa={comContas([
+          linha({ billId: "b-1", nome: "Internet", estado: "ativa" }),
+          linha({
+            billId: "b-2",
+            nome: "Academia",
+            estado: "encerrada",
+            celulas: [cel("2026-06", "fora-vigencia")],
+          }),
+        ])}
+      />,
+    )
+    // Default: só a ativa aparece.
+    expect(screen.getByText("Internet")).toBeInTheDocument()
+    expect(screen.queryByText("Academia")).toBeNull()
+  })
+
+  it("test_toggle_revela_contas_encerradas_ao_incluir", () => {
+    render(
+      <MapaDoAno
+        mapa={comContas([
+          linha({ billId: "b-1", nome: "Internet", estado: "ativa" }),
+          linha({
+            billId: "b-2",
+            nome: "Academia",
+            estado: "encerrada",
+            celulas: [cel("2026-06", "fora-vigencia")],
+          }),
+        ])}
+      />,
+    )
+    fireEvent.click(screen.getByRole("button", { name: "Ativas + encerradas" }))
+    expect(screen.getByText("Academia")).toBeInTheDocument()
+  })
+
+  it("test_so_encerradas_e_default_ativas_mostra_nota", () => {
+    // Todas encerradas + default (ativas) → nota textual, não a matriz vazia.
+    render(
+      <MapaDoAno
+        mapa={comContas([
+          linha({ estado: "encerrada", celulas: [cel("2026-06", "fora-vigencia")] }),
+        ])}
+      />,
+    )
+    expect(screen.getByText(/Nenhuma Conta ativa nos últimos 12 meses/i)).toBeInTheDocument()
   })
 
   it("test_legenda_explica_os_estados_por_extenso", () => {
