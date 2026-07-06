@@ -100,10 +100,13 @@ describe("ConnectedNovaContaForm — costura com o action", () => {
       <ConnectedNovaContaForm action={action} successHref="/rota/lista" />,
     )
 
+    await user.click(screen.getByRole("button", { name: "Logo customizado" }))
     await user.upload(
       container.querySelector('input[type="file"]') as HTMLInputElement,
       new File(["logo"], "logo.png", { type: "image/png" }),
     )
+    // A seleção normaliza no cliente antes de reter — espera o chip do arquivo.
+    await screen.findByText("logo.png")
     await user.click(screen.getByRole("button", { name: "Cadastrar Conta" }))
 
     expect(await screen.findByText(/Conta criada, complete o logo pelo Editar/)).toBeInTheDocument()

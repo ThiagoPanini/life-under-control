@@ -13,6 +13,13 @@ import type { ErroCampo } from "./bill"
 /** Tamanho máximo de um comprovante (25 MB) — um recibo cabe folgado; barra o absurdo. */
 export const TAMANHO_MAX_BYTES = 25 * 1024 * 1024
 
+/**
+ * Teto do logo de uma Conta (5 MB) — bem mais apertado que o do comprovante: o
+ * logo é decorativo e ainda é normalizado no cliente (redimensionado até ~512px)
+ * antes de subir, então 5 MB já é folga de sobra.
+ */
+export const TAMANHO_MAX_LOGO_BYTES = 5 * 1024 * 1024
+
 /** Os metadados de um Anexo já validados (a forma normalizada do arquivo). */
 export type DadosAttachment = {
   /** Nome do arquivo como a Pessoa o subiu (para exibir e baixar). */
@@ -68,12 +75,20 @@ export function ehTipoComprovanteAceito(tipoMime: string): boolean {
  * ou PDF) e tamanho inteiro positivo dentro do teto. Erros saem por campo (no
  * campo único `arquivo`), no mesmo formato da baixa.
  */
-/** Tamanho inteiro positivo dentro do teto — a regra que todo upload comparte. */
-function validarTamanhoArquivo(tamanhoBytes: number): ErroCampo[] {
+/**
+ * Tamanho inteiro positivo dentro do teto — a regra que todo upload comparte. O
+ * teto (e o rótulo dele na mensagem) é parâmetro: o comprovante usa 25 MB, o logo
+ * usa 5 MB. Assim a mensagem sempre traz o limite real que foi violado.
+ */
+function validarTamanhoArquivo(
+  tamanhoBytes: number,
+  maxBytes = TAMANHO_MAX_BYTES,
+  limiteRotulo = "25 MB",
+): ErroCampo[] {
   if (typeof tamanhoBytes !== "number" || !Number.isInteger(tamanhoBytes) || tamanhoBytes <= 0)
     return [{ campo: "arquivo", mensagem: "Arquivo vazio ou inválido." }]
-  if (tamanhoBytes > TAMANHO_MAX_BYTES)
-    return [{ campo: "arquivo", mensagem: "Arquivo maior que 25 MB." }]
+  if (tamanhoBytes > maxBytes)
+    return [{ campo: "arquivo", mensagem: `Arquivo maior que ${limiteRotulo}.` }]
   return []
 }
 
@@ -104,9 +119,9 @@ export function ehImagemAceita(tipoMime: string): boolean {
 }
 
 /**
- * Valida um logo de Conta: reusa o teto de tamanho do comprovante
- * (`TAMANHO_MAX_BYTES`), mas só aceita imagem — sem PDF. Sem nome: o logo é
- * decorativo, não um documento a rotular (diferente do comprovante).
+ * Valida um logo de Conta: teto próprio, mais apertado (`TAMANHO_MAX_LOGO_BYTES`,
+ * 5 MB), e só aceita imagem — sem PDF. Sem nome: o logo é decorativo, não um
+ * documento a rotular (diferente do comprovante).
  */
 export function validarLogo(tipoMime: string, tamanhoBytes: number): ErroCampo[] {
   const erros: ErroCampo[] = []
@@ -114,7 +129,7 @@ export function validarLogo(tipoMime: string, tamanhoBytes: number): ErroCampo[]
   const tipoMimeTrim = (tipoMime ?? "").trim()
   if (!ehImagemAceita(tipoMimeTrim)) erros.push({ campo: "arquivo", mensagem: "Envie uma imagem." })
 
-  erros.push(...validarTamanhoArquivo(tamanhoBytes))
+  erros.push(...validarTamanhoArquivo(tamanhoBytes, TAMANHO_MAX_LOGO_BYTES, "5 MB"))
 
   return erros
 }

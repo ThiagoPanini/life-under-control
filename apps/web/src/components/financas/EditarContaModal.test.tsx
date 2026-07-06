@@ -122,19 +122,28 @@ describe("EditarContaModal (#97)", () => {
     expect(screen.queryByText(/Manter regra atual/)).not.toBeInTheDocument()
   })
 
-  it("test_logo_reutiliza_o_picker_existente", () => {
-    // Conta sem logo: o CTA tracejado do protótipo oferece enviar (progresso/
-    // recuperação seguem do picker)
+  it("test_logo_reutiliza_o_picker_existente_ao_alternar_para_logo", async () => {
+    // Conta sem logo abre no modo Ícone (#144); alternar para Logo revela o CTA
+    // tracejado do protótipo (progresso/recuperação seguem do picker).
+    const user = userEvent.setup()
     renderModal()
+    await user.click(screen.getByRole("button", { name: "Logo customizado" }))
     expect(screen.getByRole("button", { name: /Enviar um logo/ })).toBeInTheDocument()
   })
 
-  it("test_conta_com_logo_mantem_icone_fallback_editavel_no_disclosure", async () => {
+  it("test_conta_com_logo_abre_no_modo_logo_e_preserva_o_icone_fallback", async () => {
+    // Com logo, o toggle inicia em Logo (CTA "Trocar o logo"); o ícone fallback
+    // (Energia/zap) é preservado silenciosamente — reaparece ao voltar pro Ícone.
     const user = userEvent.setup()
     renderModal({}, undefined, "https://r2.example/logo.png")
-    await user.click(screen.getByRole("button", { name: "Energia" }))
-    expect(screen.getByRole("radio", { name: "Energia" })).toBeChecked()
+    expect(screen.getByRole("button", { name: "Logo customizado" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    )
     expect(screen.getByRole("button", { name: /Trocar o logo/ })).toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: "Ícone padrão" }))
+    expect(screen.getByRole("button", { name: /Energia/ })).toBeInTheDocument()
   })
 
   it("test_fechar_dispensa_o_modal_via_replace", async () => {

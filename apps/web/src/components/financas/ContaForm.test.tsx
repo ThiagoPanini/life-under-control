@@ -26,7 +26,7 @@ describe("ContaForm — formulário gêmeo de tela única", () => {
     expect(screen.getByRole("heading", { name: "Identidade" })).toBeInTheDocument()
     expect(screen.getByRole("heading", { name: "Recorrência" })).toBeInTheDocument()
     expect(screen.getByRole("heading", { name: "Vencimento" })).toBeInTheDocument()
-    expect(screen.getByRole("heading", { name: "Ícone" })).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Identidade visual" })).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /Próximo/ })).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Cadastrar Conta" })).toBeInTheDocument()
   })
@@ -146,5 +146,98 @@ describe("ContaForm — formulário gêmeo de tela única", () => {
 
     const formData = formAction.mock.calls[0]?.[0] as FormData
     expect(formData.get("icon")).toBe("wifi")
+  })
+
+  it("test_toggle_inicia_em_icone_no_cadastro_e_troca_para_logo", async () => {
+    const user = userEvent.setup()
+    render(<ContaForm mode="create" formAction={noop} logoFile={null} onLogoFileChange={noop} />)
+
+    expect(screen.getByRole("button", { name: "Ícone padrão" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    )
+    expect(screen.getByRole("button", { name: /Escolher ícone/ })).toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: "Logo customizado" }))
+
+    expect(screen.getByRole("button", { name: "Logo customizado" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    )
+    expect(screen.queryByRole("button", { name: /Escolher ícone/ })).not.toBeInTheDocument()
+    expect(
+      screen.getByText("O arquivo só será enviado depois que a Conta existir."),
+    ).toBeInTheDocument()
+  })
+
+  it("test_edicao_com_logo_inicia_no_modo_logo", () => {
+    render(
+      <ContaForm
+        mode="edit"
+        formAction={noop}
+        billId="bill-1"
+        logoUrl="https://r2.fake/logo"
+        inicial={{
+          nome: "Luz",
+          descricao: "",
+          icon: "zap",
+          intervalMonths: "1",
+          anchorMonth: "",
+          dueRuleKind: "dia-fixo",
+          dueRuleDay: "10",
+          dueRuleNth: "5",
+          dueMonthOffset: "0",
+        }}
+      />,
+    )
+
+    expect(screen.getByRole("button", { name: "Logo customizado" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    )
+    expect(screen.queryByRole("button", { name: /Escolher ícone/ })).not.toBeInTheDocument()
+  })
+
+  it("test_modo_logo_no_cadastro_envia_o_icone_neutro", async () => {
+    const user = userEvent.setup()
+    const formAction = vi.fn()
+    render(
+      <ContaForm mode="create" formAction={formAction} logoFile={null} onLogoFileChange={noop} />,
+    )
+
+    await user.click(screen.getByRole("button", { name: "Logo customizado" }))
+    await user.click(screen.getByRole("button", { name: "Cadastrar Conta" }))
+
+    const formData = formAction.mock.calls[0]?.[0] as FormData
+    expect(formData.get("icon")).toBe("receipt")
+  })
+
+  it("test_modo_logo_na_edicao_preserva_o_icone_atual", async () => {
+    const user = userEvent.setup()
+    const formAction = vi.fn()
+    render(
+      <ContaForm
+        mode="edit"
+        formAction={formAction}
+        billId="bill-1"
+        logoUrl="https://r2.fake/logo"
+        inicial={{
+          nome: "Luz",
+          descricao: "",
+          icon: "zap",
+          intervalMonths: "1",
+          anchorMonth: "",
+          dueRuleKind: "dia-fixo",
+          dueRuleDay: "10",
+          dueRuleNth: "5",
+          dueMonthOffset: "0",
+        }}
+      />,
+    )
+
+    await user.click(screen.getByRole("button", { name: "Salvar alterações" }))
+
+    const formData = formAction.mock.calls[0]?.[0] as FormData
+    expect(formData.get("icon")).toBe("zap")
   })
 })

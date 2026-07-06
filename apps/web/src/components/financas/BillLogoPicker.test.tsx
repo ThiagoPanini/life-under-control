@@ -51,13 +51,31 @@ describe("BillLogoPicker", () => {
     const file = arquivo()
     await user.upload(input, file)
 
-    expect(onFileChange).toHaveBeenCalledWith(file)
+    // A seleção passa pela normalização no cliente (assíncrona) antes de reter o arquivo.
+    await waitFor(() => expect(onFileChange).toHaveBeenCalledWith(file))
     expect(prepararLogoConta).not.toHaveBeenCalled()
     expect(confirmarLogoConta).not.toHaveBeenCalled()
 
     rerender(<BillLogoPicker mode="deferred" icon="wifi" file={file} onFileChange={onFileChange} />)
     expect(createObjectURL).toHaveBeenCalledWith(file)
     expect(await screen.findByAltText("")).toHaveAttribute("src", "blob:logo-preview")
+  })
+
+  it("test_modo_diferido_rejeita_arquivo_grande_com_o_limite_e_nao_retem", async () => {
+    const onFileChange = vi.fn()
+    vi.stubGlobal("URL", { createObjectURL: vi.fn(), revokeObjectURL: vi.fn() })
+    const user = userEvent.setup()
+    const { container } = render(
+      <BillLogoPicker mode="deferred" icon="wifi" file={null} onFileChange={onFileChange} />,
+    )
+
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    const grande = arquivo()
+    Object.defineProperty(grande, "size", { value: 6 * 1024 * 1024 })
+    await user.upload(input, grande)
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("5 MB")
+    expect(onFileChange).not.toHaveBeenCalled()
   })
 
   it("test_sem_logo_mostra_enviar_e_sem_botao_remover", () => {

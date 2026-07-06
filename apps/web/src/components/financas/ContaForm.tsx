@@ -57,6 +57,19 @@ const FORMAS = [
   { value: "ultimo-dia-util", label: "Último dia útil" },
 ]
 
+/** Os dois modos mutuamente exclusivos da identidade visual da Conta. */
+const IDENTIDADE_MODOS = [
+  { valor: "icone" as const, label: "Ícone padrão" },
+  { valor: "logo" as const, label: "Logo customizado" },
+]
+
+/**
+ * Ícone neutro guardado quando a Conta nasce no modo Logo: `icon` é NOT NULL no
+ * banco (fallback quando o logo não carrega), então o modo Logo não pede ícone
+ * mas ainda submete um válido. Na edição o ícone atual é preservado.
+ */
+const ICONE_NEUTRO = "receipt"
+
 const selectClass = `${compactInputClass} font-sans text-[14px] font-medium [color-scheme:dark]`
 const optionClass = "bg-luc-surface-3 font-sans text-[14px] font-medium text-luc-text"
 
@@ -84,6 +97,12 @@ export function ContaForm(props: ContaFormProps) {
   const [dueRuleNth, setDueRuleNth] = useState(inicial.dueRuleNth)
   const [icon, setIcon] = useState(inicial.icon)
   const [iconesAbertos, setIconesAbertos] = useState(false)
+  const [modoIdentidade, setModoIdentidade] = useState<"icone" | "logo">(
+    props.mode === "edit" && props.logoUrl ? "logo" : "icone",
+  )
+  // No modo Logo, `icon` vira o fallback silencioso: preserva o atual na edição,
+  // guarda o neutro no cadastro (quando ainda vazio) — sempre um ícone válido.
+  const iconeEfetivo = modoIdentidade === "logo" && icon === "" ? ICONE_NEUTRO : icon
   const formId = useId()
   const iconListId = `${formId}-icon-list`
   const iconNome = BILL_ICON_NOMES[icon as keyof typeof BILL_ICON_NOMES]
@@ -284,78 +303,103 @@ export function ContaForm(props: ContaFormProps) {
       <section className="flex flex-col gap-[13px] border-luc-border border-t pt-5">
         <GrupoTitulo
           icon={ImageIcon}
-          titulo="Ícone"
-          descricao="Escolha o símbolo de fallback e, se quiser, use um logo."
+          titulo="Identidade visual"
+          descricao="Um ícone do catálogo ou o logo da Conta — escolha como ela aparece."
         />
-        <input type="hidden" name="icon" value={icon} />
-        <button
-          id={idDe("icon")}
-          type="button"
-          aria-expanded={iconesAbertos}
-          aria-controls={iconListId}
-          aria-invalid={Boolean(erroDe("icon"))}
-          onClick={() => setIconesAbertos((aberto) => !aberto)}
-          className="flex min-h-10 w-full items-center gap-2.5 rounded-[9px] border border-luc-border-strong bg-white/[0.03] px-3 text-left text-[12.5px] text-luc-text transition-colors hover:border-white/[0.18] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent aria-[invalid=true]:border-luc-warn"
-        >
-          {icon ? (
-            <span className="shrink-0 text-luc-accent-bright">
-              <BillIcon name={icon} size={17} />
-            </span>
-          ) : (
-            <span aria-hidden className="h-[17px] w-[17px] rounded-luc-sm bg-luc-surface-2" />
-          )}
-          <span className="min-w-0 flex-1 truncate">{iconNome ?? "Escolher ícone"}</span>
-          <ChevronDown
-            aria-hidden
-            size={15}
-            className={`shrink-0 text-luc-text-3 transition-transform ${iconesAbertos ? "rotate-180" : ""}`}
-          />
-        </button>
-        {iconesAbertos && (
-          <fieldset
-            id={iconListId}
-            aria-label="Opções de ícone"
-            className="grid grid-cols-6 gap-1.5 border-0 p-0"
-          >
-            {BILL_ICONS.map((item) => (
-              <label
-                key={item}
-                title={BILL_ICON_NOMES[item]}
-                className={`flex aspect-square min-w-0 cursor-pointer items-center justify-center rounded-[9px] border transition-colors focus-within:ring-2 focus-within:ring-luc-accent ${
-                  icon === item
-                    ? "border-luc-accent/45 bg-luc-accent-12 text-luc-accent-bright"
-                    : "border-luc-border bg-white/[0.03] text-luc-text-2 hover:border-luc-border-strong"
+        <input type="hidden" name="icon" value={iconeEfetivo} />
+        <fieldset className="m-0 grid min-w-0 grid-cols-2 gap-1.5 rounded-[10px] border border-luc-border bg-white/[0.02] p-1">
+          <legend className="sr-only">Tipo de identidade visual</legend>
+          {IDENTIDADE_MODOS.map((opcao) => {
+            const ativo = modoIdentidade === opcao.valor
+            return (
+              <button
+                key={opcao.valor}
+                type="button"
+                aria-pressed={ativo}
+                onClick={() => setModoIdentidade(opcao.valor)}
+                className={`flex min-h-9 items-center justify-center rounded-[7px] px-3 font-sans text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent ${
+                  ativo
+                    ? "bg-luc-accent-12 text-luc-accent-bright"
+                    : "text-luc-text-2 hover:text-luc-text"
                 }`}
               >
-                <input
-                  type="radio"
-                  name={`${formId}-icon-choice`}
-                  value={item}
-                  checked={icon === item}
-                  onChange={() => {
-                    setIcon(item)
-                    setIconesAbertos(false)
-                  }}
-                  className="sr-only"
-                />
-                <BillIcon name={item} size={17} />
-                <span className="sr-only">{BILL_ICON_NOMES[item]}</span>
-              </label>
-            ))}
-          </fieldset>
-        )}
-        {erroDe("icon") && <FieldError>{erroDe("icon")}</FieldError>}
-        {props.mode === "create" ? (
+                {opcao.label}
+              </button>
+            )
+          })}
+        </fieldset>
+
+        {modoIdentidade === "icone" ? (
+          <>
+            <button
+              id={idDe("icon")}
+              type="button"
+              aria-expanded={iconesAbertos}
+              aria-controls={iconListId}
+              aria-invalid={Boolean(erroDe("icon"))}
+              onClick={() => setIconesAbertos((aberto) => !aberto)}
+              className="flex min-h-10 w-full items-center gap-2.5 rounded-[9px] border border-luc-border-strong bg-white/[0.03] px-3 text-left text-[12.5px] text-luc-text transition-colors hover:border-white/[0.18] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent aria-[invalid=true]:border-luc-warn"
+            >
+              {icon ? (
+                <span className="shrink-0 text-luc-accent-bright">
+                  <BillIcon name={icon} size={17} />
+                </span>
+              ) : (
+                <span aria-hidden className="h-[17px] w-[17px] rounded-luc-sm bg-luc-surface-2" />
+              )}
+              <span className="min-w-0 flex-1 truncate">{iconNome ?? "Escolher ícone"}</span>
+              <ChevronDown
+                aria-hidden
+                size={15}
+                className={`shrink-0 text-luc-text-3 transition-transform ${iconesAbertos ? "rotate-180" : ""}`}
+              />
+            </button>
+            {iconesAbertos && (
+              <fieldset
+                id={iconListId}
+                aria-label="Opções de ícone"
+                className="grid grid-cols-6 gap-1.5 border-0 p-0"
+              >
+                {BILL_ICONS.map((item) => (
+                  <label
+                    key={item}
+                    title={BILL_ICON_NOMES[item]}
+                    className={`flex aspect-square min-w-0 cursor-pointer items-center justify-center rounded-[9px] border transition-colors focus-within:ring-2 focus-within:ring-luc-accent ${
+                      icon === item
+                        ? "border-luc-accent/45 bg-luc-accent-12 text-luc-accent-bright"
+                        : "border-luc-border bg-white/[0.03] text-luc-text-2 hover:border-luc-border-strong"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name={`${formId}-icon-choice`}
+                      value={item}
+                      checked={icon === item}
+                      onChange={() => {
+                        setIcon(item)
+                        setIconesAbertos(false)
+                      }}
+                      className="sr-only"
+                    />
+                    <BillIcon name={item} size={17} />
+                    <span className="sr-only">{BILL_ICON_NOMES[item]}</span>
+                  </label>
+                ))}
+              </fieldset>
+            )}
+            {erroDe("icon") && <FieldError>{erroDe("icon")}</FieldError>}
+          </>
+        ) : props.mode === "create" ? (
           <BillLogoPicker
             mode="deferred"
-            icon={icon}
+            icon={iconeEfetivo}
             file={props.logoFile}
             onFileChange={props.onLogoFileChange}
           />
         ) : (
           <BillLogoPicker
             billId={props.billId}
-            icon={icon}
+            icon={iconeEfetivo}
             logoUrl={props.logoUrl}
             variant="compacto"
             onOperacaoEmAndamento={props.onOperacaoEmAndamento}

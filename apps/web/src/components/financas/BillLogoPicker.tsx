@@ -10,6 +10,7 @@ import {
 } from "@/app/(app)/areas/financas/actions"
 import { Button } from "@/components/ds/Button"
 import { BillLogoTile } from "@/components/financas/BillLogoTile"
+import { prepararArquivoLogo } from "@/components/financas/logo-image"
 
 /** O picker aceita só imagem — o use-case revalida o tipo do lado servidor. */
 const ACEITA = "image/*"
@@ -52,6 +53,7 @@ export function BillLogoPicker(props: BillLogoPickerProps) {
 function BillLogoPickerDiferido({ icon, file, onFileChange }: BillLogoPickerDiferidoProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
 
   useEffect(() => {
     if (!file) {
@@ -62,6 +64,21 @@ function BillLogoPickerDiferido({ icon, file, onFileChange }: BillLogoPickerDife
     setPreviewUrl(objectUrl)
     return () => URL.revokeObjectURL(objectUrl)
   }, [file])
+
+  /** Normaliza/valida a escolha no cliente antes de reter o arquivo. */
+  async function selecionar(escolhido: File | null) {
+    setErro(null)
+    if (!escolhido) {
+      onFileChange(null)
+      return
+    }
+    const preparo = await prepararArquivoLogo(escolhido)
+    if (!preparo.ok) {
+      setErro(preparo.erro)
+      return
+    }
+    onFileChange(preparo.file)
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -97,8 +114,17 @@ function BillLogoPickerDiferido({ icon, file, onFileChange }: BillLogoPickerDife
         type="file"
         accept={ACEITA}
         className="hidden"
-        onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
+        onChange={(event) => {
+          const escolhido = event.target.files?.[0] ?? null
+          event.target.value = ""
+          void selecionar(escolhido)
+        }}
       />
+      {erro && (
+        <p role="alert" className="text-[11px] text-luc-warn">
+          {erro}
+        </p>
+      )}
       <span className="text-[10.5px] text-luc-faint">
         O arquivo só será enviado depois que a Conta existir.
       </span>
@@ -156,6 +182,17 @@ function BillLogoPickerPersistido({
       onOperacaoEmAndamento?.(false)
       if (inputRef.current) inputRef.current.value = ""
     }
+  }
+
+  /** Normaliza/valida no cliente e só então sobe — erro de tipo/tamanho não vira PUT. */
+  async function selecionarEEnviar(escolhido: File) {
+    setErro(null)
+    const preparo = await prepararArquivoLogo(escolhido)
+    if (!preparo.ok) {
+      setErro(preparo.erro)
+      return
+    }
+    await enviar(preparo.file)
   }
 
   async function remover() {
@@ -224,7 +261,7 @@ function BillLogoPickerPersistido({
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0]
-            if (file) enviar(file)
+            if (file) void selecionarEEnviar(file)
           }}
         />
         {erro && (
@@ -261,7 +298,7 @@ function BillLogoPickerPersistido({
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0]
-            if (file) enviar(file)
+            if (file) void selecionarEEnviar(file)
           }}
         />
       </div>
