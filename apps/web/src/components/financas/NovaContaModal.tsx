@@ -1,6 +1,6 @@
 import { criarConta } from "@/app/(app)/areas/financas/actions"
 import { Modal } from "@/components/ds/Modal"
-import { ConnectedBillForm } from "@/components/financas/ConnectedBillForm"
+import { ConnectedNovaContaForm } from "@/components/financas/ConnectedNovaContaForm"
 
 export function NovaContaModal({ closeHref }: { closeHref: string }) {
   return (
@@ -9,8 +9,9 @@ export function NovaContaModal({ closeHref }: { closeHref: string }) {
       eyebrow="Finanças · Pagamentos Recorrentes"
       description="Cadastre a regra que se repete. O valor real só aparece quando houver um Lançamento."
       closeHref={closeHref}
+      width="compact"
     >
-      <ConnectedBillForm action={criarConta} createMode successHref={closeHref} />
+      <ConnectedNovaContaForm action={criarConta} successHref={closeHref} />
     </Modal>
   )
 }
