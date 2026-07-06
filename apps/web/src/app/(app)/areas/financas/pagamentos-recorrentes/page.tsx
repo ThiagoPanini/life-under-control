@@ -22,6 +22,7 @@ import { ExcluirContaModal } from "@/components/financas/ExcluirContaModal"
 import { LancamentoRegistradoToast } from "@/components/financas/LancamentoRegistradoToast"
 import { mensagemLancamentoRegistrado } from "@/components/financas/lancamento-toast"
 import { MapaDoAno } from "@/components/financas/MapaDoAno"
+import { NovaContaButton } from "@/components/financas/NovaContaButton"
 import { NovaContaModal } from "@/components/financas/NovaContaModal"
 import { type BlocoPanorama, PanoramaContas } from "@/components/financas/PanoramaContas"
 import { PendenciasAnterioresChip } from "@/components/financas/PendenciasAnterioresChip"
@@ -272,6 +273,7 @@ export default async function FinancasPage({
           eyebrow={EYEBROW}
           title="Pagamentos Recorrentes"
           description="Gerenciamento de Contas e pagamentos recorrentes (normalmente mensais) relevantes para o casal"
+          actions={<NovaContaButton />}
         />
 
         {ativas.length > 0 && (
