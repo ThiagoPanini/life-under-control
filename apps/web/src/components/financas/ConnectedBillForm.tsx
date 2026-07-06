@@ -60,6 +60,7 @@ export function ConnectedBillForm({
         router.replace(successHref)
         router.refresh()
       } catch (error) {
+        console.error("[logo] finalizar criação da Conta falhou:", error)
         setErroFinalizacao(
           error instanceof Error
             ? error.message
