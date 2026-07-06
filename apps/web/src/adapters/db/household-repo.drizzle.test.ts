@@ -49,4 +49,13 @@ suite("drizzleHouseholdRepo (Seam 2 — Postgres real)", () => {
     expect(porInicial.J?.hue).toBe(14)
     expect(porInicial.J?.avatarKey).toBeNull()
   })
+
+  it("test_carregar_lar_inclui_whatsapp_phone_vinculado", async () => {
+    const repo = drizzleHouseholdRepo(drizzle(pool, { schema }))
+
+    const lar = await repo.carregarLar()
+
+    const porInicial = Object.fromEntries((lar?.pessoas ?? []).map((p) => [p.inicial, p]))
+    expect(porInicial.T?.whatsappPhone).toBeNull()
+  })
 })

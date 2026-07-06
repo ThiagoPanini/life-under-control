@@ -13,6 +13,7 @@ function paraDominio(u: typeof users.$inferSelect): Pessoa {
     hue: u.hue,
     inicial: u.inicial,
     avatarKey: u.avatarKey,
+    whatsappPhone: u.whatsappPhone,
   }
 }
 
@@ -47,6 +48,19 @@ export function drizzleUserRepo(db: Db = getDb()): UserRepo {
         .update(users)
         .set({ googleEmail: googleEmail.toLowerCase() })
         .where(eq(users.id, userId))
+    },
+
+    async obterPorWhatsappPhone(whatsappPhone: string): Promise<Pessoa | null> {
+      const [row] = await db.select().from(users).where(eq(users.whatsappPhone, whatsappPhone))
+      return row ? paraDominio(row) : null
+    },
+
+    async vincularWhatsappPhone(userId: string, whatsappPhone: string): Promise<void> {
+      await db.update(users).set({ whatsappPhone }).where(eq(users.id, userId))
+    },
+
+    async desvincularWhatsappPhone(userId: string): Promise<void> {
+      await db.update(users).set({ whatsappPhone: null }).where(eq(users.id, userId))
     },
   }
 }

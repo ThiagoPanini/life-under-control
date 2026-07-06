@@ -22,6 +22,13 @@ export type Pessoa = {
   inicial: string
   /** Chave do avatar no R2 (foto do Google espelhada no login); `null` sem foto. */
   avatarKey: string | null
+  /**
+   * WhatsApp vinculado (E.164, issue #152) — a allowlist da borda de ingestão
+   * (ADR-0012). Opcional (não `| null` obrigatório como `googleEmail`) pra não
+   * exigir o campo em todo fixture de `Pessoa` já existente; ausente equivale
+   * a não vinculado.
+   */
+  whatsappPhone?: string | null
 }
 
 export type Lar = {

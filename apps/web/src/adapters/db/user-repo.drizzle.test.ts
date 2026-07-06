@@ -21,6 +21,7 @@ suite("drizzleUserRepo (Seam 2 — Postgres real)", () => {
   let larId: string
   let pessoaId: string
   let pessoaEmail: string
+  let telefoneVinculado: string
 
   beforeAll(async () => {
     await runMigrations(DATABASE_URL as string)
@@ -101,5 +102,50 @@ suite("drizzleUserRepo (Seam 2 — Postgres real)", () => {
     const compartilhado = `Vinculo-${larId}@Gmail.com` // já vinculado à `pessoaId` acima
 
     await expect(repo.vincularGoogleEmail(outra.id, compartilhado)).rejects.toThrow()
+  })
+
+  it("test_whatsapp_phone_comeca_nulo", async () => {
+    const repo = drizzleUserRepo(db)
+
+    const pessoa = await repo.obterPorEmail(pessoaEmail)
+    expect(pessoa?.whatsappPhone).toBeNull()
+  })
+
+  it("test_vincular_whatsapp_phone_grava_e_resolve_na_leitura", async () => {
+    const repo = drizzleUserRepo(db)
+    telefoneVinculado = `+5511${Date.now().toString().slice(-9)}`
+
+    await repo.vincularWhatsappPhone(pessoaId, telefoneVinculado)
+
+    const porEmail = await repo.obterPorEmail(pessoaEmail)
+    expect(porEmail?.whatsappPhone).toBe(telefoneVinculado)
+    const porWhatsapp = await repo.obterPorWhatsappPhone(telefoneVinculado)
+    expect(porWhatsapp?.id).toBe(pessoaId)
+  })
+
+  it("test_whatsapp_phone_e_unico_no_banco", async () => {
+    const repo = drizzleUserRepo(db)
+    const [outra] = await db
+      .insert(users)
+      .values({
+        householdId: larId,
+        email: `outra-whatsapp-${larId}@teste.lar`,
+        nome: "Léo",
+        hue: 60,
+        inicial: "L",
+      })
+      .returning()
+
+    await expect(repo.vincularWhatsappPhone(outra.id, telefoneVinculado)).rejects.toThrow()
+  })
+
+  it("test_desvincular_whatsapp_phone_remove_e_libera_o_numero", async () => {
+    const repo = drizzleUserRepo(db)
+
+    await repo.desvincularWhatsappPhone(pessoaId)
+
+    const porEmail = await repo.obterPorEmail(pessoaEmail)
+    expect(porEmail?.whatsappPhone).toBeNull()
+    expect(await repo.obterPorWhatsappPhone(telefoneVinculado)).toBeNull()
   })
 })

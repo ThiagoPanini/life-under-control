@@ -23,5 +23,18 @@ export function fakeUserRepo(seed: Pessoa[] = []): UserRepo {
       if (!pessoa) return
       store.set(userId, { ...pessoa, googleEmail: googleEmail.toLowerCase() })
     },
+    async obterPorWhatsappPhone(whatsappPhone) {
+      return [...store.values()].find((p) => p.whatsappPhone === whatsappPhone) ?? null
+    },
+    async vincularWhatsappPhone(userId, whatsappPhone) {
+      const pessoa = store.get(userId)
+      if (!pessoa) return
+      store.set(userId, { ...pessoa, whatsappPhone })
+    },
+    async desvincularWhatsappPhone(userId) {
+      const pessoa = store.get(userId)
+      if (!pessoa) return
+      store.set(userId, { ...pessoa, whatsappPhone: null })
+    },
   }
 }
