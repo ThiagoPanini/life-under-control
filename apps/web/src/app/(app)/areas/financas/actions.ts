@@ -536,6 +536,7 @@ export async function prepararLogoConta(
     return { ok: true, uploadId, uploadUrl: prep.uploadUrl }
   } catch (e) {
     if (e instanceof AttachmentInvalidoError) return { ok: false, erro: mensagemDeAnexoInvalido(e) }
+    console.error("[logo] preparar upload falhou (servidor):", { billId, erro: e })
     throw e
   }
 }
@@ -557,6 +558,7 @@ export async function confirmarLogoConta(
   } catch (e) {
     if (e instanceof AttachmentInvalidoError) return { ok: false, erro: mensagemDeAnexoInvalido(e) }
     if (e instanceof BillNaoEncontradaError) redirect(ROTA_FINANCAS)
+    console.error("[logo] confirmar upload falhou (servidor):", { billId, uploadId, erro: e })
     throw e
   }
 
@@ -575,6 +577,7 @@ export async function removerLogoConta(billId: string): Promise<ComprovanteResul
     await removeLogo(drizzleBillRepo(), r2AttachmentStore(), lar.id, billId)
   } catch (e) {
     if (e instanceof BillNaoEncontradaError) redirect(ROTA_FINANCAS)
+    console.error("[logo] remover logo falhou (servidor):", { billId, erro: e })
     throw e
   }
 

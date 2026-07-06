@@ -3,7 +3,7 @@
 import "@testing-library/jest-dom/vitest"
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const refresh = vi.fn()
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }))
@@ -19,8 +19,15 @@ vi.mock("@/app/(app)/areas/financas/actions", () => ({
 
 import { BillLogoPicker } from "./BillLogoPicker"
 
+let errSpy: ReturnType<typeof vi.spyOn>
+
+beforeEach(() => {
+  errSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+})
+
 afterEach(() => {
   cleanup()
+  errSpy.mockRestore()
   vi.clearAllMocks()
   vi.unstubAllGlobals()
 })
@@ -80,6 +87,76 @@ describe("BillLogoPicker", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Envie uma imagem.")
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("test_erro_ao_preparar_loga_o_contexto", async () => {
+    prepararLogoConta.mockResolvedValue({ ok: false, erro: "Envie uma imagem." })
+    vi.stubGlobal("fetch", vi.fn())
+
+    const user = userEvent.setup()
+    render(<BillLogoPicker billId="bill-1" icon="wifi" logoUrl={null} />)
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, arquivo())
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Envie uma imagem.")
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("[logo]"), expect.anything())
+  })
+
+  it("test_falha_no_put_loga_e_exibe_mensagem", async () => {
+    prepararLogoConta.mockResolvedValue({
+      ok: true,
+      uploadId: "up-1",
+      uploadUrl: "https://r2.fake/put/x",
+    })
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }))
+
+    const user = userEvent.setup()
+    render(<BillLogoPicker billId="bill-1" icon="wifi" logoUrl={null} />)
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, arquivo())
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Falha ao subir o arquivo. Tente de novo.",
+    )
+    expect(confirmarLogoConta).not.toHaveBeenCalled()
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("[logo]"), expect.anything())
+  })
+
+  it("test_confirmar_com_erro_loga_e_exibe_mensagem", async () => {
+    prepararLogoConta.mockResolvedValue({
+      ok: true,
+      uploadId: "up-1",
+      uploadUrl: "https://r2.fake/put/x",
+    })
+    confirmarLogoConta.mockResolvedValue({ ok: false, erro: "Confirmação recusada." })
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }))
+
+    const user = userEvent.setup()
+    render(<BillLogoPicker billId="bill-1" icon="wifi" logoUrl={null} />)
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, arquivo())
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Confirmação recusada.")
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("[logo]"), expect.anything())
+  })
+
+  it("test_excecao_inesperada_loga_a_causa_real_e_exibe_mensagem", async () => {
+    prepararLogoConta.mockResolvedValue({
+      ok: true,
+      uploadId: "up-1",
+      uploadUrl: "https://r2.fake/put/x",
+    })
+    const boom = new Error("conexão caiu")
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(boom))
+
+    const user = userEvent.setup()
+    render(<BillLogoPicker billId="bill-1" icon="wifi" logoUrl={null} />)
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, arquivo())
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Algo deu errado ao enviar o logo.")
+    // A causa real chega ao log — não é engolida.
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("[logo]"), boom)
   })
 
   it("test_remover_chama_a_action_e_atualiza", async () => {

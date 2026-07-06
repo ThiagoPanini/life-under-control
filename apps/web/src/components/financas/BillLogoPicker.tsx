@@ -51,6 +51,7 @@ export function BillLogoPicker({
     try {
       const prep = await prepararLogoConta(billId, file.type, file.size)
       if (!prep.ok) {
+        console.error("[logo] preparar upload falhou (edição):", { billId, erro: prep.erro })
         setErro(prep.erro)
         return
       }
@@ -61,16 +62,19 @@ export function BillLogoPicker({
         headers: { "Content-Type": file.type },
       })
       if (!resposta.ok) {
+        console.error("[logo] PUT do upload falhou (edição):", { billId, status: resposta.status })
         setErro("Falha ao subir o arquivo. Tente de novo.")
         return
       }
       const conf = await confirmarLogoConta(billId, prep.uploadId)
       if (!conf.ok) {
+        console.error("[logo] confirmar upload falhou (edição):", { billId, erro: conf.erro })
         setErro(conf.erro)
         return
       }
       router.refresh()
-    } catch {
+    } catch (e) {
+      console.error("[logo] exceção no upload (edição):", e)
       setErro("Algo deu errado ao enviar o logo.")
     } finally {
       setEnviando(false)
@@ -86,11 +90,13 @@ export function BillLogoPicker({
     try {
       const res = await removerLogoConta(billId)
       if (!res.ok) {
+        console.error("[logo] remover falhou (edição):", { billId, erro: res.erro })
         setErro(res.erro)
         return
       }
       router.refresh()
-    } catch {
+    } catch (e) {
+      console.error("[logo] exceção ao remover (edição):", e)
       setErro("Não foi possível remover. Tente de novo.")
     } finally {
       setRemovendo(false)
