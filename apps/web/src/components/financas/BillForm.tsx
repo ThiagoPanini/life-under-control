@@ -383,7 +383,7 @@ export function BillForm({
             {FORMAS.map((f) => (
               <label
                 key={f.value}
-                className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-luc-md border px-3 transition-colors ${
+                className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-luc-md border px-3 text-[13.5px] transition-colors ${
                   dueRuleKind === f.value
                     ? "border-luc-accent bg-luc-accent-12 text-luc-text"
                     : "border-luc-border bg-luc-surface-2 text-luc-text-2 hover:border-luc-border-strong"
