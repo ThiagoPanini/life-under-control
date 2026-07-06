@@ -38,3 +38,5 @@ Para um **refinamento** (a decisão segue válida, muda um detalhe), edite o ADR
 - [0009 — Assunto: nível estrutural dentro da Área, unidade de especialização dos primitivos](0009-assunto-nivel-estrutural-especializacao.md)
 - [0010 — Gráficos financeiros em visx, revertendo a postura "SVG puro sem lib de chart"](0010-visx-para-graficos.md)
 - [0011 — Vigência da Conta: primeira Competência canônica e backfill aditivo](0011-vigencia-da-conta-primeira-competencia.md)
+- [0012 — WhatsApp como borda de ingestão e notificação via Meta Cloud API](0012-whatsapp-borda-meta-cloud-api.md)
+- [0013 — Extração de comprovante por LLM vision atrás de port (Claude no Bedrock)](0013-extracao-comprovante-llm-port.md)
