@@ -25,6 +25,7 @@ import type { Attachment } from "@/core/domain/attachment"
 import { descreverRecorrencia, descreverVencimento, formatarDataBr } from "@/core/domain/bill"
 import { centavosParaCampo, formatBRL } from "@/core/domain/money"
 import { descreverCompetencia, ehCompetenciaValida } from "@/core/domain/payment"
+import { resumoDeExclusao } from "@/core/use-cases/delete-bill"
 import {
   competenciaDefaultBaixaDoGrid,
   derivarCardConta,
@@ -157,6 +158,12 @@ export default async function ContaDetailPage({
   const detalheHref = `/areas/financas/pagamentos-recorrentes/${bill.id}`
   const abrirRegistro = registrar === "1" || ehCompetenciaValida(compParam ?? "")
   const abrirEdicao = editar === bill.id
+  // Ciclo de vida (#143): a contagem de dependentes só é lida quando o modal de
+  // edição abre — o rodapé mostra a mesma contagem honesta do gesto de deletar.
+  // Falha aqui degrada (null bloqueia o armar no rodapé), não derruba a página.
+  const dependentesEdicao = abrirEdicao
+    ? await resumoDeExclusao(drizzleBillRepo(), lar.id, bill.id).catch(() => null)
+    : { lancamentos: 0, anexos: 0 }
   const registrarHref = `${detalheHref}?registrar=1&competencia=${encodeURIComponent(competencia)}`
 
   return (
@@ -302,6 +309,10 @@ export default async function ContaDetailPage({
           inicial={billParaInicial(bill)}
           action={editarConta.bind(null, bill.id, detalheHref)}
           closeHref={detalheHref}
+          estado={bill.estado}
+          encerradaEm={bill.encerradaEm}
+          hoje={hoje}
+          dependentes={dependentesEdicao}
         />
       )}
     </div>

@@ -3,7 +3,14 @@ import "@testing-library/jest-dom/vitest"
 import { cleanup, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import type { ContaFormState } from "@/app/(app)/areas/financas/actions"
+import {
+  type ContaFormState,
+  deletarConta,
+  encerrarConta,
+  reativarConta,
+} from "@/app/(app)/areas/financas/actions"
+import type { BillEstado } from "@/core/domain/bill"
+import type { DependentesBill } from "@/core/ports/bill-repo"
 import type { BillFormInicial } from "./bill-form-inicial"
 import { EditarContaModal } from "./EditarContaModal"
 
@@ -16,16 +23,20 @@ vi.mock("next/navigation", () => ({
 }))
 
 // As actions reais são "use server" e arrastam @/auth (next-auth) — fora do
-// jsdom. O `BillLogoPicker` importa as actions de logo; mockamos o suficiente.
+// jsdom. O `BillLogoPicker` importa as actions de logo; o rodapé de ciclo de
+// vida importa encerrar/reativar/deletar — mockamos o suficiente de cada uma.
 vi.mock("@/app/(app)/areas/financas/actions", () => ({
   prepararLogoConta: vi.fn(),
   confirmarLogoConta: vi.fn(),
   removerLogoConta: vi.fn(),
+  encerrarConta: vi.fn(async () => ({})),
+  reativarConta: vi.fn(async () => {}),
+  deletarConta: vi.fn(async () => {}),
 }))
 
 afterEach(() => {
   cleanup()
-  replace.mockClear()
+  vi.clearAllMocks()
 })
 
 const CLOSE = "/areas/financas/pagamentos-recorrentes"
@@ -36,6 +47,12 @@ function renderModal(
     erros: [],
   }),
   logoUrl: string | null = null,
+  ciclo: {
+    estado?: BillEstado
+    encerradaEm?: string | null
+    hoje?: string
+    dependentes?: DependentesBill | null
+  } = {},
 ) {
   return render(
     <EditarContaModal
@@ -58,6 +75,12 @@ function renderModal(
       }}
       action={action}
       closeHref={CLOSE}
+      estado={ciclo.estado ?? "ativa"}
+      encerradaEm={ciclo.encerradaEm ?? null}
+      hoje={ciclo.hoje ?? "2026-07-06"}
+      dependentes={
+        ciclo.dependentes === undefined ? { lancamentos: 0, anexos: 0 } : ciclo.dependentes
+      }
     />,
   )
 }
@@ -130,5 +153,102 @@ describe("EditarContaModal (#97)", () => {
     renderModal({}, action)
     await user.click(screen.getByRole("button", { name: "Salvar alterações" }))
     expect(action).toHaveBeenCalled()
+  })
+})
+
+describe("EditarContaModal — ciclo de vida da Conta (#143)", () => {
+  it("test_conta_ativa_mostra_encerrar_com_data_default", () => {
+    renderModal(undefined, undefined, undefined, { hoje: "2026-07-06" })
+    expect(screen.getByRole("button", { name: "Encerrar" })).toBeInTheDocument()
+    expect(screen.getByLabelText("Data de encerramento")).toHaveValue("2026-07-06")
+    expect(screen.queryByRole("button", { name: "Reativar" })).not.toBeInTheDocument()
+  })
+
+  it("test_encerrar_dispara_a_action_de_encerramento", async () => {
+    const user = userEvent.setup()
+    renderModal()
+    await user.click(screen.getByRole("button", { name: "Encerrar" }))
+    expect(vi.mocked(encerrarConta)).toHaveBeenCalled()
+  })
+
+  it("test_conta_encerrada_mostra_a_data_e_reativar_persistente", () => {
+    renderModal(undefined, undefined, undefined, {
+      estado: "encerrada",
+      encerradaEm: "2026-06-29",
+    })
+    expect(screen.getByText(/29\/06\/2026/)).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Reativar" })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Encerrar" })).not.toBeInTheDocument()
+  })
+
+  it("test_reativar_dispara_a_action_de_reativacao", async () => {
+    const user = userEvent.setup()
+    renderModal(undefined, undefined, undefined, {
+      estado: "encerrada",
+      encerradaEm: "2026-06-29",
+    })
+    await user.click(screen.getByRole("button", { name: "Reativar" }))
+    expect(vi.mocked(reativarConta)).toHaveBeenCalled()
+  })
+
+  it("test_zona_de_risco_mostra_contagem_honesta_de_dependentes", () => {
+    renderModal(undefined, undefined, undefined, {
+      dependentes: { lancamentos: 3, anexos: 2 },
+    })
+    expect(
+      screen.getByText(
+        "Apaga a Conta e tudo ligado a ela: 3 Lançamentos e 2 Anexos. Não dá pra desfazer.",
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it("test_zona_de_risco_omite_o_tipo_zerado_do_aviso", () => {
+    // lancamentos>0 com anexos===0 não pode virar "0 Anexos" fabricado no texto
+    renderModal(undefined, undefined, undefined, {
+      dependentes: { lancamentos: 3, anexos: 0 },
+    })
+    expect(
+      screen.getByText("Apaga a Conta e tudo ligado a ela: 3 Lançamentos. Não dá pra desfazer."),
+    ).toBeInTheDocument()
+  })
+
+  it("test_contagem_indisponivel_bloqueia_o_armar", () => {
+    renderModal(undefined, undefined, undefined, { dependentes: null })
+    expect(
+      screen.getByText(
+        "Não deu pra confirmar o que a exclusão leva junto — recarregue e tente de novo.",
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Deletar Conta" })).toBeDisabled()
+  })
+
+  it("test_mutacao_do_rodape_trava_o_escape_do_modal", async () => {
+    // enquanto o delete está em voo, Escape/backdrop não pode fechar o modal em
+    // silêncio (travado precisa cobrir o rodapé, não só o Salvar/logo)
+    const user = userEvent.setup()
+    vi.mocked(deletarConta).mockImplementation(() => new Promise(() => {}))
+    renderModal()
+    await user.click(screen.getByRole("button", { name: "Deletar Conta" }))
+    await user.click(screen.getByRole("button", { name: "Confirmar exclusão" }))
+    await user.keyboard("{Escape}")
+    expect(replace).not.toHaveBeenCalled()
+  })
+
+  it("test_deletar_exige_armar_antes_de_confirmar", async () => {
+    const user = userEvent.setup()
+    renderModal()
+    expect(screen.queryByRole("button", { name: "Confirmar exclusão" })).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Deletar Conta" }))
+    expect(screen.getByRole("button", { name: "Confirmar exclusão" })).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Cancelar" }))
+    expect(screen.queryByRole("button", { name: "Confirmar exclusão" })).not.toBeInTheDocument()
+  })
+
+  it("test_confirmar_exclusao_dispara_a_action_de_delete", async () => {
+    const user = userEvent.setup()
+    renderModal()
+    await user.click(screen.getByRole("button", { name: "Deletar Conta" }))
+    await user.click(screen.getByRole("button", { name: "Confirmar exclusão" }))
+    expect(vi.mocked(deletarConta)).toHaveBeenCalled()
   })
 })

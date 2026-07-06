@@ -32,6 +32,7 @@ import {
 import { descreverRecorrencia, descreverVencimento, formatarDataBr } from "@/core/domain/bill"
 import { centavosParaCampo, formatBRLSemCentavos } from "@/core/domain/money"
 import { descreverCompetencia, ehCompetenciaValida } from "@/core/domain/payment"
+import { resumoDeExclusao } from "@/core/use-cases/delete-bill"
 import { derivarAnaliseHistorica } from "@/core/use-cases/derive-analise-historica"
 import { derivarCenarioMes } from "@/core/use-cases/derive-cenario-mes"
 import { derivarDestaquesMes } from "@/core/use-cases/derive-destaques-mes"
@@ -196,6 +197,12 @@ export default async function FinancasPage({
   // compacto, preenchido com o estado atual da Conta (nome · ícone · vencimento
   // simples · logo). A regra completa segue na página de edição.
   const billEditar = editar ? billsPorId.get(editar) : undefined
+  // Ciclo de vida (#143): a contagem de dependentes só é lida quando o modal de
+  // edição abre — o rodapé mostra a mesma contagem honesta do gesto de deletar.
+  // Falha aqui degrada (null bloqueia o armar no rodapé), não derruba a página.
+  const dependentesEditar = billEditar
+    ? await resumoDeExclusao(drizzleBillRepo(), lar.id, billEditar.id).catch(() => null)
+    : { lancamentos: 0, anexos: 0 }
   // Toast pós-edição: `?editado=<id>` de uma Conta ativa conhecida.
   const billEditado = editado ? billsPorId.get(editado) : undefined
 
@@ -331,6 +338,10 @@ export default async function FinancasPage({
           inicial={billParaInicial(billEditar)}
           action={editarConta.bind(null, billEditar.id, "/areas/financas/pagamentos-recorrentes")}
           closeHref="/areas/financas/pagamentos-recorrentes"
+          estado={billEditar.estado}
+          encerradaEm={billEditar.encerradaEm}
+          hoje={hoje}
+          dependentes={dependentesEditar}
         />
       )}
       {billExcluir && (

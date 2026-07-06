@@ -53,6 +53,19 @@ function voltarParaFinancas(): never {
   redirect(ROTA_FINANCAS)
 }
 
+/**
+ * Cauda do ciclo de vida (encerrar/reativar): volta pro detalhe da Conta quando
+ * foi de lá que a ação partiu (`successHref` bate a rota do detalhe — o mesmo
+ * `closeHref` do modal); senão volta pra lista. Espelha `editarConta`.
+ */
+function voltarParaOrigemDoCiclo(billId: string, successHref: string): never {
+  const rotaDetalhe = `${ROTA_FINANCAS}/${billId}`
+  const destino = successHref === rotaDetalhe ? rotaDetalhe : ROTA_FINANCAS
+  revalidatePath(ROTA_FINANCAS)
+  revalidatePath(rotaDetalhe)
+  redirect(destino)
+}
+
 /** Lê um campo numérico do form: vazio/ausente → null; texto inválido → null. */
 function numeroOuNull(v: FormDataEntryValue | null): number | null {
   if (v == null || v === "") return null
@@ -139,10 +152,12 @@ export async function editarConta(
 /**
  * Server action de encerramento. Grava `encerrada` + a data civil informada (a
  * Pessoa pode datar "quando cancelei"); a Conta sai da lista ativa e cessa a
- * projeção. Data inválida volta como mensagem; sucesso revalida e volta à lista.
+ * projeção. Data inválida volta como mensagem; sucesso revalida e volta pra
+ * onde a edição partiu (`successHref` — o `closeHref` do modal).
  */
 export async function encerrarConta(
   billId: string,
+  successHref: string,
   _prev: EncerrarContaState,
   formData: FormData,
 ): Promise<EncerrarContaState> {
@@ -158,7 +173,7 @@ export async function encerrarConta(
     throw e
   }
 
-  voltarParaFinancas()
+  voltarParaOrigemDoCiclo(billId, successHref)
 }
 
 /**
@@ -184,13 +199,18 @@ export async function excluirConta(billId: string): Promise<void> {
 }
 
 /**
- * Server action do Desfazer do toast de exclusão (#99). Reativa a Conta
+ * Server action do Desfazer do toast de exclusão (#99) e do controle
+ * persistente de Reativar no rodapé de ciclo de vida (#143). Reativa a Conta
  * encerrada de forma atômica: volta a `ativa`, limpa a data e ela reaparece no
  * panorama, sem tocar nenhum fato. Um Desfazer repetido — ou de outro Lar — não
  * acha Conta encerrada e cai seguro na lista (`BillNaoEncontradaError`), nunca
- * "des-desfaz".
+ * "des-desfaz". `successHref` volta pra onde a ação partiu (o toast da lista
+ * não o informa — default pra lista, seu destino de sempre).
  */
-export async function reativarConta(billId: string): Promise<void> {
+export async function reativarConta(
+  billId: string,
+  successHref: string = ROTA_FINANCAS,
+): Promise<void> {
   const { lar } = await getPainel(drizzleHouseholdRepo())
 
   try {
@@ -200,7 +220,7 @@ export async function reativarConta(billId: string): Promise<void> {
     throw e
   }
 
-  voltarParaFinancas()
+  voltarParaOrigemDoCiclo(billId, successHref)
 }
 
 /**
