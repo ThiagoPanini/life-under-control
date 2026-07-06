@@ -17,7 +17,7 @@ export type BlocoPanorama = {
   valor: ValorCard
   /** Href da baixa já preenchida; `null` quando paga (não há o que registrar). */
   registrarHref: string | null
-  /** Href da edição rápida (o lápis do card): abre o modal compacto (`?editar=`). */
+  /** Href da edição (o lápis do card): abre o modal estreito (`?editar=`). */
   editarHref: string
   /** Href da exclusão (a lixeira do card): abre a confirmação de encerramento (`?excluir=`). */
   excluirHref: string

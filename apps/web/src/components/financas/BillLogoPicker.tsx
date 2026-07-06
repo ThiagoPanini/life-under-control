@@ -2,7 +2,7 @@
 
 import { Paperclip, X } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   confirmarLogoConta,
   prepararLogoConta,
@@ -14,30 +14,105 @@ import { BillLogoTile } from "@/components/financas/BillLogoTile"
 /** O picker aceita só imagem — o use-case revalida o tipo do lado servidor. */
 const ACEITA = "image/*"
 
-/**
- * Logo de uma Conta (borda fina — ADR-0008, #50). Sobe/troca/remove pelo mesmo
- * caminho dos Comprovantes: upload em três tempos por URL assinada (prepara →
- * PUT direto pro R2 → confirma). Chave fixa por Conta: trocar sobrescreve o
- * mesmo objeto. Após gravar, `router.refresh()` traz o logo revalidado.
- *
- * Duas vestes: a padrão (página de edição — tile 48px + botões) e a `compacto`
- * do modal de edição rápida (Final): chip "Logo personalizado" com X quando há
- * logo, e o CTA tracejado com clipe ("Enviar/Trocar o logo · imagem").
- */
-export function BillLogoPicker({
-  billId,
-  icon,
-  logoUrl,
-  variant = "padrao",
-  onOperacaoEmAndamento,
-}: {
+type BillLogoPickerPersistidoProps = {
+  mode?: "persisted"
   billId: string
   icon: string
   logoUrl: string | null
   variant?: "padrao" | "compacto"
   /** Avisa o dono (modal) que um envio/remoção começou/terminou — trava o descarte silencioso. */
   onOperacaoEmAndamento?: (emAndamento: boolean) => void
-}) {
+}
+
+type BillLogoPickerDiferidoProps = {
+  mode: "deferred"
+  icon: string
+  file: File | null
+  onFileChange: (file: File | null) => void
+}
+
+export type BillLogoPickerProps = BillLogoPickerPersistidoProps | BillLogoPickerDiferidoProps
+
+/**
+ * Logo de uma Conta (borda fina — ADR-0008, #50). Sobe/troca/remove pelo mesmo
+ * caminho dos Comprovantes: upload em três tempos por URL assinada (prepara →
+ * PUT direto pro R2 → confirma). Chave fixa por Conta: trocar sobrescreve o
+ * mesmo objeto. Após gravar, `router.refresh()` traz o logo revalidado.
+ *
+ * Duas vestes: a padrão (tile 48px + botões) e a `compacto` do modal de edição
+ * (Final): chip "Logo personalizado" com X quando há
+ * logo, e o CTA tracejado com clipe ("Enviar/Trocar o logo · imagem").
+ */
+export function BillLogoPicker(props: BillLogoPickerProps) {
+  if (props.mode === "deferred") return <BillLogoPickerDiferido {...props} />
+  return <BillLogoPickerPersistido {...props} />
+}
+
+/** Seleção local usada no cadastro: preview por object URL, sem tocar servidor ou storage. */
+function BillLogoPickerDiferido({ icon, file, onFileChange }: BillLogoPickerDiferidoProps) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null)
+      return
+    }
+    const objectUrl = URL.createObjectURL(file)
+    setPreviewUrl(objectUrl)
+    return () => URL.revokeObjectURL(objectUrl)
+  }, [file])
+
+  return (
+    <div className="flex flex-col gap-2">
+      {file && (
+        <div className="flex items-center gap-2.5 rounded-[9px] border border-luc-accent/[0.32] bg-luc-accent-06 px-[11px] py-[9px]">
+          <BillLogoTile icon={icon} logoUrl={previewUrl} size={34} iconSize={18} />
+          <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-luc-text">
+            {file.name}
+          </span>
+          <button
+            type="button"
+            aria-label="Remover logo selecionado"
+            onClick={() => onFileChange(null)}
+            className="flex shrink-0 rounded-[7px] p-1 text-luc-text-3 transition-colors hover:text-luc-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent"
+          >
+            <X aria-hidden size={15} />
+          </button>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        className="flex w-full items-center gap-[9px] rounded-[9px] border border-luc-border-strong border-dashed bg-white/[0.02] px-3 py-2.5 text-left transition-colors hover:border-luc-accent/45 hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luc-accent"
+      >
+        <Paperclip aria-hidden size={15} className="shrink-0 text-luc-text-3" />
+        <span className="min-w-0 flex-1 text-[12.5px] text-luc-text-2">
+          {file ? "Trocar o logo" : "Enviar um logo"}{" "}
+          <span className="text-luc-faint">· imagem</span>
+        </span>
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={ACEITA}
+        className="hidden"
+        onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
+      />
+      <span className="text-[10.5px] text-luc-faint">
+        O arquivo só será enviado depois que a Conta existir.
+      </span>
+    </div>
+  )
+}
+
+function BillLogoPickerPersistido({
+  billId,
+  icon,
+  logoUrl,
+  variant = "padrao",
+  onOperacaoEmAndamento,
+}: BillLogoPickerPersistidoProps) {
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
   const [enviando, setEnviando] = useState(false)

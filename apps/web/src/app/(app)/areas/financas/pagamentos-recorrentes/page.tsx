@@ -5,15 +5,12 @@ import { drizzleBillRepo } from "@/adapters/db/bill-repo.drizzle"
 import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
 import { drizzlePaymentRepo } from "@/adapters/db/payment-repo.drizzle"
 import { r2AttachmentStore } from "@/adapters/r2/r2-attachment-store"
-import {
-  criarLancamento,
-  edicaoRapidaConta,
-  excluirConta,
-} from "@/app/(app)/areas/financas/actions"
+import { criarLancamento, editarConta, excluirConta } from "@/app/(app)/areas/financas/actions"
 import { auth } from "@/auth"
 import { Button } from "@/components/ds/Button"
 import { PageHeader } from "@/components/ds/PageHeader"
 import { SectionHeading } from "@/components/ds/SectionHeading"
+import { billParaInicial } from "@/components/financas/bill-form-inicial"
 import { CenarioPagamentosMes } from "@/components/financas/CenarioPagamentosMes"
 import { ContaEditadaToast } from "@/components/financas/ContaEditadaToast"
 import { ContaExcluidaToast } from "@/components/financas/ContaExcluidaToast"
@@ -199,7 +196,7 @@ export default async function FinancasPage({
   // compacto, preenchido com o estado atual da Conta (nome · ícone · vencimento
   // simples · logo). A regra completa segue na página de edição.
   const billEditar = editar ? billsPorId.get(editar) : undefined
-  // Toast pós-edição rápida: `?editado=<id>` de uma Conta ativa conhecida.
+  // Toast pós-edição: `?editado=<id>` de uma Conta ativa conhecida.
   const billEditado = editado ? billsPorId.get(editado) : undefined
 
   // Exclusão pelo card (#99): `?excluir=<id>` abre a confirmação compacta (a
@@ -274,6 +271,7 @@ export default async function FinancasPage({
           title="Pagamentos Recorrentes"
           description="Gerenciamento de Contas e pagamentos recorrentes (normalmente mensais) relevantes para o casal"
           actions={<NovaContaButton />}
+          actionsAlign="center"
         />
 
         {ativas.length > 0 && (
@@ -330,14 +328,8 @@ export default async function FinancasPage({
           billIcon={billEditar.icon}
           logoUrl={logoUrls.get(billEditar.id) ?? null}
           contexto={`recorrência ${descreverRecorrencia(billEditar.recurrence).toLowerCase()} · o valor nasce em cada Lançamento`}
-          inicial={{
-            nome: billEditar.nome,
-            icon: billEditar.icon,
-            dueRuleKind: billEditar.dueRule.kind,
-            dueRuleDay:
-              billEditar.dueRule.kind === "dia-fixo" ? String(billEditar.dueRule.day) : "10",
-          }}
-          action={edicaoRapidaConta.bind(null, billEditar.id)}
+          inicial={billParaInicial(billEditar)}
+          action={editarConta.bind(null, billEditar.id, "/areas/financas/pagamentos-recorrentes")}
           closeHref="/areas/financas/pagamentos-recorrentes"
         />
       )}

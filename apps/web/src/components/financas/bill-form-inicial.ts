@@ -4,7 +4,7 @@ import type { Bill } from "@/core/domain/bill"
  * Projeção da Conta nos campos-string do formulário — **módulo puro, sem
  * `"use client"`** de propósito: o Server Component da edição chama
  * `billParaInicial(bill)` e passa o resultado pro formulário cliente. Se isto
- * morasse no módulo `"use client"` do BillForm, todo export viraria uma
+ * morasse no módulo `"use client"` do ContaForm, todo export viraria uma
  * referência-cliente e chamar a função no servidor explodiria (RSC).
  */
 

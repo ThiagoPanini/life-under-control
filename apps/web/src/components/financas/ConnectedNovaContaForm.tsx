@@ -1,34 +1,121 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useActionState, useEffect, useRef } from "react"
-import type { ContaFormState } from "@/app/(app)/areas/financas/actions"
-import { NovaContaForm } from "@/components/financas/NovaContaForm"
+import { useActionState, useCallback, useEffect, useRef, useState } from "react"
+import {
+  type ContaFormState,
+  confirmarLogoConta,
+  prepararLogoConta,
+} from "@/app/(app)/areas/financas/actions"
+import { Button } from "@/components/ds/Button"
+import { ContaForm } from "@/components/financas/ContaForm"
 
 /**
- * Liga o `NovaContaForm` ao server action de cadastro via `useActionState` (borda
- * fina). É a fiação do fluxo de **criação** em 2 etapas — mais enxuta que o
- * `ConnectedBillForm` do wizard: aqui a identidade é só o ícone (a metade de logo
- * vem na S8), então não há orquestração de upload nem tela de sucesso; ao receber o
- * `createdBillId` do servidor, redireciona para a lista e a fecha.
+ * Orquestra o cadastro na borda: cria a Conta primeiro e, só com o id em mãos,
+ * envia o logo retido no cliente. O estado pós-criação remove o formulário, por
+ * isso um retry do logo jamais dispara `criarConta` novamente.
  */
 export function ConnectedNovaContaForm({
   action,
   successHref = "/areas/financas/pagamentos-recorrentes",
+  onOperacaoEmAndamento,
 }: {
   action: (prev: ContaFormState, formData: FormData) => Promise<ContaFormState>
   successHref?: string
+  onOperacaoEmAndamento?: (emAndamento: boolean) => void
 }) {
   const [state, formAction, pending] = useActionState(action, { erros: [] })
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [finalizando, setFinalizando] = useState(false)
+  const [erroFinalizacao, setErroFinalizacao] = useState<string | null>(null)
+  const iniciadoRef = useRef<string | null>(null)
   const router = useRouter()
-  const feitoRef = useRef<string | null>(null)
 
-  useEffect(() => {
-    if (!state.createdBillId || feitoRef.current === state.createdBillId) return
-    feitoRef.current = state.createdBillId
+  const navegar = useCallback(() => {
     router.replace(successHref)
     router.refresh()
-  }, [state.createdBillId, router, successHref])
+  }, [router, successHref])
 
-  return <NovaContaForm formAction={formAction} erros={state.erros} pending={pending} />
+  const finalizarCriacao = useCallback(
+    async (billId: string) => {
+      setFinalizando(true)
+      setErroFinalizacao(null)
+      try {
+        if (logoFile) {
+          const preparo = await prepararLogoConta(billId, logoFile.type, logoFile.size)
+          if (!preparo.ok) throw new Error(preparo.erro)
+          const upload = await fetch(preparo.uploadUrl, {
+            method: "PUT",
+            body: logoFile,
+            headers: { "Content-Type": logoFile.type },
+          })
+          if (!upload.ok) throw new Error("Não foi possível enviar o logo.")
+          const confirmacao = await confirmarLogoConta(billId, preparo.uploadId)
+          if (!confirmacao.ok) throw new Error(confirmacao.erro)
+        }
+        navegar()
+      } catch (error) {
+        console.error("[logo] finalizar criação da Conta falhou:", error)
+        const causa = error instanceof Error ? error.message : "Não foi possível enviar o logo."
+        setErroFinalizacao(`Conta criada, complete o logo pelo Editar. ${causa}`)
+      } finally {
+        setFinalizando(false)
+      }
+    },
+    [logoFile, navegar],
+  )
+
+  useEffect(() => {
+    if (!state.createdBillId || iniciadoRef.current === state.createdBillId) return
+    iniciadoRef.current = state.createdBillId
+    void finalizarCriacao(state.createdBillId)
+  }, [finalizarCriacao, state.createdBillId])
+
+  useEffect(() => {
+    onOperacaoEmAndamento?.(pending || finalizando)
+  }, [finalizando, onOperacaoEmAndamento, pending])
+
+  if (state.createdBillId) {
+    return (
+      <div className="flex min-h-[260px] flex-col items-center justify-center rounded-luc-lg border border-luc-border bg-luc-surface-2 p-6 text-center">
+        <span
+          className={`flex h-11 w-11 items-center justify-center rounded-full ${erroFinalizacao ? "bg-luc-warn/10 text-luc-warn" : "bg-luc-success/10 text-luc-success"}`}
+        >
+          {erroFinalizacao ? "!" : "✓"}
+        </span>
+        <h2 className="mt-4 text-[15px] font-bold text-luc-text">
+          {erroFinalizacao ? "Conta criada; falta concluir o logo" : "Conta criada"}
+        </h2>
+        <p className="mt-1 max-w-[46ch] text-[11.5px] leading-relaxed text-luc-muted">
+          {erroFinalizacao ??
+            (finalizando ? "Finalizando os últimos detalhes…" : "Abrindo suas Contas…")}
+        </p>
+        {erroFinalizacao && (
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => void finalizarCriacao(state.createdBillId as string)}
+            >
+              Tentar o logo novamente
+            </Button>
+            <Button type="button" variant="secondary" onClick={navegar}>
+              Continuar sem logo
+            </Button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <ContaForm
+      mode="create"
+      formAction={formAction}
+      erros={state.erros}
+      pending={pending}
+      logoFile={logoFile}
+      onLogoFileChange={setLogoFile}
+    />
+  )
 }

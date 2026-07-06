@@ -109,9 +109,9 @@ As Contas ativas vêm na **mesma ordem de urgência do Panorama** (rank de `deri
 
 Sinaleiro e sparkline usam a **mesma janela** de 12 ocorrências e concordam célula a célula. Os tooltips são um único elemento `position: fixed` (linguagem do Mapa do Ano), com foco de teclado e hover independentes, escapando o `overflow` do scroll sem recorte. No celular a tabela rola na horizontal com a coluna de identificação fixa e legível. Nenhum estado é comunicado só por cor; a linha encerrada soma opacidade reduzida + badge + traço no valor, nunca a atenuação sozinha.
 
-## Modal compacto (`narrow`)
+## Modal estreito (`narrow`)
 
-Cartão de gesto curto do protótipo Final (edição rápida de Conta, Registrar Lançamento em contexto). Difere da casca clássica de modal e **não** vira tela cheia no mobile:
+Cartão estreito do protótipo Final (formulários de Conta e Registrar Lançamento em contexto). Difere da casca clássica de modal e **não** vira tela cheia no mobile; o corpo rolável comporta formulários completos de tela única:
 
 - painel central **com margem em toda largura** (20px), máx. 400px, raio `--luc-r-xl`, `--luc-surface-3`, borda strong, sombra profunda; altura máx. `100dvh - 40px` com corpo rolável;
 - overlay `--luc-bg` a 70% com blur leve (3px); entrada com leve *pop*;
@@ -121,7 +121,7 @@ Cartão de gesto curto do protótipo Final (edição rápida de Conta, Registrar
 - CTA de anexo tracejado com clipe ("Anexar comprovantes · imagem ou PDF"); chips de arquivo com borda accent a 32% sobre accent-06;
 - rodapé com um **primário de largura cheia** (ou primário flex + secundário estreito quando há Cancelar);
 - Escape e clique no overlay são **descartes silenciosos**: uma operação em andamento os trava (`travado`); o X rotulado segue sendo a saída deliberada;
-- a grade de ícones fica **sempre visível**, mesmo com logo — o ícone é o fallback persistido e o mock não dita comportamento (decisão derivada, 04/07/2026).
+- o ícone da Conta é escolhido num disclosure em fluxo: o gatilho mostra glifo, nome e chevron; aberto, revela os 17 ícones num grid que quebra linha, empurra o conteúdo e fecha ao escolher ou reclicar. O ícone continua sendo o fallback persistido mesmo quando há logo.
 
 ## Command palette
 
@@ -135,6 +135,6 @@ O protótipo não define formulários. Para telas existentes:
 - `Input`, `Select` e `Textarea` usam surface-1/2, border, raio `--luc-r-md`, texto primário e placeholder faint;
 - foco segue o estado comum; erro usa warn, mensagem textual e `aria-describedby`;
 - radios e seletores de ícone usam o mesmo padrão ativo da navegação;
-- wizard mostra etapa atual com accent e etapas concluídas com success;
+- criação e edição de Conta usam o mesmo formulário de tela única, agrupado em Identidade, Recorrência, Vencimento e Ícone; `primeiraCompetencia` nunca aparece como campo editável;
 - ações destrutivas usam `danger` (vermelho), linguagem explícita e confirmação — o mesmo semântico do vencimento consumado, reservado a perigo e destruição;
 - pending desabilita submissão, mantém o rótulo legível e expõe `aria-busy` quando aplicável.

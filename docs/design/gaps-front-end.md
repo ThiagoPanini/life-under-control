@@ -44,11 +44,11 @@ Auditoria feita em 01/07/2026 contra o contrato oficial e o protótipo. Priorida
 | Onde | Divergência | O design manda | Fix |
 |---|---|---|---|
 | `components/financas/form-field.tsx` | base parcial, sem catálogo oficial | Field/Input/Select derivados | promover para `components/ds/` e centralizar estados |
-| `components/financas/BillForm.tsx` | radios, icon picker, wizard e opacidades ad-hoc | padrões ativos da navegação, focus e disabled comuns | migrar controles sem alterar etapas ou payload |
+| `components/financas/ContaForm.tsx` | controles de identidade, recorrência, vencimento e ícone | padrões ativos da navegação, focus e disabled comuns | manter criação e edição no mesmo formulário de tela única |
 | `components/financas/PaymentForm.tsx` | campos e pending não compartilham estados visuais | controles DS, `aria-busy` e copy pt-BR | migrar mantendo centavos, ISO e aviso não bloqueante |
 | `components/financas/DangerZone.tsx` | input repetido e fundo `warn` arbitrário | ação destrutiva âmbar, confirmação explícita | reutilizar Field/Button e intensidade documentada |
 | `app/(app)/areas/financas/[id]/page.tsx` | detalhe, baixa e anexos não têm tela no protótipo | decisão do operador: aplicar contrato sem mudar função | uniformizar headers, superfícies, linhas, autoria e estados |
-| `app/(app)/areas/financas/nova/page.tsx` e `[id]/editar/page.tsx` | wrappers e títulos repetidos | mesma casca e escala de página | extrair PageHeader/Surface e alinhar espaçamento |
+| modais `?nova=1` e `?editar=<id>` | criação e edição precisam da mesma casca | modal `narrow` e escala compartilhada | usar a mesma casca e o mesmo `ContaForm` nas duas jornadas |
 | `app/layout.tsx` | `themeColor` repete hex oficial | token é fonte única em CSS; metadata exige valor estático | manter valor estático documentado como limitação da API, sem criar outra cor |
 | várias telas/componentes | tamanhos 9–13px, tracking e opacidades arbitrários | escala e tokens oficiais | substituir quando houver papel equivalente; manter só medidas contextuais registradas |
 | várias telas/componentes | states pending/disabled são principalmente texto | estado visual comum e semântica nativa | aplicar disabled/aria-disabled/aria-busy de forma uniforme |
@@ -77,7 +77,7 @@ Todos os gaps listados acima foram tratados em 01/07/2026. Itens em que a origem
 | cockpit e tendência de Finanças | corrigido | `CockpitFinancas`, `TrendCard`, `serieTotalPago` |
 | farol, grid de 12 ocorrências, média e sparkline | corrigido | `BillCard` consumindo `derivarCardConta` |
 | detalhe, Lançamentos e anexos | corrigido | rota de Conta, `LancamentosLista`, `ComprovantesLancamento` |
-| formulários, pending, disabled, erro e zona de risco | corrigido | `FormField`, `BillForm`, `PaymentForm`, `DangerZone` |
+| formulários, pending, disabled, erro e zona de risco | corrigido | `FormField`, `ContaForm`, `PaymentForm`, `DangerZone` |
 
 Validação local final: Biome em 146 arquivos, TypeScript sem erros e 246 testes aprovados; 31 testes de adapters dependentes de infraestrutura permaneceram corretamente ignorados pela configuração da suíte.
 

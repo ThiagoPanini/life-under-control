@@ -31,11 +31,6 @@ import {
   prepareAttachmentUpload,
 } from "@/core/use-cases/prepare-attachment-upload"
 import { prepareLogoUpload } from "@/core/use-cases/prepare-logo-upload"
-import {
-  type CamposEdicaoRapida,
-  type DueRuleSimples,
-  quickEditBill,
-} from "@/core/use-cases/quick-edit-bill"
 import { reativarBill } from "@/core/use-cases/reativar-bill"
 import { PaymentInvalidoError, recordPayment } from "@/core/use-cases/record-payment"
 import { registerAttachment } from "@/core/use-cases/register-attachment"
@@ -119,6 +114,7 @@ export async function criarConta(
  */
 export async function editarConta(
   billId: string,
+  successHref: string,
   _prev: ContaFormState,
   formData: FormData,
 ): Promise<ContaFormState> {
@@ -133,53 +129,11 @@ export async function editarConta(
     throw e
   }
 
-  voltarParaFinancas()
-}
-
-/**
- * Traduz o FormData do modal compacto na allowlist da edição rápida. `dueRuleKind`
- * fora de {dia-fixo, ultimo-dia-util} (ex.: "manter") deixa `dueRule` ausente — o
- * use-case então preserva a regra atual, inclusive uma avançada (n-ésimo dia útil)
- * que o formulário compacto não representa.
- */
-function lerCamposRapidosDoForm(formData: FormData): CamposEdicaoRapida {
-  const kind = String(formData.get("dueRuleKind") ?? "")
-  let dueRule: DueRuleSimples | undefined
-  if (kind === "dia-fixo")
-    dueRule = { kind: "dia-fixo", day: numeroOuNull(formData.get("dueRuleDay")) ?? Number.NaN }
-  else if (kind === "ultimo-dia-util") dueRule = { kind: "ultimo-dia-util" }
-  return {
-    nome: String(formData.get("nome") ?? ""),
-    icon: String(formData.get("icon") ?? ""),
-    dueRule,
-  }
-}
-
-/**
- * Server action da edição rápida pelo card (modal compacto). Relê a Conta e
- * mescla **somente** nome · ícone · vencimento simples (`quickEditBill`),
- * preservando byte a byte as regras avançadas fora do formulário (#4). O `billId`
- * chega ligado (`.bind`) — nunca do formulário. Sucesso volta à lista com o toast
- * de confirmação (`?editado=`); erro de validação volta pros campos do modal.
- */
-export async function edicaoRapidaConta(
-  billId: string,
-  _prev: ContaFormState,
-  formData: FormData,
-): Promise<ContaFormState> {
-  const campos = lerCamposRapidosDoForm(formData)
-  const { lar } = await getPainel(drizzleHouseholdRepo())
-
-  try {
-    await quickEditBill(drizzleBillRepo(), lar.id, billId, campos)
-  } catch (e) {
-    if (e instanceof BillInvalidaError) return { erros: e.erros }
-    if (e instanceof BillNaoEncontradaError) redirect(ROTA_FINANCAS)
-    throw e
-  }
-
+  const rotaDetalhe = `${ROTA_FINANCAS}/${billId}`
+  const destino = successHref === rotaDetalhe ? rotaDetalhe : ROTA_FINANCAS
   revalidatePath(ROTA_FINANCAS)
-  redirect(`${ROTA_FINANCAS}?editado=${billId}`)
+  revalidatePath(rotaDetalhe)
+  redirect(`${destino}?editado=${billId}`)
 }
 
 /**

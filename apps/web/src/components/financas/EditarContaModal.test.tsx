@@ -4,8 +4,8 @@ import { cleanup, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { ContaFormState } from "@/app/(app)/areas/financas/actions"
+import type { BillFormInicial } from "./bill-form-inicial"
 import { EditarContaModal } from "./EditarContaModal"
-import type { QuickBillInicial } from "./QuickEditBillForm"
 
 // next/navigation não tem router montado nos testes — mockamos o mínimo (o X e o
 // picker de logo usam `useRouter`). A navegação em si é do Next, não deste seam.
@@ -31,7 +31,7 @@ afterEach(() => {
 const CLOSE = "/areas/financas/pagamentos-recorrentes"
 
 function renderModal(
-  inicial: Partial<QuickBillInicial> = {},
+  inicial: Partial<BillFormInicial> = {},
   action: (prev: ContaFormState, fd: FormData) => Promise<ContaFormState> = async () => ({
     erros: [],
   }),
@@ -44,7 +44,18 @@ function renderModal(
       billIcon="zap"
       logoUrl={logoUrl}
       contexto="recorrência mensal · o valor nasce em cada Lançamento"
-      inicial={{ nome: "Luz", icon: "zap", dueRuleKind: "dia-fixo", dueRuleDay: "10", ...inicial }}
+      inicial={{
+        nome: "Luz",
+        descricao: "Energia do apartamento",
+        icon: "zap",
+        intervalMonths: "1",
+        anchorMonth: "",
+        dueRuleKind: "dia-fixo",
+        dueRuleDay: "10",
+        dueRuleNth: "5",
+        dueMonthOffset: "0",
+        ...inicial,
+      }}
       action={action}
       closeHref={CLOSE}
     />,
@@ -54,7 +65,7 @@ function renderModal(
 describe("EditarContaModal (#97)", () => {
   it("test_modal_compacto_preenchido_no_cartao_do_prototipo", () => {
     renderModal()
-    // diálogo rotulado pelo nome da Conta + rótulo da edição rápida
+    // diálogo rotulado pelo nome da Conta + rótulo da edição
     expect(screen.getByRole("dialog", { name: "Luz" })).toBeInTheDocument()
     expect(screen.getByText("Editar Conta")).toBeInTheDocument()
     // contexto mono do header (Final): a recorrência + o invariante do valor
@@ -62,8 +73,8 @@ describe("EditarContaModal (#97)", () => {
       screen.getByText("recorrência mensal · o valor nasce em cada Lançamento"),
     ).toBeInTheDocument()
     // preenchido com o estado atual
-    expect(screen.getByLabelText("Nome da Conta")).toHaveValue("Luz")
-    expect(screen.getByLabelText("todo dia")).toHaveValue(10)
+    expect(screen.getByLabelText("Nome")).toHaveValue("Luz")
+    expect(screen.getByLabelText("Dia do mês")).toHaveValue(10)
     // cartão do protótipo: até 400px, central com margem, overlay com blur leve
     const dialog = screen.getByRole("dialog")
     expect(dialog).toHaveClass("max-w-[400px]")
@@ -71,25 +82,21 @@ describe("EditarContaModal (#97)", () => {
     expect(screen.getByLabelText("Fechar diálogo")).toHaveClass("backdrop-blur-[3px]")
   })
 
-  it("test_allowlist_nao_expoe_campos_avancados", () => {
+  it("test_edicao_expoe_os_campos_editaveis_sem_offset", () => {
     renderModal()
-    // o essencial aparece…
+    expect(screen.getByLabelText("Descrição (opcional)")).toHaveValue("Energia do apartamento")
+    expect(screen.getByLabelText("Periodicidade")).toHaveValue("1")
     expect(screen.getByText("Dia fixo")).toBeInTheDocument()
+    expect(screen.getByText("N-ésimo dia útil")).toBeInTheDocument()
     expect(screen.getByText("Último dia útil")).toBeInTheDocument()
-    // …e as regras avançadas NÃO: sem periodicidade, descrição, âncora, nth, offset
-    expect(screen.queryByLabelText("Periodicidade")).not.toBeInTheDocument()
-    expect(screen.queryByLabelText("Descrição (opcional)")).not.toBeInTheDocument()
-    expect(screen.queryByLabelText("Mês-âncora")).not.toBeInTheDocument()
-    expect(screen.queryByLabelText("Dia útil nº")).not.toBeInTheDocument()
     expect(screen.queryByLabelText("Offset de vencimento")).not.toBeInTheDocument()
   })
 
-  it("test_regra_avancada_abre_em_manter_para_preservar_o_n_esimo", () => {
-    renderModal({ dueRuleKind: "n-esimo-dia-util" })
-    const manter = screen.getByRole("radio", { name: /Manter regra atual/ })
-    expect(manter).toBeChecked()
-    // em "manter" não há dia a informar — o vencimento avançado fica intocado
-    expect(screen.queryByLabelText("todo dia")).not.toBeInTheDocument()
+  it("test_regra_avancada_abre_editavel_sem_segmento_manter", () => {
+    renderModal({ dueRuleKind: "n-esimo-dia-util", dueRuleNth: "7" })
+    expect(screen.getByRole("radio", { name: "N-ésimo dia útil" })).toBeChecked()
+    expect(screen.getByLabelText("Dia útil nº")).toHaveValue(7)
+    expect(screen.queryByText(/Manter regra atual/)).not.toBeInTheDocument()
   })
 
   it("test_logo_reutiliza_o_picker_existente", () => {
@@ -99,11 +106,10 @@ describe("EditarContaModal (#97)", () => {
     expect(screen.getByRole("button", { name: /Enviar um logo/ })).toBeInTheDocument()
   })
 
-  it("test_conta_com_logo_mantem_grade_de_icones_visivel", () => {
-    // O protótipo esconde a grade com logo, mas o ícone é o fallback persistido
-    // (mock não dita comportamento): trocar o fallback não pode exigir destruir
-    // o logo antes — a remoção é imediata e sem desfazer.
+  it("test_conta_com_logo_mantem_icone_fallback_editavel_no_disclosure", async () => {
+    const user = userEvent.setup()
     renderModal({}, undefined, "https://r2.example/logo.png")
+    await user.click(screen.getByRole("button", { name: "Energia" }))
     expect(screen.getByRole("radio", { name: "Energia" })).toBeChecked()
     expect(screen.getByRole("button", { name: /Trocar o logo/ })).toBeInTheDocument()
   })
@@ -118,7 +124,7 @@ describe("EditarContaModal (#97)", () => {
     expect(replace).toHaveBeenCalledWith(CLOSE, { scroll: false })
   })
 
-  it("test_submeter_dispara_a_action_da_edicao_rapida", async () => {
+  it("test_submeter_dispara_a_action_da_edicao", async () => {
     const user = userEvent.setup()
     const action = vi.fn(async (): Promise<ContaFormState> => ({ erros: [] }))
     renderModal({}, action)

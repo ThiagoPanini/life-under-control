@@ -28,7 +28,7 @@ export function Modal({
   icon?: ReactNode
   closeHref: string
   children: ReactNode
-  /** "narrow": 400px + entrada luc-modal-pop + padding 18px — hoje só o modal de Registrar pagamento (Final, #87). */
+  /** "narrow": 400px + entrada luc-modal-pop + padding 18px — formulários de Conta e Registrar pagamento. */
   width?: "wide" | "compact" | "narrow"
   /**
    * Trava os descartes **silenciosos** (Escape/backdrop) enquanto uma operação

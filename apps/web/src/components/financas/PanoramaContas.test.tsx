@@ -81,7 +81,7 @@ describe("PanoramaContas (Seam 2)", () => {
 describe("PanoramaContas — editar pelo card (#97)", () => {
   it("test_cada_card_expoe_editar_com_nome_acessivel_foco_e_alvo_seguro", () => {
     render(<PanoramaContas blocos={[bloco()]} />)
-    // nome acessível (não só um ícone mudo) e destino da edição rápida
+    // nome acessível (não só um ícone mudo) e destino da edição
     const editar = screen.getByRole("link", { name: "Editar Luz" })
     expect(editar).toHaveAttribute("href", "/areas/financas/pagamentos-recorrentes?editar=luz")
     // foco visível + alvo de toque seguro: box visual 27px do protótipo com

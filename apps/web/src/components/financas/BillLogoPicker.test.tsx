@@ -37,6 +37,29 @@ function arquivo(nome = "logo.png", tipo = "image/png") {
 }
 
 describe("BillLogoPicker", () => {
+  it("test_modo_diferido_retem_o_arquivo_e_nao_inicia_upload", async () => {
+    const onFileChange = vi.fn()
+    const createObjectURL = vi.fn(() => "blob:logo-preview")
+    const revokeObjectURL = vi.fn()
+    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL })
+    const user = userEvent.setup()
+    const { container, rerender } = render(
+      <BillLogoPicker mode="deferred" icon="wifi" file={null} onFileChange={onFileChange} />,
+    )
+
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    const file = arquivo()
+    await user.upload(input, file)
+
+    expect(onFileChange).toHaveBeenCalledWith(file)
+    expect(prepararLogoConta).not.toHaveBeenCalled()
+    expect(confirmarLogoConta).not.toHaveBeenCalled()
+
+    rerender(<BillLogoPicker mode="deferred" icon="wifi" file={file} onFileChange={onFileChange} />)
+    expect(createObjectURL).toHaveBeenCalledWith(file)
+    expect(await screen.findByAltText("")).toHaveAttribute("src", "blob:logo-preview")
+  })
+
   it("test_sem_logo_mostra_enviar_e_sem_botao_remover", () => {
     render(<BillLogoPicker billId="bill-1" icon="wifi" logoUrl={null} />)
     expect(screen.getByRole("button", { name: "Enviar logo" })).toBeInTheDocument()

@@ -6,13 +6,16 @@ import { drizzleBillRepo } from "@/adapters/db/bill-repo.drizzle"
 import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
 import { drizzlePaymentRepo } from "@/adapters/db/payment-repo.drizzle"
 import { r2AttachmentStore } from "@/adapters/r2/r2-attachment-store"
-import { criarLancamento } from "@/app/(app)/areas/financas/actions"
+import { criarLancamento, editarConta } from "@/app/(app)/areas/financas/actions"
 import { auth } from "@/auth"
 import { Button } from "@/components/ds/Button"
 import { MetricCard } from "@/components/ds/MetricCard"
 import { Pill } from "@/components/ds/Pill"
 import { FAROL } from "@/components/financas/BillCard"
 import { BillLogoTile } from "@/components/financas/BillLogoTile"
+import { billParaInicial } from "@/components/financas/bill-form-inicial"
+import { ContaEditadaToast } from "@/components/financas/ContaEditadaToast"
+import { EditarContaModal } from "@/components/financas/EditarContaModal"
 import { HistoriaConta } from "@/components/financas/HistoriaConta"
 import { LancamentoRegistradoToast } from "@/components/financas/LancamentoRegistradoToast"
 import { LancamentosLista } from "@/components/financas/LancamentosLista"
@@ -56,10 +59,22 @@ export default async function ContaDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ competencia?: string; lancado?: string; registrar?: string }>
+  searchParams: Promise<{
+    competencia?: string
+    lancado?: string
+    registrar?: string
+    editar?: string
+    editado?: string
+  }>
 }) {
   const { id } = await params
-  const { competencia: compParam, lancado: lancadoParam, registrar } = await searchParams
+  const {
+    competencia: compParam,
+    lancado: lancadoParam,
+    registrar,
+    editar,
+    editado,
+  } = await searchParams
 
   // Dado o Lar, a Conta, seus Lançamentos e a sessão são independentes — em paralelo.
   const { lar } = await getPainel(drizzleHouseholdRepo())
@@ -141,6 +156,7 @@ export default async function ContaDetailPage({
   const lancadoValido = ehCompetenciaValida(lancadoParam ?? "") ? (lancadoParam as string) : null
   const detalheHref = `/areas/financas/pagamentos-recorrentes/${bill.id}`
   const abrirRegistro = registrar === "1" || ehCompetenciaValida(compParam ?? "")
+  const abrirEdicao = editar === bill.id
   const registrarHref = `${detalheHref}?registrar=1&competencia=${encodeURIComponent(competencia)}`
 
   return (
@@ -150,6 +166,7 @@ export default async function ContaDetailPage({
           mensagem={`Lançamento registrado — ${bill.nome} · ${descreverCompetencia(lancadoValido, bill.recurrence)}`}
         />
       )}
+      {editado === bill.id && <ContaEditadaToast mensagem={`Conta atualizada — ${bill.nome}`} />}
       <div className="mx-auto flex max-w-[820px] flex-col gap-6">
         <header className="flex flex-col gap-4 rounded-[14px] border border-luc-border bg-luc-surface-2 p-5">
           <Button
@@ -199,10 +216,7 @@ export default async function ContaDetailPage({
                 Registrar pagamento
               </Button>
             )}
-            <Button
-              href={`/areas/financas/pagamentos-recorrentes/${bill.id}/editar`}
-              variant="secondary"
-            >
+            <Button href={`${detalheHref}?editar=${bill.id}`} variant="secondary">
               Editar Conta
             </Button>
           </div>
@@ -274,6 +288,19 @@ export default async function ContaDetailPage({
           pessoas={pessoasComAvatar}
           inicial={inicialBaixa}
           competenciasComLancamento={competenciasComLancamento}
+          closeHref={detalheHref}
+        />
+      )}
+      {abrirEdicao && (
+        <EditarContaModal
+          key={`editar-${bill.id}`}
+          billId={bill.id}
+          billName={bill.nome}
+          billIcon={bill.icon}
+          logoUrl={logoUrl}
+          contexto={`recorrência ${descreverRecorrencia(bill.recurrence).toLowerCase()} · o valor nasce em cada Lançamento`}
+          inicial={billParaInicial(bill)}
+          action={editarConta.bind(null, bill.id, detalheHref)}
           closeHref={detalheHref}
         />
       )}
