@@ -351,7 +351,11 @@ export default async function FinancasPage({
       )}
       {billRegistrar && linhaRegistrar && (
         <RegistrarPagamentoModal
-          key={`registro-${billRegistrar.id}-${lancamentosRegistrar.length}`}
+          // key estável por Conta — NÃO inclua a contagem de Lançamentos: ela sobe
+          // no `router.refresh()` do sucesso e remontaria o modal, trocando a tela
+          // de sucesso por um formulário que reacende o aviso de competência sobre
+          // um Lançamento já gravado ("pisca e volta com o aviso").
+          key={`registro-${billRegistrar.id}`}
           billId={billRegistrar.id}
           billName={billRegistrar.nome}
           billIcon={billRegistrar.icon}

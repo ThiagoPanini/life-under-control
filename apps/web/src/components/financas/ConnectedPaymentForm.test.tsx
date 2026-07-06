@@ -253,6 +253,40 @@ describe("ConnectedPaymentForm — orquestração da baixa compacta (#100)", () 
     expect(ultimaUrl()).toContain("comprovantes=1")
   })
 
+  it("test_sucesso_persiste_quando_competencia_passa_a_constar_no_aviso", async () => {
+    // Regressão do "pisca e volta com o aviso": após o registro, o refresh do RSC
+    // traz a competência recém-criada para `competenciasComLancamento`. Enquanto a
+    // MESMA instância seguir montada (key estável por Conta, não pela contagem de
+    // Lançamentos), a tela de sucesso persiste e o aviso de duplicidade NÃO
+    // ressurge sobre um Lançamento já gravado.
+    const action = vi.fn(async () => SUCESSO)
+    const props = {
+      action,
+      pessoas: PESSOAS,
+      inicial: {
+        valor: "120,00",
+        dataPagamento: "2026-07-09",
+        competencia: "2026-07",
+        paidBy: "p-1",
+      },
+      compacto: true,
+      billId: "luz",
+      successHref: SUCCESS_HREF,
+      closeHref: "/areas/financas/pagamentos-recorrentes",
+    }
+    const user = userEvent.setup()
+    const { rerender } = render(<ConnectedPaymentForm {...props} competenciasComLancamento={[]} />)
+
+    await user.click(screen.getByRole("button", { name: "Registrar pagamento" }))
+    expect(await screen.findByText("Lançamento registrado")).toBeInTheDocument()
+
+    // o refresh re-renderiza a MESMA instância com a competência já lançada
+    rerender(<ConnectedPaymentForm {...props} competenciasComLancamento={["2026-07"]} />)
+
+    expect(screen.getByText("Lançamento registrado")).toBeInTheDocument()
+    expect(screen.queryByText(/Já existe um Lançamento nesta competência/)).not.toBeInTheDocument()
+  })
+
   it("test_continuar_sem_comprovante_fecha_marcando_so_os_enviados", async () => {
     prepararMock.mockResolvedValue({ ok: true, attachmentId: "att", uploadUrl: "https://r2/put" })
     confirmarMock.mockImplementation(async (_billId, _paymentId, _attachmentId, nome) =>

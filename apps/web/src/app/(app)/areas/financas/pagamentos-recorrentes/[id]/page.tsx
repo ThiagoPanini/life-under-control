@@ -265,7 +265,9 @@ export default async function ContaDetailPage({
       </div>
       {abrirRegistro && bill.estado === "ativa" && (
         <PaymentWizardModal
-          key={`registro-${lancamentos.length}`}
+          // key estável por Conta — sem a contagem de Lançamentos (que sobe no
+          // refresh do sucesso e remontaria o modal, ressuscitando o aviso).
+          key={`registro-${bill.id}`}
           billId={bill.id}
           billName={bill.nome}
           action={criarLancamento.bind(null, bill.id)}
