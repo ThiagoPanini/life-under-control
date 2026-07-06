@@ -1,5 +1,5 @@
 import { emailNaAllowlist, parseAllowlist } from "../domain/access"
-import type { Pessoa } from "../domain/household"
+import { type Pessoa, PessoaForaDoLarError } from "../domain/household"
 import type { UserRepo } from "../ports/user-repo"
 
 /**
@@ -24,14 +24,6 @@ export class EmailForaDaAllowlistError extends Error {
   constructor(email: string) {
     super(`O e-mail ${email} não está na allowlist do Lar`)
     this.name = "EmailForaDaAllowlistError"
-  }
-}
-
-/** A Pessoa alvo não pertence ao Lar informado. */
-export class PessoaForaDoLarError extends Error {
-  constructor(pessoaId: string) {
-    super(`A Pessoa ${pessoaId} não pertence ao Lar`)
-    this.name = "PessoaForaDoLarError"
   }
 }
 

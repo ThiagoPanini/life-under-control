@@ -40,12 +40,19 @@ export const users = pgTable(
     // Chave do avatar no R2 (foto do Google espelhada no login, #51). Nula até o
     // 1º login bem-sucedido — o badge cai no fallback inicial+hue.
     avatarKey: text("avatar_key"),
+    // WhatsApp vinculado por ato no portal (issue #152, ADR-0012) em E.164. Nulo
+    // até o vínculo; a coluna É a allowlist da borda de ingestão — sem env redundante.
+    whatsappPhone: text("whatsapp_phone"),
   },
   // Unicidade case-insensitive do vínculo Google (issue #94): a operação já grava
   // em minúsculas, mas o índice em `lower(...)` garante no banco que dois e-mails
   // que só diferem na caixa não coexistam — defesa-em-profundidade. NULLs múltiplos
-  // são permitidos, então as duas Pessoas coexistem sem vínculo.
-  (t) => [uniqueIndex("users_google_email_lower_unique").on(sql`lower(${t.googleEmail})`)],
+  // são permitidos, então as duas Pessoas coexistem sem vínculo. `whatsapp_phone` é
+  // E.164 (sem caixa) — unicidade direta, mesmos NULLs múltiplos permitidos.
+  (t) => [
+    uniqueIndex("users_google_email_lower_unique").on(sql`lower(${t.googleEmail})`),
+    uniqueIndex("users_whatsapp_phone_unique").on(t.whatsappPhone),
+  ],
 )
 
 /**

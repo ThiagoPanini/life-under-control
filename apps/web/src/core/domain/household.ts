@@ -22,12 +22,27 @@ export type Pessoa = {
   inicial: string
   /** Chave do avatar no R2 (foto do Google espelhada no login); `null` sem foto. */
   avatarKey: string | null
+  /**
+   * WhatsApp vinculado (E.164, issue #152) — a allowlist da borda de ingestão
+   * (ADR-0012). Opcional (não `| null` obrigatório como `googleEmail`) pra não
+   * exigir o campo em todo fixture de `Pessoa` já existente; ausente equivale
+   * a não vinculado.
+   */
+  whatsappPhone?: string | null
 }
 
 export type Lar = {
   id: string
   nome: string
   pessoas: Pessoa[]
+}
+
+/** A Pessoa alvo não pertence ao Lar informado — invariante compartilhada por todo vínculo (Google, WhatsApp). */
+export class PessoaForaDoLarError extends Error {
+  constructor(pessoaId: string) {
+    super(`A Pessoa ${pessoaId} não pertence ao Lar`)
+    this.name = "PessoaForaDoLarError"
+  }
 }
 
 /** Par de cores (texto/fundo) da Pessoa, derivado do hue no padrão do sistema de design. */

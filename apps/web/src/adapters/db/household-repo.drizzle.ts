@@ -28,6 +28,7 @@ export function drizzleHouseholdRepo(db: Db = getDb()): HouseholdRepo {
         hue: u.hue,
         inicial: u.inicial,
         avatarKey: u.avatarKey,
+        whatsappPhone: u.whatsappPhone,
       }))
 
       return { id: lar.id, nome: lar.nome, pessoas }

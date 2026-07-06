@@ -1,6 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres"
 import { Pool } from "pg"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { TelefoneEmConflitoError } from "@/core/use-cases/vincular-telefone"
 import { runMigrations } from "../../../migrate.mjs"
 import * as schema from "./schema"
 import { households, users } from "./schema"
@@ -21,6 +22,7 @@ suite("drizzleUserRepo (Seam 2 — Postgres real)", () => {
   let larId: string
   let pessoaId: string
   let pessoaEmail: string
+  let telefoneVinculado: string
 
   beforeAll(async () => {
     await runMigrations(DATABASE_URL as string)
@@ -101,5 +103,76 @@ suite("drizzleUserRepo (Seam 2 — Postgres real)", () => {
     const compartilhado = `Vinculo-${larId}@Gmail.com` // já vinculado à `pessoaId` acima
 
     await expect(repo.vincularGoogleEmail(outra.id, compartilhado)).rejects.toThrow()
+  })
+
+  it("test_whatsapp_phone_comeca_nulo", async () => {
+    const repo = drizzleUserRepo(db)
+
+    const pessoa = await repo.obterPorEmail(pessoaEmail)
+    expect(pessoa?.whatsappPhone).toBeNull()
+  })
+
+  it("test_vincular_whatsapp_phone_grava_e_resolve_na_leitura", async () => {
+    const repo = drizzleUserRepo(db)
+    telefoneVinculado = `+5511${Date.now().toString().slice(-9)}`
+
+    await repo.vincularWhatsappPhone(pessoaId, telefoneVinculado)
+
+    const porEmail = await repo.obterPorEmail(pessoaEmail)
+    expect(porEmail?.whatsappPhone).toBe(telefoneVinculado)
+    const porWhatsapp = await repo.obterPorWhatsappPhone(telefoneVinculado)
+    expect(porWhatsapp?.id).toBe(pessoaId)
+  })
+
+  it("test_whatsapp_phone_e_unico_no_banco_e_lanca_erro_amigavel", async () => {
+    const repo = drizzleUserRepo(db)
+    const [outra] = await db
+      .insert(users)
+      .values({
+        householdId: larId,
+        email: `outra-whatsapp-${larId}@teste.lar`,
+        nome: "Léo",
+        hue: 60,
+        inicial: "L",
+      })
+      .returning()
+
+    await expect(repo.vincularWhatsappPhone(outra.id, telefoneVinculado)).rejects.toThrow(
+      TelefoneEmConflitoError,
+    )
+  })
+
+  it("test_vinculo_concorrente_do_mesmo_numero_lanca_conflito_amigavel_nao_erro_cru", async () => {
+    const repo = drizzleUserRepo(db)
+    const [terceira] = await db
+      .insert(users)
+      .values({
+        householdId: larId,
+        email: `terceira-whatsapp-${larId}@teste.lar`,
+        nome: "Rui",
+        hue: 120,
+        inicial: "R",
+      })
+      .returning()
+    const numeroDisputado = `+5521${Date.now().toString().slice(-9)}`
+
+    const resultados = await Promise.allSettled([
+      repo.vincularWhatsappPhone(pessoaId, numeroDisputado),
+      repo.vincularWhatsappPhone(terceira.id, numeroDisputado),
+    ])
+
+    const rejeitados = resultados.filter((r): r is PromiseRejectedResult => r.status === "rejected")
+    expect(rejeitados).toHaveLength(1)
+    expect(rejeitados[0].reason).toBeInstanceOf(TelefoneEmConflitoError)
+  })
+
+  it("test_desvincular_whatsapp_phone_remove_e_libera_o_numero", async () => {
+    const repo = drizzleUserRepo(db)
+
+    await repo.desvincularWhatsappPhone(pessoaId)
+
+    const porEmail = await repo.obterPorEmail(pessoaEmail)
+    expect(porEmail?.whatsappPhone).toBeNull()
+    expect(await repo.obterPorWhatsappPhone(telefoneVinculado)).toBeNull()
   })
 })

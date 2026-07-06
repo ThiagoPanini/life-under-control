@@ -64,6 +64,13 @@
       "when": 1783204506260,
       "tag": "0008_add_bill_primeira_competencia",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1783360823386,
+      "tag": "0009_add_whatsapp_phone",
+      "breakpoints": true
     }
   ]
 }
