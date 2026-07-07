@@ -4,21 +4,25 @@ import { classificarEventoWebhook, type EventoWebhook } from "../domain/whatsapp
 import type { UserRepo } from "../ports/user-repo"
 import type { WhatsappEventRepo } from "../ports/whatsapp-event-repo"
 import type { WhatsappMessenger } from "../ports/whatsapp-messenger"
+import { type ComprovanteDeps, proporLancamentoComprovante } from "./propor-lancamento-comprovante"
 
 /**
- * Orquestração do webhook (ADR-0012, issue #155): idempotência por
+ * Orquestração do webhook (ADR-0012, issues #155/#158): idempotência por
  * `wa_message_id`, resolução do remetente pela Pessoa vinculada (#152) e o
- * eco de fase 0 — só mensagens de texto de remetente vinculado recebem
- * resposta; o resto é ignorado em silêncio (log mascarado).
+ * roteamento por tipo de mensagem — comprovante (imagem/PDF) vira Proposta de
+ * Lançamento (#158, pipeline `comprovante`); texto recebe o eco de instrução; o
+ * resto é ignorado em silêncio (log mascarado).
  */
 
 export const TEXTO_INSTRUCAO_USO =
-  "Oi! Em breve vou ajudar a registrar seus comprovantes automaticamente por aqui."
+  "Oi! Manda a foto ou o PDF do comprovante que eu registro o pagamento pra vocês. 📎"
 
 type Dependencias = {
   userRepo: UserRepo
   eventRepo: WhatsappEventRepo
   messenger: WhatsappMessenger
+  /** Pipeline do comprovante (#158); ausente = borda só de texto (fase 0). */
+  comprovante?: ComprovanteDeps
   /** Injetável pro use-case não depender do `console` global direto; default é o próprio `console.log`. */
   log?: (mensagem: string) => void
 }
@@ -51,6 +55,27 @@ async function processarMensagem(
     log(
       `whatsapp: remetente ${mascararTelefone(evento.remetente)} não vinculado a nenhuma Pessoa, ignorado`,
     )
+    return
+  }
+
+  // Comprovante (imagem/PDF) → Proposta de Lançamento (#158). Roteia antes do
+  // texto: a mensagem de mídia tem `texto` nulo e `midia` preenchida.
+  if (evento.midia !== null) {
+    if (!deps.comprovante) {
+      log(`whatsapp: comprovante recebido sem pipeline configurado (evento ${evento.waMessageId})`)
+      return
+    }
+    if (!pessoa.householdId) {
+      log(`whatsapp: Pessoa ${pessoa.id} sem Lar resolvido — comprovante ignorado`)
+      return
+    }
+    await proporLancamentoComprovante(deps.comprovante, {
+      householdId: pessoa.householdId,
+      paidBy: pessoa.id,
+      remetente: evento.remetente,
+      waMessageId: evento.waMessageId,
+      midia: evento.midia,
+    })
     return
   }
 

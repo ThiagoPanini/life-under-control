@@ -16,6 +16,7 @@ function paraDominio(u: typeof users.$inferSelect): Pessoa {
     inicial: u.inicial,
     avatarKey: u.avatarKey,
     whatsappPhone: u.whatsappPhone,
+    householdId: u.householdId,
   }
 }
 

@@ -3,6 +3,7 @@ import {
   bigint,
   check,
   date,
+  index,
   integer,
   pgTable,
   text,
@@ -216,3 +217,60 @@ export const whatsappEvents = pgTable("whatsapp_events", {
   remetente: text("remetente").notNull(),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
 })
+
+/**
+ * Propostas de Lançamento do WhatsApp (`whatsapp_proposals`, ADR-0012, issue
+ * #158) — o comprovante lido, aguardando o casal confirmar. Estado de
+ * borda/adapter, não primitivo de domínio (ADR-0005): a Proposta nomeia o
+ * transitório para não contaminar o Lançamento — só vira `payments` no Confirmar
+ * (#159). Campos do recibo são anuláveis (ilegível = `null`, nunca palpite —
+ * ADR-0013). `bytes_hash` (SHA-256 dos bytes) detecta reenvio do mesmo arquivo;
+ * `bill_id` cai a `null` se a Conta for apagada (a Proposta sobrevive, Trocar Conta).
+ */
+export const whatsappProposals = pgTable(
+  "whatsapp_proposals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id),
+    // A mensagem que originou a Proposta (auditoria) — a idempotência da entrega
+    // vive em `whatsapp_events`; aqui é só referência.
+    waMessageId: text("wa_message_id").notNull(),
+    // SHA-256 (hex) dos bytes da mídia — identidade do comprovante p/ detectar reenvio.
+    bytesHash: text("bytes_hash").notNull(),
+    paidBy: uuid("paid_by")
+      .notNull()
+      .references(() => users.id),
+    // Conta candidata casada; nula quando o casamento não achou candidata confiável.
+    billId: uuid("bill_id").references(() => bills.id, { onDelete: "set null" }),
+    // Centavos (BRL, #6); nulo = ilegível na extração.
+    valorCentavos: bigint("valor_centavos", { mode: "number" }),
+    dataPagamento: date("data_pagamento"),
+    competencia: text("competencia"),
+    favorecido: text("favorecido"),
+    // Chave transitória dos bytes no R2 (staging), promovida à canônica no Confirmar.
+    stagingKey: text("staging_key").notNull(),
+    tipoMime: text("tipo_mime").notNull(),
+    estado: text("estado").notNull().default("proposta"),
+    criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check(
+      "whatsapp_proposals_estado_check",
+      sql`${t.estado} in ('proposta', 'confirmada', 'cancelada', 'expirada')`,
+    ),
+    // Valor, quando lido, é positivo (#6) — nulo é permitido (ilegível).
+    check(
+      "whatsapp_proposals_valor_check",
+      sql`${t.valorCentavos} is null or ${t.valorCentavos} > 0`,
+    ),
+    // Competência, quando inferida, é `ano-mês` (YYYY-MM); nula é permitida.
+    check(
+      "whatsapp_proposals_competencia_check",
+      sql`${t.competencia} is null or ${t.competencia} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`,
+    ),
+    // Lookup da detecção de repetido: por Lar + hash dos bytes.
+    index("whatsapp_proposals_hash_idx").on(t.householdId, t.bytesHash),
+  ],
+)

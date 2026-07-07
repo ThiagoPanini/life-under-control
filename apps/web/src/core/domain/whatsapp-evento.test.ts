@@ -30,11 +30,17 @@ describe("classificarEventoWebhook", () => {
     }
 
     expect(classificarEventoWebhook(payload)).toEqual([
-      { tipo: "mensagem", waMessageId: "wamid.ABC123", remetente: "5511987654321", texto: "oi" },
+      {
+        tipo: "mensagem",
+        waMessageId: "wamid.ABC123",
+        remetente: "5511987654321",
+        texto: "oi",
+        midia: null,
+      },
     ])
   })
 
-  it("test_mensagem_nao_texto_classifica_como_mensagem_com_texto_nulo", () => {
+  it("test_mensagem_de_imagem_sem_id_de_midia_classifica_com_midia_nula", () => {
     const payload = {
       entry: [
         {
@@ -50,7 +56,83 @@ describe("classificarEventoWebhook", () => {
     }
 
     expect(classificarEventoWebhook(payload)).toEqual([
-      { tipo: "mensagem", waMessageId: "wamid.IMG", remetente: "5511987654321", texto: null },
+      {
+        tipo: "mensagem",
+        waMessageId: "wamid.IMG",
+        remetente: "5511987654321",
+        texto: null,
+        midia: null,
+      },
+    ])
+  })
+
+  it("test_comprovante_imagem_extrai_media_id_e_tipo_mime", () => {
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                messages: [
+                  {
+                    id: "wamid.IMG2",
+                    from: "5511987654321",
+                    type: "image",
+                    image: { id: "media-123", mime_type: "image/jpeg", sha256: "abc" },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    expect(classificarEventoWebhook(payload)).toEqual([
+      {
+        tipo: "mensagem",
+        waMessageId: "wamid.IMG2",
+        remetente: "5511987654321",
+        texto: null,
+        midia: { mediaId: "media-123", tipoMime: "image/jpeg" },
+      },
+    ])
+  })
+
+  it("test_comprovante_pdf_documento_extrai_media_id_e_tipo_mime", () => {
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                messages: [
+                  {
+                    id: "wamid.DOC",
+                    from: "5511987654321",
+                    type: "document",
+                    document: {
+                      id: "media-456",
+                      mime_type: "application/pdf",
+                      filename: "boleto.pdf",
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    expect(classificarEventoWebhook(payload)).toEqual([
+      {
+        tipo: "mensagem",
+        waMessageId: "wamid.DOC",
+        remetente: "5511987654321",
+        texto: null,
+        midia: { mediaId: "media-456", tipoMime: "application/pdf" },
+      },
     ])
   })
 
@@ -117,8 +199,20 @@ describe("classificarEventoWebhook", () => {
     }
 
     expect(classificarEventoWebhook(payload)).toEqual([
-      { tipo: "mensagem", waMessageId: "wamid.1", remetente: "5511900000001", texto: "a" },
-      { tipo: "mensagem", waMessageId: "wamid.2", remetente: "5511900000002", texto: "b" },
+      {
+        tipo: "mensagem",
+        waMessageId: "wamid.1",
+        remetente: "5511900000001",
+        texto: "a",
+        midia: null,
+      },
+      {
+        tipo: "mensagem",
+        waMessageId: "wamid.2",
+        remetente: "5511900000002",
+        texto: "b",
+        midia: null,
+      },
     ])
   })
 })

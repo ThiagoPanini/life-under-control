@@ -29,6 +29,13 @@ export type Pessoa = {
    * a não vinculado.
    */
   whatsappPhone?: string | null
+  /**
+   * O Lar a que a Pessoa pertence (escopo de todo dado, #1). Opcional (como
+   * `whatsappPhone`) pra não exigir o campo em todo fixture já existente; o
+   * adapter Drizzle sempre o preenche a partir da linha. A borda de ingestão do
+   * WhatsApp (#158) usa isto pra escopar Contas/Lançamentos/Propostas.
+   */
+  householdId?: string
 }
 
 export type Lar = {
