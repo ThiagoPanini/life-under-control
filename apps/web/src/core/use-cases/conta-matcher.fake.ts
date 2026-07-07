@@ -10,6 +10,11 @@ export function fakeContaMatcher(ordenacao: string[] = []): ContaMatcher {
   return async (favorecido, candidatas) => {
     if (favorecido == null) return []
     const oferecidas = new Set(candidatas.map((c) => c.billId))
-    return ordenacao.filter((id) => oferecidas.has(id))
+    // Mesma guarda do adapter real: só ids do conjunto oferecido, sem repetição.
+    const ordenados: string[] = []
+    for (const id of ordenacao) {
+      if (oferecidas.has(id) && !ordenados.includes(id)) ordenados.push(id)
+    }
+    return ordenados
   }
 }

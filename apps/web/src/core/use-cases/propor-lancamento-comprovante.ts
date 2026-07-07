@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { type Bill, formatarDataBr } from "../domain/bill"
 import { formatBRL } from "../domain/money"
-import { descreverCompetencia } from "../domain/payment"
+import { descreverCompetencia, type Payment } from "../domain/payment"
 import {
   botoesDaProposta,
   chaveStaging,
@@ -29,7 +29,6 @@ import { inferirCompetenciaRecibo } from "./inferir-competencia-recibo"
  * ADR-0013, issue #158). Roda **pós-resposta** ao webhook (o handler já devolveu
  * 200): baixa a mídia pelo media ID na Graph API (nunca URL do payload —
  * anti-SSRF), detecta reenvio do mesmo arquivo por hash, extrai o recibo (#156),
- * casa a Conta e infere a Competência (funções puras de #162), estaciona os bytes
  * casa a Conta por LLM (#177) e infere a Competência (função pura de #162),
  * estaciona os bytes numa chave de staging e persiste a Proposta, respondendo no
  * chat com botões.
@@ -139,17 +138,29 @@ export async function proporLancamentoComprovante(
 
   // 5. Matching de Conta pelo `ContaMatcher` LLM (#177): só Contas ativas
   //    concorrem; o topo da ordenação vira a Conta proposta e vazio = abstenção
-  //    (Conta não identificada, sem palpite). A Competência é inferida a seguir
-  //    por função pura determinística (#162), sobre a Conta escolhida.
-  const bills = await deps.billRepo.listarBills(householdId)
-  const todosPayments = await deps.paymentRepo.listarTodosPayments(householdId)
-  const ativas = bills.filter((b) => b.estado === "ativa")
-  const ranking = await deps.matcher(
-    recibo.favorecido,
-    ativas.map((b) => ({ billId: b.id, nome: b.nome })),
-  )
-  const contaCasada: Bill | null =
-    ranking.length > 0 ? (ativas.find((b) => b.id === ranking[0]) ?? null) : null
+  //    (Conta não identificada, sem palpite). É chamada de rede — falha degrada
+  //    como o extrator ("tente de novo"), nunca some. Roda concorrente com a
+  //    leitura dos Lançamentos (que só a Competência, a seguir, usa).
+  let contaCasada: Bill | null
+  let todosPayments: Payment[]
+  try {
+    const ativas = (await deps.billRepo.listarBills(householdId)).filter(
+      (b) => b.estado === "ativa",
+    )
+    const [ranking, payments] = await Promise.all([
+      deps.matcher(
+        recibo.favorecido,
+        ativas.map((b) => ({ billId: b.id, nome: b.nome })),
+      ),
+      deps.paymentRepo.listarTodosPayments(householdId),
+    ])
+    todosPayments = payments
+    contaCasada = ranking.length > 0 ? (ativas.find((b) => b.id === ranking[0]) ?? null) : null
+  } catch (e) {
+    log(`whatsapp: matching de Conta falhou (evento ${waMessageId}): ${e}`)
+    await deps.messenger.enviarTexto(remetente, TEXTO_TENTE_DE_NOVO)
+    return
+  }
 
   const competencia = contaCasada
     ? inferirCompetenciaRecibo(

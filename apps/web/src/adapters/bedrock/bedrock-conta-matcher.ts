@@ -73,6 +73,13 @@ export function bedrockContaMatcher(
       ],
     })
 
+    // Truncou (max_tokens): o ranking veio parcial; tratá-lo como válido faria
+    // um casamento óbvio degradar a abstenção em silêncio. Falha alto — a borda
+    // captura e degrada pra "tente de novo" (mesma guarda do extrator, #156).
+    if (resposta.stop_reason === "max_tokens") {
+      throw new Error("ordenação de Conta truncada (max_tokens): ranking incompleto")
+    }
+
     const bloco = resposta.content.find((b) => b.type === "tool_use")
     if (bloco?.type !== "tool_use") return []
 

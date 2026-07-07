@@ -4,6 +4,7 @@ import type { Payment } from "@/core/domain/payment"
 import type { PaymentProposal } from "@/core/domain/payment-proposal"
 import type { ReciboWhatsapp } from "@/core/domain/recibo-whatsapp"
 import type { BillRepo } from "@/core/ports/bill-repo"
+import type { ContaMatcher } from "@/core/ports/conta-matcher"
 import {
   type PaymentProposalRepo,
   PropostaDuplicadaError,
@@ -100,6 +101,8 @@ type Opts = {
   midiaPorId?: Record<string, MidiaBaixada>
   /** Ordenação de billIds que o matcher (fake) devolve; default = ids das Contas na ordem dada. */
   matcherIds?: string[]
+  /** Sobrescreve o matcher inteiro — pra simular o adapter fora (throw). */
+  matcher?: ContaMatcher
 }
 
 function montar(opts: Opts = {}) {
@@ -115,7 +118,9 @@ function montar(opts: Opts = {}) {
   const deps = {
     mediaFetcher,
     extractor: opts.extractor ?? fakeReceiptExtractor(opts.recibo ?? reciboCompleto()),
-    matcher: fakeContaMatcher(opts.matcherIds ?? (opts.bills ?? [bill()]).map((b) => b.id)),
+    matcher:
+      opts.matcher ??
+      fakeContaMatcher(opts.matcherIds ?? (opts.bills ?? [bill()]).map((b) => b.id)),
     billRepo,
     paymentRepo: fakePaymentRepo(opts.payments ?? []),
     proposalRepo,
@@ -191,6 +196,22 @@ describe("proporLancamentoComprovante (Seam 1)", () => {
     expect(proposalRepo.propostas[0].billId).toBeNull()
     expect(proposalRepo.propostas[0].competencia).toBeNull()
     expect(messenger.interativos[0].botoes.some((b) => b.titulo === "Trocar Conta")).toBe(true)
+  })
+
+  it("test_matcher_fora_responde_tente_de_novo_sem_criar_proposta", async () => {
+    // O matcher é chamada de rede (Bedrock): throttle/timeout não pode sumir com
+    // o comprovante — degrada como o extrator, pedindo reenvio, sem estacionar.
+    const { deps, proposalRepo, messenger, store } = montar({
+      matcher: async () => {
+        throw new Error("bedrock throttle")
+      },
+    })
+
+    await proporLancamentoComprovante(deps, entrada())
+
+    expect(proposalRepo.propostas).toHaveLength(0)
+    expect(messenger.enviados).toEqual([{ para: "5511987654321", corpo: TEXTO_TENTE_DE_NOVO }])
+    expect(store.chaves()).toHaveLength(0)
   })
 
   it("test_favorecido_ambiguo_propoe_o_top_e_deixa_trocar_conta", async () => {
