@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { redirect } from "next/navigation"
 import { pessoaLogada } from "@/adapters/auth/pessoa-logada"
 import { drizzleHouseholdRepo } from "@/adapters/db/household-repo.drizzle"
 import { drizzleUserRepo } from "@/adapters/db/user-repo.drizzle"
@@ -43,7 +44,11 @@ export async function vincularMeuWhatsapp(
   return {}
 }
 
-/** Server action: remove o WhatsApp vinculado da Pessoa logada. */
+/**
+ * Server action: remove o WhatsApp vinculado da Pessoa logada — disparada pelo
+ * modal de confirmação (`?remover=1`). O redirect pra rota limpa fecha o modal
+ * (mesmo padrão de `excluirConta` em Finanças).
+ */
 export async function desvincularMeuWhatsapp(): Promise<void> {
   const { lar } = await getPainel(drizzleHouseholdRepo())
   const pessoa = await pessoaLogada(lar.pessoas)
@@ -51,4 +56,5 @@ export async function desvincularMeuWhatsapp(): Promise<void> {
 
   await desvincularTelefone(drizzleUserRepo(), lar.pessoas, pessoa.id)
   revalidatePath(ROTA_WHATSAPP)
+  redirect(ROTA_WHATSAPP)
 }
