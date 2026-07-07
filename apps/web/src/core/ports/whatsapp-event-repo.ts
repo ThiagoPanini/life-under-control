@@ -3,8 +3,11 @@
  * idempotência por `wa_message_id` e log auditável.
  */
 export type WhatsappEventRepo = {
-  /** `true` se esse `wa_message_id` já foi registrado antes. */
-  jaProcessado(waMessageId: string): Promise<boolean>
-  /** Grava o evento processado (idempotente — reentrada no mesmo id não duplica). */
-  registrar(evento: { waMessageId: string; remetente: string }): Promise<void>
+  /**
+   * Reivindica o processamento do evento — `true` na primeira vez (grava),
+   * `false` se `wa_message_id` já foi reivindicado antes. Atômico: sob
+   * reentrega concorrente, só uma chamada devolve `true` (o índice único no
+   * banco decide, não uma leitura seguida de escrita).
+   */
+  reivindicar(evento: { waMessageId: string; remetente: string }): Promise<boolean>
 }

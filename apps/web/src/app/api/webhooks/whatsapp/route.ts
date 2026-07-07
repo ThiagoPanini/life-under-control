@@ -10,6 +10,11 @@ import { processarEventoWhatsapp } from "@/core/use-cases/processar-evento-whats
 // Runtime Node (padrão do Next) — `node:crypto` da assinatura não roda em Edge.
 
 export function GET(request: Request): Response {
+  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN
+  // Sem o verify token configurado, não há como validar — fecha (403), nunca
+  // abre: um `?? ""` aqui aceitaria qualquer challenge sem token nenhum.
+  if (!verifyToken) return new Response(null, { status: 403 })
+
   const { searchParams } = new URL(request.url)
   const resultado = verificarChallengeWebhook(
     {
@@ -17,7 +22,7 @@ export function GET(request: Request): Response {
       token: searchParams.get("hub.verify_token"),
       challenge: searchParams.get("hub.challenge"),
     },
-    process.env.WHATSAPP_VERIFY_TOKEN ?? "",
+    verifyToken,
   )
 
   return resultado.status === 200
@@ -26,10 +31,15 @@ export function GET(request: Request): Response {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const appSecret = process.env.META_APP_SECRET
+  // Mesma lógica do GET: sem secret configurado, fecha — nunca cai pra uma
+  // assinatura sobre chave vazia que qualquer corpo sem assinatura bateria.
+  if (!appSecret) return new Response(null, { status: 403 })
+
   const corpoBruto = await request.text()
   const header = request.headers.get("x-hub-signature-256")
 
-  if (!assinaturaValida(corpoBruto, header, process.env.META_APP_SECRET ?? "")) {
+  if (!assinaturaValida(corpoBruto, header, appSecret)) {
     return new Response(null, { status: 403 })
   }
 
