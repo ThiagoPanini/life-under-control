@@ -11,17 +11,20 @@ import {
   TEXTO_TENTE_DE_NOVO,
 } from "./propor-lancamento-comprovante"
 import {
+  type EdicaoTextoDeps,
+  editarCampoTexto,
   type ResponderDeps,
   responderProposta,
   varrerPropostasExpiradas,
 } from "./responder-proposta"
 
 /**
- * Orquestração do webhook (ADR-0012, issues #155/#158): idempotência por
+ * Orquestração do webhook (ADR-0012, issues #155/#158/#178): idempotência por
  * `wa_message_id`, resolução do remetente pela Pessoa vinculada (#152) e o
  * roteamento por tipo de mensagem — comprovante (imagem/PDF) vira Proposta de
- * Lançamento (#158, pipeline `comprovante`); texto recebe o eco de instrução; o
- * resto é ignorado em silêncio (log mascarado).
+ * Lançamento (#158, pipeline `comprovante`); botão/lista roteia pro menu Alterar
+ * (#159/#178); texto livre, quando há edição pendente da Pessoa, vira o valor
+ * daquele campo (#178) — senão, o eco de instrução; o resto é ignorado em silêncio.
  */
 
 export const TEXTO_INSTRUCAO_USO =
@@ -48,6 +51,12 @@ type Dependencias = {
    * R2/Bedrock só nascem quando chega uma interação.
    */
   responder?: () => ResponderDeps
+  /**
+   * Fábrica **leve** da edição por texto livre do menu Alterar (#178) — só
+   * repo/billRepo/messenger/clock, **sem R2/Bedrock**: uma mensagem de texto nunca
+   * pode falhar por env de mídia ausente. Ausente = texto sempre vira eco.
+   */
+  edicaoTexto?: () => EdicaoTextoDeps
   /**
    * Fábrica leve da varredura oportunista de Propostas expiradas (#159) — só
    * repo/store/clock, sem Bedrock. Roda pós-processamento; ausente = sem varredura.
@@ -136,7 +145,24 @@ async function processarMensagem(
   }
 
   if (evento.texto !== null) {
-    await deps.messenger.enviarTexto(evento.remetente, TEXTO_INSTRUCAO_USO)
+    // #178: se a Pessoa tem uma edição pendente (tocou Alterar → Valor/Data/
+    // Favorecido), o texto é o valor daquele campo; senão, é mensagem solta → eco.
+    let consumido = false
+    if (deps.edicaoTexto && pessoa.householdId) {
+      try {
+        consumido = await editarCampoTexto(deps.edicaoTexto(), {
+          householdId: pessoa.householdId,
+          remetente: evento.remetente,
+          pessoaId: pessoa.id,
+          texto: evento.texto,
+        })
+      } catch (e) {
+        // Reivindicado, sem retry: um throw na edição não deixa a Pessoa no vácuo —
+        // cai no eco abaixo (pelo menos responde algo, e ela re-toca Alterar).
+        log(`whatsapp: falha ao editar campo por texto ${evento.waMessageId}: ${e}`)
+      }
+    }
+    if (!consumido) await deps.messenger.enviarTexto(evento.remetente, TEXTO_INSTRUCAO_USO)
   }
 }
 
@@ -171,6 +197,7 @@ async function processarInteracao(
     await responderProposta(deps.responder(), {
       householdId: pessoa.householdId,
       remetente: evento.remetente,
+      pessoaId: pessoa.id,
       acao,
     })
   } catch (e) {

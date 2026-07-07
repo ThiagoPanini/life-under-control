@@ -11,6 +11,7 @@
  */
 
 import { createHash } from "node:crypto"
+import { descreverMesPorExtenso, ehCompetenciaValida } from "./bill"
 
 /**
  * Estado de vida da Proposta. `proposta` = aberta, aguardando o casal; as três
@@ -57,6 +58,13 @@ export type PaymentProposal = DadosPaymentProposal & {
   estado: EstadoProposta
   /** Instante em que a Proposta nasceu (ISO-8601) — fato persistido. */
   criadoEm: string
+  /**
+   * Estado de conversa do menu Alterar (#178): o campo de texto livre que o bot
+   * espera (`valor`/`data`/`favorecido`), e a Pessoa de quem espera. `null` = sem
+   * edição pendente. Nasce sempre nulo (Proposta nova); só o menu Alterar o seta.
+   */
+  aguardandoCampo: CampoLivre | null
+  aguardandoPor: string | null
 }
 
 /** Dados de uma Proposta nova já montada, mais identidade e dono (o Lar). */
@@ -107,17 +115,21 @@ export function mensagemComprovanteRepetido(existente: PaymentProposal): string 
 
 /** Ações dos botões da Proposta — o `id` do botão é `{acao}:{proposalId}` (a borda de resposta, #159, roteia por aqui). */
 export const ACAO_CONFIRMAR = "confirmar"
+/** O menu Alterar (#178) generaliza o antigo "Trocar Conta": edita todo campo coletado. */
+export const ACAO_ALTERAR = "alterar"
+/** Botão legado "Trocar Conta" de Propostas criadas antes do #178 — o parser ainda o aceita, roteando pro menu Alterar. */
 export const ACAO_TROCAR = "trocar"
 export const ACAO_CANCELAR = "cancelar"
 
 /**
  * Os três botões de uma Proposta, cada um carregando o id dela na ação para o
- * webhook de resposta (#159) saber sobre qual Proposta a Pessoa agiu.
+ * webhook de resposta (#159/#178) saber sobre qual Proposta a Pessoa agiu. O botão
+ * do meio abre o menu **Alterar** (#178) — a lista de campos editáveis.
  */
 export function botoesDaProposta(proposalId: string): BotaoInterativo[] {
   return [
     { id: `${ACAO_CONFIRMAR}:${proposalId}`, titulo: "Confirmar" },
-    { id: `${ACAO_TROCAR}:${proposalId}`, titulo: "Trocar Conta" },
+    { id: `${ACAO_ALTERAR}:${proposalId}`, titulo: "Alterar" },
     { id: `${ACAO_CANCELAR}:${proposalId}`, titulo: "Cancelar" },
   ]
 }
@@ -137,12 +149,12 @@ export type ResumoProposta = {
 
 /** Campo ilegível não vira palpite (ADR-0013): a mensagem diz que não leu, e o casal corrige. */
 const ILEGIVEL = "_não consegui ler — confira no comprovante_"
-const SEM_CONTA = "_não identifiquei — toque *Trocar Conta*_"
+const SEM_CONTA = "_não identifiquei — toque *Alterar*_"
 
 /**
  * Compõe a mensagem da Proposta para o chat: Conta candidata, valor, data de
  * pagamento e Competência, uma por linha. Campo `null` é sinalizado em branco
- * (nunca um valor inventado); Conta ausente orienta o *Trocar Conta*.
+ * (nunca um valor inventado); Conta ausente orienta o *Alterar*.
  */
 export function formatarPropostaMensagem(resumo: ResumoProposta): string {
   return [
@@ -155,17 +167,17 @@ export function formatarPropostaMensagem(resumo: ResumoProposta): string {
   ].join("\n")
 }
 
-/** Prefixo do id de uma linha da lista de Trocar Conta: `conta:{proposalId}:{billId}`. */
+/** Prefixo do id de uma linha da lista de Conta (Alterar → Conta): `conta:{proposalId}:{billId}`. */
 export const PREFIXO_ESCOLHER_CONTA = "conta"
 
-/** Uma linha da lista interativa do WhatsApp (Trocar Conta): id oculto + título visível (≤24 chars). */
+/** Uma linha da lista interativa do WhatsApp (menu Alterar, listas de Conta/Mês): id oculto + título visível (≤24 chars). */
 export type LinhaInterativa = { id: string; titulo: string }
 
 /**
- * As linhas da lista de Trocar Conta: cada Conta candidata vira uma linha cujo id
- * carrega a Proposta e a Conta escolhida (`conta:{proposalId}:{billId}`), para o
- * webhook de resposta (#159) saber o que refazer. O título é o nome da Conta,
- * cortado no limite do WhatsApp (24 chars).
+ * As linhas da lista de Conta (Alterar → Conta, #159/#178): cada Conta candidata
+ * vira uma linha cujo id carrega a Proposta e a Conta escolhida
+ * (`conta:{proposalId}:{billId}`), para o webhook de resposta saber o que refazer.
+ * O título é o nome da Conta, cortado no limite do WhatsApp (24 chars).
  */
 export function linhasContasProposta(
   proposalId: string,
@@ -173,8 +185,88 @@ export function linhasContasProposta(
 ): LinhaInterativa[] {
   return contas.map((c) => ({
     id: `${PREFIXO_ESCOLHER_CONTA}:${proposalId}:${c.billId}`,
-    titulo: c.nome.length > 24 ? `${c.nome.slice(0, 23)}…` : c.nome,
+    titulo: cortarTitulo(c.nome),
   }))
+}
+
+/** Título de linha da lista interativa cabe em 24 chars (limite do WhatsApp). */
+function cortarTitulo(texto: string): string {
+  return texto.length > 24 ? `${texto.slice(0, 23)}…` : texto
+}
+
+/** Prefixo do id de uma linha do menu Alterar: `campo:{proposalId}:{campo}` (#178). */
+export const PREFIXO_CAMPO = "campo"
+/** Prefixo do id de uma linha da lista de Competência (mês): `mes:{proposalId}:{YYYY-MM}` (#178). */
+export const PREFIXO_ESCOLHER_MES = "mes"
+
+/** Todo campo coletado que o menu Alterar (#178) edita. Conta/Competência por lista; o resto por texto livre. */
+export type CampoEditavel = "conta" | "competencia" | "valor" | "data" | "favorecido"
+/** Os campos que se editam por **texto livre** (parser determinístico por campo) — subconjunto de `CampoEditavel`. */
+export type CampoLivre = "valor" | "data" | "favorecido"
+
+/** O menu Alterar em ordem: rótulo visível de cada campo editável. */
+const CAMPOS_MENU: { campo: CampoEditavel; titulo: string }[] = [
+  { campo: "conta", titulo: "Conta" },
+  { campo: "competencia", titulo: "Competência (mês)" },
+  { campo: "valor", titulo: "Valor" },
+  { campo: "data", titulo: "Data de pagamento" },
+  { campo: "favorecido", titulo: "Favorecido" },
+]
+
+const CAMPOS_EDITAVEIS = new Set<string>(CAMPOS_MENU.map((c) => c.campo))
+const CAMPOS_LIVRES = new Set<CampoLivre>(["valor", "data", "favorecido"])
+
+/** Um campo de texto livre? (guarda de tipo para o roteamento do texto na borda, #178). */
+export function ehCampoLivre(campo: CampoEditavel): campo is CampoLivre {
+  return CAMPOS_LIVRES.has(campo as CampoLivre)
+}
+
+/** Cabeçalho da lista do menu Alterar. */
+export const TITULO_MENU_ALTERAR = "O que você quer alterar?"
+
+/**
+ * As linhas do menu Alterar (#178): cada campo editável vira uma linha cujo id
+ * carrega a Proposta e o campo (`campo:{proposalId}:{campo}`). Inverso parcial de
+ * `parsearAcaoBotao`.
+ */
+export function linhasCamposProposta(proposalId: string): LinhaInterativa[] {
+  return CAMPOS_MENU.map((c) => ({
+    id: `${PREFIXO_CAMPO}:${proposalId}:${c.campo}`,
+    titulo: c.titulo,
+  }))
+}
+
+/** Cabeçalho da lista de Competência (mês). */
+export const TITULO_LISTA_MESES = "Qual é a Competência (mês)?"
+
+/**
+ * As linhas da lista de Competência (#178): cada mês candidato vira uma linha cujo
+ * id carrega a Proposta e a Competência (`mes:{proposalId}:{YYYY-MM}`). O rótulo é
+ * o mês por extenso, capitalizado ("Julho de 2026").
+ */
+export function linhasCompetenciasProposta(
+  proposalId: string,
+  competencias: string[],
+): LinhaInterativa[] {
+  return competencias.map((comp) => {
+    const extenso = descreverMesPorExtenso(comp)
+    return {
+      id: `${PREFIXO_ESCOLHER_MES}:${proposalId}:${comp}`,
+      titulo: cortarTitulo(extenso.charAt(0).toUpperCase() + extenso.slice(1)),
+    }
+  })
+}
+
+/** O texto que pede um campo de texto livre, com um exemplo — serve também de reprompt no parse falho (#178). */
+export function promptEdicaoCampo(campo: CampoLivre): string {
+  switch (campo) {
+    case "valor":
+      return "Qual o valor certo? Manda em reais — ex.: *253,43*."
+    case "data":
+      return "Qual a data de pagamento? Manda *dd/mm* ou *dd/mm/aaaa* — ex.: *05/07/2026*."
+    case "favorecido":
+      return "Qual o favorecido? Manda o nome como aparece no comprovante."
+  }
 }
 
 /**
@@ -184,21 +276,34 @@ export function linhasContasProposta(
  * ignora em silêncio, nunca chuta uma ação.
  */
 export type AcaoProposta =
-  | { acao: "confirmar" | "trocar" | "cancelar"; proposalId: string }
+  | { acao: "confirmar" | "cancelar"; proposalId: string }
+  | { acao: "alterar"; proposalId: string }
+  | { acao: "escolher-campo"; proposalId: string; campo: CampoEditavel }
   | { acao: "escolher-conta"; proposalId: string; billId: string }
+  | { acao: "escolher-mes"; proposalId: string; competencia: string }
 
 export function parsearAcaoBotao(replyId: string): AcaoProposta | null {
   const partes = replyId.split(":")
   if (partes.length === 2) {
     const [acao, proposalId] = partes
-    if ((acao === ACAO_CONFIRMAR || acao === ACAO_TROCAR || acao === ACAO_CANCELAR) && proposalId) {
-      return { acao, proposalId }
-    }
+    if (!proposalId) return null
+    if (acao === ACAO_CONFIRMAR || acao === ACAO_CANCELAR) return { acao, proposalId }
+    // "Alterar" (#178) e o "Trocar Conta" legado (#159) caem no mesmo menu de campos.
+    if (acao === ACAO_ALTERAR || acao === ACAO_TROCAR) return { acao: "alterar", proposalId }
     return null
   }
-  if (partes.length === 3 && partes[0] === PREFIXO_ESCOLHER_CONTA) {
-    const [, proposalId, billId] = partes
-    if (proposalId && billId) return { acao: "escolher-conta", proposalId, billId }
+  if (partes.length === 3) {
+    const [prefixo, proposalId, valor] = partes
+    if (!proposalId || !valor) return null
+    if (prefixo === PREFIXO_ESCOLHER_CONTA) {
+      return { acao: "escolher-conta", proposalId, billId: valor }
+    }
+    if (prefixo === PREFIXO_CAMPO && CAMPOS_EDITAVEIS.has(valor)) {
+      return { acao: "escolher-campo", proposalId, campo: valor as CampoEditavel }
+    }
+    if (prefixo === PREFIXO_ESCOLHER_MES && ehCompetenciaValida(valor)) {
+      return { acao: "escolher-mes", proposalId, competencia: valor }
+    }
   }
   return null
 }

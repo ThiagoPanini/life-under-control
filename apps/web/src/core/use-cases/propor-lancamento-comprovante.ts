@@ -224,6 +224,15 @@ export async function proporLancamentoComprovante(
     return
   }
 
+  // 6b. Colisão do menu Alterar (#178): esta Proposta nova assume — larga qualquer
+  //     edição pendente da Pessoa numa Proposta anterior (o texto seguinte dela não
+  //     vai mais parar na Proposta abandonada). Best-effort: não derruba a resposta.
+  try {
+    await deps.proposalRepo.limparAguardando(householdId, paidBy)
+  } catch (e) {
+    log(`whatsapp: falha ao largar edição pendente (evento ${waMessageId}): ${e}`)
+  }
+
   // 7. Responde a Proposta no chat com botões; campo ilegível sai sinalizado em
   //    branco (nunca palpite — ADR-0013).
   const resumo: ResumoProposta = {

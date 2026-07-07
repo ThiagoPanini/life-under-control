@@ -252,12 +252,23 @@ export const whatsappProposals = pgTable(
     stagingKey: text("staging_key").notNull(),
     tipoMime: text("tipo_mime").notNull(),
     estado: text("estado").notNull().default("proposta"),
+    // Estado de conversa do menu Alterar (#178): o campo de texto livre que o bot
+    // espera desta Pessoa (`valor`/`data`/`favorecido`) e por quem — a próxima
+    // mensagem de texto do remetente é lida SÓ como esse campo. Nulo = sem edição
+    // pendente (texto solto vira eco de instrução).
+    aguardandoCampo: text("aguardando_campo"),
+    aguardandoPor: uuid("aguardando_por").references(() => users.id, { onDelete: "set null" }),
     criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     check(
       "whatsapp_proposals_estado_check",
       sql`${t.estado} in ('proposta', 'confirmada', 'cancelada', 'expirada')`,
+    ),
+    // O campo aguardado, quando há edição pendente, é um dos de texto livre.
+    check(
+      "whatsapp_proposals_aguardando_check",
+      sql`${t.aguardandoCampo} is null or ${t.aguardandoCampo} in ('valor', 'data', 'favorecido')`,
     ),
     // Valor, quando lido, é positivo (#6) — nulo é permitido (ilegível).
     check(

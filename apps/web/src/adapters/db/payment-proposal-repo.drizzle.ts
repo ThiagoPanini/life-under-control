@@ -1,5 +1,6 @@
-import { and, desc, eq, inArray } from "drizzle-orm"
+import { and, desc, eq, inArray, isNotNull, ne } from "drizzle-orm"
 import {
+  type CampoLivre,
   ESTADOS_PROPOSTA_ATIVA,
   type EstadoProposta,
   type PaymentProposal,
@@ -29,6 +30,8 @@ function paraDominio(r: typeof whatsappProposals.$inferSelect): PaymentProposal 
     tipoMime: r.tipoMime,
     estado: r.estado as EstadoProposta,
     criadoEm: r.criadoEm.toISOString(),
+    aguardandoCampo: r.aguardandoCampo as CampoLivre | null,
+    aguardandoPor: r.aguardandoPor,
   }
 }
 
@@ -127,7 +130,7 @@ export function drizzleWhatsappProposalRepo(db: Db = getDb()): PaymentProposalRe
     async atualizarConta(householdId, id, billId, competencia) {
       const [row] = await db
         .update(whatsappProposals)
-        .set({ billId, competencia })
+        .set({ billId, competencia, aguardandoCampo: null, aguardandoPor: null })
         .where(
           and(
             eq(whatsappProposals.householdId, householdId),
@@ -137,6 +140,92 @@ export function drizzleWhatsappProposalRepo(db: Db = getDb()): PaymentProposalRe
         )
         .returning()
       return row ? paraDominio(row) : null
+    },
+
+    async atualizarCompetencia(householdId, id, competencia) {
+      const [row] = await db
+        .update(whatsappProposals)
+        .set({ competencia, aguardandoCampo: null, aguardandoPor: null })
+        .where(
+          and(
+            eq(whatsappProposals.householdId, householdId),
+            eq(whatsappProposals.id, id),
+            eq(whatsappProposals.estado, "proposta"),
+          ),
+        )
+        .returning()
+      return row ? paraDominio(row) : null
+    },
+
+    async atualizarCampo(householdId, id, patch) {
+      const [row] = await db
+        .update(whatsappProposals)
+        .set({ ...patch, aguardandoCampo: null, aguardandoPor: null })
+        .where(
+          and(
+            eq(whatsappProposals.householdId, householdId),
+            eq(whatsappProposals.id, id),
+            eq(whatsappProposals.estado, "proposta"),
+          ),
+        )
+        .returning()
+      return row ? paraDominio(row) : null
+    },
+
+    async definirAguardando(householdId, id, campo, pessoa) {
+      // Um slot por Pessoa: libera qualquer edição pendente dela em OUTRA Proposta
+      // antes de setar esta — o texto seguinte tem um único destino inequívoco.
+      await db
+        .update(whatsappProposals)
+        .set({ aguardandoCampo: null, aguardandoPor: null })
+        .where(
+          and(
+            eq(whatsappProposals.householdId, householdId),
+            eq(whatsappProposals.aguardandoPor, pessoa),
+            ne(whatsappProposals.id, id),
+          ),
+        )
+      const [row] = await db
+        .update(whatsappProposals)
+        .set({ aguardandoCampo: campo, aguardandoPor: pessoa })
+        .where(
+          and(
+            eq(whatsappProposals.householdId, householdId),
+            eq(whatsappProposals.id, id),
+            eq(whatsappProposals.estado, "proposta"),
+          ),
+        )
+        .returning()
+      return row ? paraDominio(row) : null
+    },
+
+    async obterAguardandoPor(householdId, pessoa) {
+      const [row] = await db
+        .select()
+        .from(whatsappProposals)
+        .where(
+          and(
+            eq(whatsappProposals.householdId, householdId),
+            eq(whatsappProposals.estado, "proposta"),
+            eq(whatsappProposals.aguardandoPor, pessoa),
+            isNotNull(whatsappProposals.aguardandoCampo),
+          ),
+        )
+        .orderBy(desc(whatsappProposals.criadoEm))
+        .limit(1)
+      return row ? paraDominio(row) : null
+    },
+
+    async limparAguardando(householdId, pessoa) {
+      await db
+        .update(whatsappProposals)
+        .set({ aguardandoCampo: null, aguardandoPor: null })
+        .where(
+          and(
+            eq(whatsappProposals.householdId, householdId),
+            eq(whatsappProposals.aguardandoPor, pessoa),
+          ),
+        )
     },
 
     async listarAbertas() {
