@@ -1,11 +1,14 @@
 import { and, desc, eq, inArray } from "drizzle-orm"
-import type { EstadoProposta, PaymentProposal } from "@/core/domain/payment-proposal"
+import {
+  ESTADOS_PROPOSTA_ATIVA,
+  type EstadoProposta,
+  type PaymentProposal,
+} from "@/core/domain/payment-proposal"
 import type { PaymentProposalRepo } from "@/core/ports/payment-proposal-repo"
+import { PropostaDuplicadaError } from "@/core/ports/payment-proposal-repo"
 import { type Db, getDb } from "./client"
+import { ehViolacaoDeUnicidade } from "./postgres-error"
 import { whatsappProposals } from "./schema"
-
-/** Estados que contam como Proposta ativa (repetição avisa); terminais não contam. */
-const ESTADOS_ATIVOS: EstadoProposta[] = ["proposta", "confirmada"]
 
 function paraDominio(r: typeof whatsappProposals.$inferSelect): PaymentProposal {
   return {
@@ -30,25 +33,35 @@ function paraDominio(r: typeof whatsappProposals.$inferSelect): PaymentProposal 
 export function drizzleWhatsappProposalRepo(db: Db = getDb()): PaymentProposalRepo {
   return {
     async criar(nova) {
-      // `estado` e `criadoEm` caem nos defaults do banco (proposta / now()).
-      const [row] = await db
-        .insert(whatsappProposals)
-        .values({
-          id: nova.id,
-          householdId: nova.householdId,
-          waMessageId: nova.waMessageId,
-          bytesHash: nova.bytesHash,
-          paidBy: nova.paidBy,
-          billId: nova.billId,
-          valorCentavos: nova.valorCentavos,
-          dataPagamento: nova.dataPagamento,
-          competencia: nova.competencia,
-          favorecido: nova.favorecido,
-          stagingKey: nova.stagingKey,
-          tipoMime: nova.tipoMime,
-        })
-        .returning()
-      return paraDominio(row)
+      // `estado` e `criadoEm` caem nos defaults do banco (proposta / now()). O
+      // índice único parcial (`whatsapp_proposals_hash_ativo_uidx`) é quem decide
+      // sob entrega concorrente do mesmo arquivo — não uma leitura seguida de
+      // escrita; a violação vira `PropostaDuplicadaError` pra borda avisar.
+      try {
+        const [row] = await db
+          .insert(whatsappProposals)
+          .values({
+            id: nova.id,
+            householdId: nova.householdId,
+            waMessageId: nova.waMessageId,
+            bytesHash: nova.bytesHash,
+            paidBy: nova.paidBy,
+            billId: nova.billId,
+            valorCentavos: nova.valorCentavos,
+            dataPagamento: nova.dataPagamento,
+            competencia: nova.competencia,
+            favorecido: nova.favorecido,
+            stagingKey: nova.stagingKey,
+            tipoMime: nova.tipoMime,
+          })
+          .returning()
+        return paraDominio(row)
+      } catch (e) {
+        if (ehViolacaoDeUnicidade(e, "whatsapp_proposals_hash_ativo_uidx")) {
+          throw new PropostaDuplicadaError(nova.bytesHash)
+        }
+        throw e
+      }
     },
 
     async obterAtivaPorHash(householdId, bytesHash) {
@@ -59,7 +72,7 @@ export function drizzleWhatsappProposalRepo(db: Db = getDb()): PaymentProposalRe
           and(
             eq(whatsappProposals.householdId, householdId),
             eq(whatsappProposals.bytesHash, bytesHash),
-            inArray(whatsappProposals.estado, ESTADOS_ATIVOS),
+            inArray(whatsappProposals.estado, ESTADOS_PROPOSTA_ATIVA),
           ),
         )
         .orderBy(desc(whatsappProposals.criadoEm))

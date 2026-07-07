@@ -134,7 +134,7 @@ describe("processarEventoWhatsapp (Seam 1)", () => {
     const comprovante = comprovanteFake()
 
     await processarEventoWhatsapp(
-      { userRepo, eventRepo, messenger, comprovante },
+      { userRepo, eventRepo, messenger, comprovante: () => comprovante },
       payloadComprovante("wamid.img", "5511987654321", "media-1"),
     )
 

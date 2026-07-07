@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest"
 import type { Bill } from "@/core/domain/bill"
 import type { Payment } from "@/core/domain/payment"
+import type { PaymentProposal } from "@/core/domain/payment-proposal"
 import type { ReciboWhatsapp } from "@/core/domain/recibo-whatsapp"
 import type { BillRepo } from "@/core/ports/bill-repo"
+import {
+  type PaymentProposalRepo,
+  PropostaDuplicadaError,
+} from "@/core/ports/payment-proposal-repo"
 import type { ReceiptExtractor } from "@/core/ports/receipt-extractor"
 import type { MidiaBaixada } from "@/core/ports/whatsapp-media-fetcher"
 import { fakeAttachmentStore } from "./attachment-store.fake"
@@ -13,6 +18,7 @@ import {
   type ComprovanteEntrada,
   proporLancamentoComprovante,
   TEXTO_TENTE_DE_NOVO,
+  TEXTO_TIPO_NAO_SUPORTADO,
 } from "./propor-lancamento-comprovante"
 import { fakeReceiptExtractor } from "./receipt-extractor.fake"
 import { fakeWhatsappMediaFetcher } from "./whatsapp-media-fetcher.fake"
@@ -240,5 +246,86 @@ describe("proporLancamentoComprovante (Seam 1)", () => {
     expect(mediaFetcher.pedidos).toEqual(["media-1"])
     expect(proposalRepo.propostas).toHaveLength(0)
     expect(messenger.enviados).toEqual([{ para: "5511987654321", corpo: TEXTO_TENTE_DE_NOVO }])
+  })
+
+  it("test_tipo_de_arquivo_nao_suportado_pede_outro_formato_sem_extrair", async () => {
+    // Erro PERMANENTE (não transitório): HEIC passa o "image/*" genérico mas o
+    // extrator não lê — insistir no mesmo nunca resolveria.
+    const { deps, proposalRepo, messenger, store } = montar({
+      midiaPorId: { "media-1": midia("bytes", "image/heic") },
+    })
+
+    await proporLancamentoComprovante(deps, entrada())
+
+    expect(proposalRepo.propostas).toHaveLength(0)
+    expect(messenger.enviados).toEqual([{ para: "5511987654321", corpo: TEXTO_TIPO_NAO_SUPORTADO }])
+    expect(store.chaves()).toHaveLength(0)
+  })
+
+  it("test_falha_ao_persistir_responde_tente_de_novo_e_limpa_staging_orfao", async () => {
+    // R2 subiu mas o banco caiu ao gravar a Proposta: o comprovante não some em
+    // silêncio — pede reenvio e o staging órfão é removido.
+    const { deps, proposalRepo, messenger, store } = montar()
+    proposalRepo.criar = async () => {
+      throw new Error("postgres indisponível")
+    }
+
+    await proporLancamentoComprovante(deps, entrada())
+
+    expect(proposalRepo.propostas).toHaveLength(0)
+    expect(messenger.enviados).toEqual([{ para: "5511987654321", corpo: TEXTO_TENTE_DE_NOVO }])
+    // O staging foi limpo — nada de objeto órfão no bucket.
+    expect(await store.metadados("finance/proposals/lar-1/prop-1")).toBeNull()
+  })
+
+  it("test_corrida_do_mesmo_arquivo_avisa_referenciando_sem_duplicar", async () => {
+    // A pré-checagem passa (obterAtivaPorHash null), mas entre ela e o insert
+    // outra entrega do mesmo arquivo gravou → o índice único faz `criar` lançar
+    // PropostaDuplicadaError; a borda avisa referenciando a existente, não duplica.
+    const messenger = fakeWhatsappMessenger()
+    const store = fakeAttachmentStore()
+    const jaExistente = {
+      id: "prop-outra",
+      householdId: LAR,
+      estado: "proposta",
+      bytesHash: "x",
+    } as PaymentProposal
+    let preCheck = true
+    const proposalRepo: PaymentProposalRepo = {
+      async criar() {
+        throw new PropostaDuplicadaError("x")
+      },
+      async obterAtivaPorHash() {
+        if (preCheck) {
+          preCheck = false
+          return null
+        }
+        return jaExistente
+      },
+    }
+    const deps = {
+      mediaFetcher: fakeWhatsappMediaFetcher({ "media-1": midia() }),
+      extractor: fakeReceiptExtractor(reciboCompleto()),
+      billRepo: {
+        async listarBills() {
+          return [bill()]
+        },
+      } as Pick<BillRepo, "listarBills">,
+      paymentRepo: fakePaymentRepo([]),
+      proposalRepo,
+      store,
+      messenger,
+      clock: { hoje: () => "2026-07-20" },
+      calendar: fakeCalendar(),
+      novoId: () => "prop-1",
+    }
+
+    await proporLancamentoComprovante(deps, entrada())
+
+    expect(messenger.interativos).toHaveLength(0)
+    expect(messenger.enviados).toHaveLength(1)
+    expect(messenger.enviados[0].corpo.toLowerCase()).toContain("já")
+    // Staging da tentativa perdida foi limpo.
+    expect(await store.metadados("finance/proposals/lar-1/prop-1")).toBeNull()
   })
 })

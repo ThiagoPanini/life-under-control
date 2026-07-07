@@ -1,6 +1,6 @@
 import { AnthropicBedrock } from "@anthropic-ai/bedrock-sdk"
 import { parseReciboWhatsapp } from "@/core/domain/recibo-whatsapp"
-import type { ReceiptExtractor } from "@/core/ports/receipt-extractor"
+import { ehMimeComprovanteSuportado, type ReceiptExtractor } from "@/core/ports/receipt-extractor"
 
 /**
  * Adapter do `ReceiptExtractor` (ADR-0013) — Claude no Bedrock lê o comprovante
@@ -36,14 +36,6 @@ export function getBedrockClient(): AnthropicBedrock {
 
 /** MIME de imagem que o bloco `image` do Anthropic aceita. */
 type MimeImagem = "image/jpeg" | "image/png" | "image/webp" | "image/gif"
-
-/** Os únicos MIME que a visão do Claude entende — o resto rejeita cedo, com erro claro. */
-const MIMES_IMAGEM: ReadonlySet<string> = new Set<MimeImagem>([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-])
 
 /**
  * A tool que crava o shape do recibo — `tool_choice` a força, então a resposta é
@@ -104,8 +96,9 @@ export function bedrockReceiptExtractor(
   return async (conteudo, tipoMime) => {
     const ehPdf = tipoMime === "application/pdf"
     // Rejeita cedo o que a visão do Claude não aceita — melhor um erro claro aqui
-    // do que um `media_type` inválido virar 400 opaco lá no Bedrock.
-    if (!ehPdf && !MIMES_IMAGEM.has(tipoMime)) {
+    // do que um `media_type` inválido virar 400 opaco lá no Bedrock. Mesma fonte
+    // (`MIMES_COMPROVANTE_SUPORTADOS`) que a borda pré-checa (#158).
+    if (!ehMimeComprovanteSuportado(tipoMime)) {
       throw new Error(
         `tipo MIME não suportado: ${tipoMime} (esperado application/pdf ou image/{jpeg,png,webp,gif})`,
       )

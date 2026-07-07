@@ -21,8 +21,13 @@ type Dependencias = {
   userRepo: UserRepo
   eventRepo: WhatsappEventRepo
   messenger: WhatsappMessenger
-  /** Pipeline do comprovante (#158); ausente = borda só de texto (fase 0). */
-  comprovante?: ComprovanteDeps
+  /**
+   * Fábrica do pipeline do comprovante (#158); ausente = borda só de texto (fase
+   * 0). É uma fábrica (não o bundle pronto) pra construção **preguiçosa**: os
+   * adapters de R2/Bedrock só nascem quando chega um comprovante — um evento de
+   * texto/status nunca falha por env de mídia ausente.
+   */
+  comprovante?: () => ComprovanteDeps
   /** Injetável pro use-case não depender do `console` global direto; default é o próprio `console.log`. */
   log?: (mensagem: string) => void
 }
@@ -69,7 +74,7 @@ async function processarMensagem(
       log(`whatsapp: Pessoa ${pessoa.id} sem Lar resolvido — comprovante ignorado`)
       return
     }
-    await proporLancamentoComprovante(deps.comprovante, {
+    await proporLancamentoComprovante(deps.comprovante(), {
       householdId: pessoa.householdId,
       paidBy: pessoa.id,
       remetente: evento.remetente,

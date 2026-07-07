@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import type { Bill } from "../domain/bill"
+import { type Bill, formatarDataBr } from "../domain/bill"
 import { formatBRL } from "../domain/money"
 import { descreverCompetencia } from "../domain/payment"
 import {
@@ -16,9 +16,9 @@ import type { AttachmentStore } from "../ports/attachment-store"
 import type { BillRepo } from "../ports/bill-repo"
 import type { Calendar } from "../ports/calendar"
 import type { Clock } from "../ports/clock"
-import type { PaymentProposalRepo } from "../ports/payment-proposal-repo"
+import { type PaymentProposalRepo, PropostaDuplicadaError } from "../ports/payment-proposal-repo"
 import type { PaymentRepo } from "../ports/payment-repo"
-import type { ReceiptExtractor } from "../ports/receipt-extractor"
+import { ehMimeComprovanteSuportado, type ReceiptExtractor } from "../ports/receipt-extractor"
 import type { WhatsappMediaFetcher } from "../ports/whatsapp-media-fetcher"
 import type { WhatsappMessenger } from "../ports/whatsapp-messenger"
 import { type CandidatoConta, casarReciboConta } from "./casar-recibo-conta"
@@ -33,14 +33,19 @@ import { inferirCompetenciaRecibo } from "./inferir-competencia-recibo"
  * numa chave de staging e persiste a Proposta, respondendo no chat com botões.
  *
  * Só orquestra ports — a regra vive no núcleo. A borda (webhook) resolve a Pessoa
- * e o Lar e chama isto por comprovante. Degrada em vez de derrubar: mídia fora ou
- * extrator fora respondem "tente de novo" sem persistir nada (o evento é
- * recuperável no reenvio).
+ * e o Lar e chama isto por comprovante. **Sempre responde algo** em vez de sumir:
+ * mídia/extração fora → "tente de novo" (transitório, recuperável no reenvio);
+ * tipo de arquivo não suportado → pede outro formato (permanente); falha ao
+ * estacionar/persistir → "tente de novo" e limpa o staging órfão.
  */
 
-/** Resposta de degradação transitória (mídia/extração indisponível) — o reenvio recupera. */
+/** Resposta de degradação transitória (mídia/extração/persistência indisponível) — o reenvio recupera. */
 export const TEXTO_TENTE_DE_NOVO =
   "Tive um problema pra ler seu comprovante agora. Pode mandar de novo daqui a pouco? 🙏"
+
+/** Resposta de erro **permanente**: o tipo de arquivo não é legível — pedir outro não adianta insistir no mesmo. */
+export const TEXTO_TIPO_NAO_SUPORTADO =
+  "Não consigo ler esse tipo de arquivo. Manda uma foto (JPG ou PNG) ou o PDF do comprovante, por favor. 📎"
 
 /** Um comprovante recebido, já com a Pessoa e o Lar resolvidos pela borda. */
 export type ComprovanteEntrada = {
@@ -60,7 +65,7 @@ export type ComprovanteDeps = {
   billRepo: Pick<BillRepo, "listarBills">
   paymentRepo: Pick<PaymentRepo, "listarTodosPayments">
   proposalRepo: PaymentProposalRepo
-  store: Pick<AttachmentStore, "enviar">
+  store: Pick<AttachmentStore, "enviar" | "remover">
   messenger: WhatsappMessenger
   clock: Clock
   calendar: Calendar
@@ -70,10 +75,17 @@ export type ComprovanteDeps = {
   log?: (mensagem: string) => void
 }
 
-/** Data civil ISO (YYYY-MM-DD) → exibição pt-BR (DD/MM/YYYY). */
-function formatarDataCivil(iso: string): string {
-  const [ano, mes, dia] = iso.split("-")
-  return `${dia}/${mes}/${ano}`
+/** Remove o staging órfão sem derrubar o fluxo — o objeto vira lixo a coletar se falhar, nunca um throw. */
+async function removerStagingSeguro(
+  store: Pick<AttachmentStore, "remover">,
+  chave: string,
+  log: (mensagem: string) => void,
+): Promise<void> {
+  try {
+    await store.remover(chave)
+  } catch (e) {
+    log(`whatsapp: falha ao limpar staging ${chave}: ${e}`)
+  }
 }
 
 export async function proporLancamentoComprovante(
@@ -93,7 +105,16 @@ export async function proporLancamentoComprovante(
     return
   }
 
-  // 2. Repetição = mesmo arquivo (hash dos bytes), checada antes da extração cara.
+  // 2. Tipo não legível = erro PERMANENTE (não transitório): pedir o mesmo de
+  //    novo nunca resolveria — orienta a mandar foto/PDF. (Distinto de "tente de
+  //    novo".) Pré-checa contra a mesma fonte que o extrator (#156).
+  if (!ehMimeComprovanteSuportado(baixada.tipoMime)) {
+    log(`whatsapp: tipo ${baixada.tipoMime} não suportado (evento ${waMessageId})`)
+    await deps.messenger.enviarTexto(remetente, TEXTO_TIPO_NAO_SUPORTADO)
+    return
+  }
+
+  // 3. Repetição = mesmo arquivo (hash dos bytes), checada antes da extração cara.
   //    Mesmo hash com Proposta aberta ou já virada Lançamento → avisa, não duplica.
   const bytesHash = hashComprovante(baixada.conteudo)
   const existente = await deps.proposalRepo.obterAtivaPorHash(householdId, bytesHash)
@@ -102,7 +123,7 @@ export async function proporLancamentoComprovante(
     return
   }
 
-  // 3. Extração via port (#156). Extrator fora = transitório: pede reenvio e não
+  // 4. Extração via port (#156). Extrator fora = transitório: pede reenvio e não
   //    estaciona nem persiste nada (o evento é recuperável).
   let recibo: ReciboWhatsapp
   try {
@@ -113,7 +134,7 @@ export async function proporLancamentoComprovante(
     return
   }
 
-  // 4. Matching de Conta + inferência de Competência (#162). Só Contas ativas
+  // 5. Matching de Conta + inferência de Competência (#162). Só Contas ativas
   //    casam; score 0 = sem candidata confiável (Conta não identificada).
   const bills = await deps.billRepo.listarBills(householdId)
   const todosPayments = await deps.paymentRepo.listarTodosPayments(householdId)
@@ -134,31 +155,48 @@ export async function proporLancamentoComprovante(
       )
     : null
 
-  // 5. Staging dos bytes (chave transitória — sem Lançamento ainda) + Proposta.
+  // 6. Staging dos bytes (chave transitória — sem Lançamento ainda) + Proposta.
+  //    Falha aqui NÃO some em silêncio: limpa o staging órfão e responde. A
+  //    corrida (duas entregas do mesmo arquivo) vira `PropostaDuplicadaError`
+  //    pelo índice único → avisa referenciando a existente, não duplica.
   const id = novoId()
   const stagingKey = chaveStaging(householdId, id)
-  await deps.store.enviar(stagingKey, baixada.conteudo, baixada.tipoMime)
-  await deps.proposalRepo.criar({
-    id,
-    householdId,
-    waMessageId,
-    bytesHash,
-    paidBy,
-    billId: contaCasada?.id ?? null,
-    valorCentavos: recibo.valorCentavos,
-    dataPagamento: recibo.dataPagamento,
-    competencia,
-    favorecido: recibo.favorecido,
-    stagingKey,
-    tipoMime: baixada.tipoMime,
-  })
+  try {
+    await deps.store.enviar(stagingKey, baixada.conteudo, baixada.tipoMime)
+    await deps.proposalRepo.criar({
+      id,
+      householdId,
+      waMessageId,
+      bytesHash,
+      paidBy,
+      billId: contaCasada?.id ?? null,
+      valorCentavos: recibo.valorCentavos,
+      dataPagamento: recibo.dataPagamento,
+      competencia,
+      favorecido: recibo.favorecido,
+      stagingKey,
+      tipoMime: baixada.tipoMime,
+    })
+  } catch (e) {
+    await removerStagingSeguro(deps.store, stagingKey, log)
+    if (e instanceof PropostaDuplicadaError) {
+      const jaExistente = await deps.proposalRepo.obterAtivaPorHash(householdId, bytesHash)
+      if (jaExistente) {
+        await deps.messenger.enviarTexto(remetente, mensagemComprovanteRepetido(jaExistente))
+        return
+      }
+    }
+    log(`whatsapp: falha ao estacionar/persistir (evento ${waMessageId}): ${e}`)
+    await deps.messenger.enviarTexto(remetente, TEXTO_TENTE_DE_NOVO)
+    return
+  }
 
-  // 6. Responde a Proposta no chat com botões; campo ilegível sai sinalizado em
+  // 7. Responde a Proposta no chat com botões; campo ilegível sai sinalizado em
   //    branco (nunca palpite — ADR-0013).
   const resumo: ResumoProposta = {
     contaNome: contaCasada?.nome ?? null,
     valor: recibo.valorCentavos !== null ? formatBRL(recibo.valorCentavos) : null,
-    dataPagamento: recibo.dataPagamento ? formatarDataCivil(recibo.dataPagamento) : null,
+    dataPagamento: recibo.dataPagamento ? formatarDataBr(recibo.dataPagamento) : null,
     competencia:
       competencia && contaCasada ? descreverCompetencia(competencia, contaCasada.recurrence) : null,
   }

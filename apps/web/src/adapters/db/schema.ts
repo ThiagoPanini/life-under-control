@@ -3,7 +3,6 @@ import {
   bigint,
   check,
   date,
-  index,
   integer,
   pgTable,
   text,
@@ -270,7 +269,12 @@ export const whatsappProposals = pgTable(
       "whatsapp_proposals_competencia_check",
       sql`${t.competencia} is null or ${t.competencia} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`,
     ),
-    // Lookup da detecção de repetido: por Lar + hash dos bytes.
-    index("whatsapp_proposals_hash_idx").on(t.householdId, t.bytesHash),
+    // Detecção de repetido, atômica: no máximo UMA Proposta ativa por (Lar, hash)
+    // — o índice único parcial fecha a corrida check-then-insert entre duas
+    // entregas concorrentes do mesmo arquivo (também serve de lookup). Terminais
+    // (cancelada/expirada) ficam de fora: reenviar depois de cancelar é legítimo.
+    uniqueIndex("whatsapp_proposals_hash_ativo_uidx")
+      .on(t.householdId, t.bytesHash)
+      .where(sql`${t.estado} in ('proposta', 'confirmada')`),
   ],
 )

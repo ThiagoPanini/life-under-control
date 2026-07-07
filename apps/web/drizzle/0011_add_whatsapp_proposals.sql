@@ -21,4 +21,4 @@ CREATE TABLE "whatsapp_proposals" (
 ALTER TABLE "whatsapp_proposals" ADD CONSTRAINT "whatsapp_proposals_household_id_households_id_fk" FOREIGN KEY ("household_id") REFERENCES "public"."households"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "whatsapp_proposals" ADD CONSTRAINT "whatsapp_proposals_paid_by_users_id_fk" FOREIGN KEY ("paid_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "whatsapp_proposals" ADD CONSTRAINT "whatsapp_proposals_bill_id_bills_id_fk" FOREIGN KEY ("bill_id") REFERENCES "public"."bills"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "whatsapp_proposals_hash_idx" ON "whatsapp_proposals" USING btree ("household_id","bytes_hash");
+CREATE UNIQUE INDEX "whatsapp_proposals_hash_ativo_uidx" ON "whatsapp_proposals" USING btree ("household_id","bytes_hash") WHERE "whatsapp_proposals"."estado" in ('proposta', 'confirmada');

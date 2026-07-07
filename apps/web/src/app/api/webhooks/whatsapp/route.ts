@@ -80,7 +80,10 @@ export async function POST(request: Request): Promise<Response> {
           userRepo: drizzleUserRepo(),
           eventRepo: drizzleWhatsappEventRepo(),
           messenger,
-          comprovante: {
+          // Fábrica preguiçosa: os adapters de R2/Bedrock (que leem env na
+          // construção) só nascem quando chega um comprovante — texto/status não
+          // quebram por env de mídia ausente.
+          comprovante: () => ({
             mediaFetcher: httpWhatsappMediaFetcher({ accessToken }),
             extractor: bedrockReceiptExtractor(),
             billRepo: drizzleBillRepo(),
@@ -90,7 +93,7 @@ export async function POST(request: Request): Promise<Response> {
             messenger,
             clock: systemClock(),
             calendar: nationalBankCalendar(),
-          },
+          }),
         },
         payload,
       )

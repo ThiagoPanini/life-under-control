@@ -1,5 +1,5 @@
 {
-  "id": "299fbaf3-7431-4efd-acd4-ff434c0bbe51",
+  "id": "03fb8da8-090a-4984-ac31-8c16c2f8b97c",
   "prevId": "985e9d51-7e57-457e-9cd4-269dc2a073a3",
   "version": "7",
   "dialect": "postgresql",
@@ -637,8 +637,8 @@
         }
       },
       "indexes": {
-        "whatsapp_proposals_hash_idx": {
-          "name": "whatsapp_proposals_hash_idx",
+        "whatsapp_proposals_hash_ativo_uidx": {
+          "name": "whatsapp_proposals_hash_ativo_uidx",
           "columns": [
             {
               "expression": "household_id",
@@ -653,7 +653,8 @@
               "nulls": "last"
             }
           ],
-          "isUnique": false,
+          "isUnique": true,
+          "where": "\"whatsapp_proposals\".\"estado\" in ('proposta', 'confirmada')",
           "concurrently": false,
           "method": "btree",
           "with": {}

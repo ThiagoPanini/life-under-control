@@ -18,6 +18,14 @@ import { createHash } from "node:crypto"
  */
 export type EstadoProposta = "proposta" | "confirmada" | "cancelada" | "expirada"
 
+/**
+ * Estados em que uma Proposta é **ativa** para a detecção de repetido: aberta
+ * (`proposta`) ou já virada Lançamento (`confirmada`). `cancelada`/`expirada`
+ * são terminais e não contam — reenviar o mesmo arquivo depois de cancelar abre
+ * Proposta nova. Fonte única, consumida pelo repo (query + índice único parcial).
+ */
+export const ESTADOS_PROPOSTA_ATIVA: EstadoProposta[] = ["proposta", "confirmada"]
+
 /** Os dados de uma Proposta lidos do comprovante — campo `null` = ilegível, nunca palpite (ADR-0013). */
 export type DadosPaymentProposal = {
   /** A mensagem do WhatsApp que originou a Proposta (auditoria/idempotência da borda). */
