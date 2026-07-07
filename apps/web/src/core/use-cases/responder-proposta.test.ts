@@ -10,6 +10,8 @@ import { fakePaymentProposalRepo } from "./payment-proposal-repo.fake"
 import { fakePaymentRepo } from "./payment-repo.fake"
 import {
   MENSAGEM_CANCELADO,
+  MENSAGEM_COMPROVANTE_INVALIDO,
+  MENSAGEM_CONTA_SUMIU,
   MENSAGEM_FALTA_CONTA,
   MENSAGEM_JA_RESOLVIDA,
   MENSAGEM_PROPOSTA_SUMIU,
@@ -75,6 +77,8 @@ type Opts = {
   hoje?: string
   matcherIds?: string[]
   semStaging?: boolean
+  /** Tamanho do objeto de staging — >25 MB força o Confirmar a rejeitar como comprovante inválido. */
+  stagingBytes?: number
 }
 
 function montar(opts: Opts = {}) {
@@ -89,7 +93,9 @@ function montar(opts: Opts = {}) {
     },
   }
   const store = fakeAttachmentStore(
-    opts.semStaging ? [] : [{ chave: p.stagingKey, tamanhoBytes: 2048, tipoMime: p.tipoMime }],
+    opts.semStaging
+      ? []
+      : [{ chave: p.stagingKey, tamanhoBytes: opts.stagingBytes ?? 2048, tipoMime: p.tipoMime }],
   )
   const messenger = fakeWhatsappMessenger()
   const deps: ResponderDeps = {
@@ -220,7 +226,7 @@ describe("responderProposta (Seam 1)", () => {
     expect(messenger.enviados.at(-1)?.corpo).toBe(MENSAGEM_PROPOSTA_SUMIU)
   })
 
-  it("test_falha_ao_criar_lancamento_reabre_a_proposta_e_pede_retry", async () => {
+  it("test_falha_ao_criar_lancamento_mantem_proposta_aberta_e_pede_retry", async () => {
     const { deps, proposalRepo, paymentRepo, messenger } = montar()
     paymentRepo.criarPayment = async () => {
       throw new Error("postgres indisponível")
@@ -228,9 +234,70 @@ describe("responderProposta (Seam 1)", () => {
 
     await responderProposta(deps, acao({ acao: "confirmar", proposalId: "prop-1" }))
 
-    // Compensou: voltou a `proposta` (nada de confirmada sem Lançamento).
+    // CAS é o commit final: se recordPayment falha, o estado nunca virou —
+    // segue `proposta` (nada de confirmada sem Lançamento) e o retry é seguro.
+    expect(await paymentRepo.listarTodosPayments(LAR)).toHaveLength(0)
     expect(proposalRepo.propostas[0].estado).toBe("proposta")
     expect(messenger.enviados.at(-1)?.corpo).toBe(MENSAGEM_TENTE_CONFIRMAR_DE_NOVO)
+  })
+
+  it("test_confirmar_conta_encerrada_orienta_e_nao_cria_lancamento", async () => {
+    // A Proposta aponta pra Conta que foi encerrada depois de proposta: não se
+    // lança em Conta arquivada (paridade com o portal). billLuz sai da lista ativa.
+    const { deps, proposalRepo, paymentRepo, messenger } = montar({
+      bills: [billLuz({ estado: "encerrada", encerradaEm: "2026-07-06" })],
+    })
+
+    await responderProposta(deps, acao({ acao: "confirmar", proposalId: "prop-1" }))
+
+    expect(await paymentRepo.listarTodosPayments(LAR)).toHaveLength(0)
+    expect(proposalRepo.propostas[0].estado).toBe("proposta")
+    expect(messenger.enviados.at(-1)?.corpo).toBe(MENSAGEM_CONTA_SUMIU)
+  })
+
+  it("test_falha_no_anexo_compensa_o_lancamento_sem_deixar_orfao", async () => {
+    const { deps, proposalRepo, paymentRepo, store, messenger } = montar()
+    // recordPayment cria o Lançamento; a promoção do comprovante falha logo depois.
+    // A compensação DELETA o Lançamento recém-criado — o bug clássico (Lançamento
+    // órfão que duplica no retry) não pode existir.
+    store.copiar = async () => {
+      throw new Error("R2 fora")
+    }
+
+    await responderProposta(deps, acao({ acao: "confirmar", proposalId: "prop-1" }))
+
+    expect(await paymentRepo.listarTodosPayments(LAR)).toHaveLength(0)
+    expect(proposalRepo.propostas[0].estado).toBe("proposta")
+    expect(messenger.enviados.at(-1)?.corpo).toBe(MENSAGEM_TENTE_CONFIRMAR_DE_NOVO)
+  })
+
+  it("test_comprovante_grande_demais_erro_permanente_e_compensa", async () => {
+    // Bytes acima do teto (25 MB) passaram o staging mas o Confirmar revalida os
+    // metadados reais na chave canônica (registerAttachment) → AttachmentInvalidoError.
+    // Erro PERMANENTE: mensagem distinta (reenviar o mesmo não resolve) e sem órfão.
+    const { deps, proposalRepo, paymentRepo, messenger } = montar({
+      stagingBytes: 26 * 1024 * 1024,
+    })
+
+    await responderProposta(deps, acao({ acao: "confirmar", proposalId: "prop-1" }))
+
+    expect(await paymentRepo.listarTodosPayments(LAR)).toHaveLength(0)
+    expect(proposalRepo.propostas[0].estado).toBe("proposta")
+    expect(messenger.enviados.at(-1)?.corpo).toBe(MENSAGEM_COMPROVANTE_INVALIDO)
+  })
+
+  it("test_corrida_perdida_no_commit_desfaz_o_lancamento_e_avisa_ja_resolvida", async () => {
+    const { deps, proposalRepo, paymentRepo, store, messenger } = montar()
+    // Double-tap concorrente: o outro clique confirmou entre a checagem de estado e
+    // o CAS aqui → confirmar() devolve null. O perdedor desfaz o que criou; só o
+    // vencedor fica com o Lançamento (aqui, nenhum — simulamos só o perdedor).
+    proposalRepo.confirmar = async () => null
+
+    await responderProposta(deps, acao({ acao: "confirmar", proposalId: "prop-1" }))
+
+    expect(await paymentRepo.listarTodosPayments(LAR)).toHaveLength(0)
+    expect(store.chaves().some((k) => k.startsWith(`finance/payments/${LAR}/`))).toBe(false)
+    expect(messenger.enviados.at(-1)?.corpo).toBe(MENSAGEM_JA_RESOLVIDA)
   })
 })
 

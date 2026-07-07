@@ -19,6 +19,7 @@ import { fakePaymentRepo } from "./payment-repo.fake"
 import {
   type ComprovanteEntrada,
   proporLancamentoComprovante,
+  TEXTO_ARQUIVO_GRANDE,
   TEXTO_TENTE_DE_NOVO,
   TEXTO_TIPO_NAO_SUPORTADO,
 } from "./propor-lancamento-comprovante"
@@ -319,6 +320,22 @@ describe("proporLancamentoComprovante (Seam 1)", () => {
     expect(store.chaves()).toHaveLength(0)
   })
 
+  it("test_comprovante_acima_do_teto_pede_arquivo_menor_sem_extrair", async () => {
+    // Erro PERMANENTE: o Confirmar rejeitaria os mesmos bytes lá na frente (25 MB) —
+    // falha cedo, no staging, sem gastar extração nem criar Proposta natimorta.
+    const { deps, proposalRepo, messenger, store } = montar({
+      midiaPorId: {
+        "media-1": { conteudo: new Uint8Array(26 * 1024 * 1024), tipoMime: "image/jpeg" },
+      },
+    })
+
+    await proporLancamentoComprovante(deps, entrada())
+
+    expect(proposalRepo.propostas).toHaveLength(0)
+    expect(messenger.enviados).toEqual([{ para: "5511987654321", corpo: TEXTO_ARQUIVO_GRANDE }])
+    expect(store.chaves()).toHaveLength(0)
+  })
+
   it("test_falha_ao_persistir_responde_tente_de_novo_e_limpa_staging_orfao", async () => {
     // R2 subiu mas o banco caiu ao gravar a Proposta: o comprovante não some em
     // silêncio — pede reenvio e o staging órfão é removido.
@@ -363,9 +380,6 @@ describe("proporLancamentoComprovante (Seam 1)", () => {
         return null
       },
       async confirmar() {
-        return null
-      },
-      async reabrir() {
         return null
       },
       async cancelar() {

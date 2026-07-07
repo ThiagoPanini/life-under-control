@@ -37,13 +37,12 @@ export type PaymentProposalRepo = {
   /** A Proposta do Lar por id (qualquer estado) — os botões agem sobre ela. `null` se não existe. */
   obterPorId(householdId: string, id: string): Promise<PaymentProposal | null>
   /**
-   * Transição CAS `proposta → confirmada` (o Confirmar). Devolve a Proposta
-   * atualizada, ou `null` se ela **já não estava** em `proposta` (clique repetido
-   * ou já resolvida) — a trava de idempotência: só um Confirmar cria Lançamento.
+   * Transição CAS `proposta → confirmada` — o **commit** do Confirmar. Devolve a
+   * Proposta atualizada, ou `null` se ela **já não estava** em `proposta` (corrida
+   * concorrente perdida): só um Confirmar persiste o Lançamento; o perdedor da
+   * corrida desfaz o que criou (o clique repetido já é barrado antes, pelo estado).
    */
   confirmar(householdId: string, id: string): Promise<PaymentProposal | null>
-  /** CAS `confirmada → proposta` — compensação se a criação do Lançamento falhar após o Confirmar. */
-  reabrir(householdId: string, id: string): Promise<PaymentProposal | null>
   /** Transição CAS `proposta → cancelada` (o Cancelar). `null` se já não estava em `proposta`. */
   cancelar(householdId: string, id: string): Promise<PaymentProposal | null>
   /** Transição CAS `proposta → expirada` (limpeza lazy ou varredura). `null` se já não estava em `proposta`. */

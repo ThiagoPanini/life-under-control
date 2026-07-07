@@ -10,6 +10,9 @@ import { type Db, getDb } from "./client"
 import { ehViolacaoDeUnicidade } from "./postgres-error"
 import { whatsappProposals } from "./schema"
 
+/** Teto de Propostas abertas lidas por passe de varredura (limpeza oportunista, não relatório). */
+const MAX_VARREDURA = 200
+
 function paraDominio(r: typeof whatsappProposals.$inferSelect): PaymentProposal {
   return {
     id: r.id,
@@ -114,9 +117,6 @@ export function drizzleWhatsappProposalRepo(db: Db = getDb()): PaymentProposalRe
     confirmar(householdId, id) {
       return transicao(householdId, id, "proposta", "confirmada")
     },
-    reabrir(householdId, id) {
-      return transicao(householdId, id, "confirmada", "proposta")
-    },
     cancelar(householdId, id) {
       return transicao(householdId, id, "proposta", "cancelada")
     },
@@ -140,10 +140,15 @@ export function drizzleWhatsappProposalRepo(db: Db = getDb()): PaymentProposalRe
     },
 
     async listarAbertas() {
+      // Teto na varredura oportunista: um backlog patológico de abertas não vira um
+      // scan sem-limite a cada evento — o excedente escoa nos passes seguintes (as
+      // mais antigas primeiro, que são as que já expiraram). Sweep, não relatório.
       const rows = await db
         .select()
         .from(whatsappProposals)
         .where(eq(whatsappProposals.estado, "proposta"))
+        .orderBy(whatsappProposals.criadoEm)
+        .limit(MAX_VARREDURA)
       return rows.map(paraDominio)
     },
   }

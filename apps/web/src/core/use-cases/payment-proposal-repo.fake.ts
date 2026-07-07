@@ -62,9 +62,6 @@ export function fakePaymentProposalRepo(iniciais: PaymentProposal[] = []): Payme
     async confirmar(householdId, id) {
       return transicao(householdId, id, "proposta", "confirmada")
     },
-    async reabrir(householdId, id) {
-      return transicao(householdId, id, "confirmada", "proposta")
-    },
     async cancelar(householdId, id) {
       return transicao(householdId, id, "proposta", "cancelada")
     },

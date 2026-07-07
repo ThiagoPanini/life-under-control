@@ -10,7 +10,7 @@ import { fakeContaMatcher } from "./conta-matcher.fake"
 import { fakePaymentProposalRepo } from "./payment-proposal-repo.fake"
 import { fakePaymentRepo } from "./payment-repo.fake"
 import { processarEventoWhatsapp, TEXTO_INSTRUCAO_USO } from "./processar-evento-whatsapp"
-import type { ComprovanteDeps } from "./propor-lancamento-comprovante"
+import { type ComprovanteDeps, TEXTO_TENTE_DE_NOVO } from "./propor-lancamento-comprovante"
 import { fakeReceiptExtractor } from "./receipt-extractor.fake"
 import type { ResponderDeps } from "./responder-proposta"
 import { fakeUserRepo } from "./user-repo.fake"
@@ -328,6 +328,72 @@ describe("processarEventoWhatsapp (Seam 1)", () => {
     ).resolves.not.toThrow()
 
     expect(messenger.enviados).toEqual([{ para: "5511900000002", corpo: TEXTO_INSTRUCAO_USO }])
+  })
+
+  it("test_webhook_so_de_status_nao_dispara_a_varredura", async () => {
+    // A Meta dispara `status` (sent/delivered/read) a cada mensagem que o bot manda,
+    // em alta frequência: não pode virar um SELECT de limpeza. Sem tráfego humano, sem varredura.
+    const userRepo = fakeUserRepo([pessoa()])
+    const eventRepo = fakeWhatsappEventRepo()
+    const messenger = fakeWhatsappMessenger()
+    let varreu = false
+    const varredura = () => {
+      varreu = true
+      return {
+        proposalRepo: fakePaymentProposalRepo(),
+        store: fakeAttachmentStore(),
+        clock: { hoje: () => "2026-07-08" },
+      }
+    }
+    const payloadStatus = {
+      entry: [{ changes: [{ value: { statuses: [{ id: "wamid.st2", status: "read" }] } }] }],
+    }
+
+    await processarEventoWhatsapp({ userRepo, eventRepo, messenger, varredura }, payloadStatus)
+
+    expect(varreu).toBe(false)
+  })
+
+  it("test_webhook_com_mensagem_dispara_a_varredura_oportunista", async () => {
+    const userRepo = fakeUserRepo([pessoa()])
+    const eventRepo = fakeWhatsappEventRepo()
+    const messenger = fakeWhatsappMessenger()
+    let varreu = false
+    const varredura = () => {
+      varreu = true
+      return {
+        proposalRepo: fakePaymentProposalRepo(),
+        store: fakeAttachmentStore(),
+        clock: { hoje: () => "2026-07-08" },
+      }
+    }
+
+    await processarEventoWhatsapp(
+      { userRepo, eventRepo, messenger, varredura },
+      payloadMensagem("wamid.sw", "5511987654321", "oi"),
+    )
+
+    expect(varreu).toBe(true)
+  })
+
+  it("test_comprovante_que_estoura_no_pipeline_responde_tente_de_novo", async () => {
+    // O evento já foi reivindicado (a Meta não reenvia): um throw fora dos caminhos
+    // que já degradam (aqui, o repo de Proposta fora) não pode deixar o casal no vácuo.
+    const userRepo = fakeUserRepo([pessoa({ householdId: "lar-1" })])
+    const eventRepo = fakeWhatsappEventRepo()
+    const messenger = fakeWhatsappMessenger()
+    const comprovante = comprovanteFake()
+    comprovante.proposalRepo.obterAtivaPorHash = async () => {
+      throw new Error("postgres fora")
+    }
+
+    await processarEventoWhatsapp(
+      { userRepo, eventRepo, messenger, comprovante: () => comprovante },
+      payloadComprovante("wamid.err", "5511987654321", "media-1"),
+    )
+
+    // A rede de segurança é da borda: responde pelo messenger externo, não o do bundle.
+    expect(messenger.enviados.at(-1)?.corpo).toBe(TEXTO_TENTE_DE_NOVO)
   })
 
   it("test_log_e_injetavel_em_vez_de_preso_ao_console_global", async () => {

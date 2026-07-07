@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import { chaveComprovante } from "../domain/attachment"
 import { type Bill, formatarDataBr } from "../domain/bill"
 import { formatBRL } from "../domain/money"
-import { descreverCompetencia } from "../domain/payment"
+import { descreverCompetencia, type Payment } from "../domain/payment"
 import {
   type AcaoProposta,
   botoesDaProposta,
@@ -24,6 +24,7 @@ import type { PaymentProposalRepo } from "../ports/payment-proposal-repo"
 import type { PaymentRepo } from "../ports/payment-repo"
 import type { WhatsappMessenger } from "../ports/whatsapp-messenger"
 import { inferirCompetenciaRecibo } from "./inferir-competencia-recibo"
+import { AttachmentInvalidoError } from "./prepare-attachment-upload"
 import { removerStagingSeguro } from "./propor-lancamento-comprovante"
 import { recordPayment } from "./record-payment"
 import { registerAttachment } from "./register-attachment"
@@ -52,9 +53,12 @@ export const MENSAGEM_FALTA_CONTA =
 /** Confirmar com valor/data/competência ilegível: não cria Lançamento inválido (ADR-0013). */
 export const MENSAGEM_FALTA_DADO =
   "Faltou ler algum dado do comprovante. Manda ele de novo, por favor. 🙏"
-/** Falha transitória ao criar o Lançamento (banco/R2) após o Confirmar — pede retry; a Proposta reabre. */
+/** Falha transitória ao criar o Lançamento (banco/R2) — pede retry; a Proposta segue aberta, o retry é seguro. */
 export const MENSAGEM_TENTE_CONFIRMAR_DE_NOVO =
   "Não consegui registrar agora. Toque *Confirmar* de novo daqui a pouco. 🙏"
+/** Erro PERMANENTE ao registrar o comprovante (arquivo grande demais/inválido) — reenviar não resolve. */
+export const MENSAGEM_COMPROVANTE_INVALIDO =
+  "Esse comprovante não pôde ser registrado (arquivo grande demais ou inválido). Manda um mais leve, por favor. 📎"
 /** Cancelamento: nada foi registrado. */
 export const MENSAGEM_CANCELADO = "Cancelado — não registrei nada. 👍"
 /** Trocar Conta sem nenhuma Conta ativa pra oferecer. */
@@ -98,11 +102,24 @@ function nomeComprovante(proposta: PaymentProposal): string {
 
 /** Ordena as Contas pela ordem do ranking do matcher; as fora do ranking vão ao fim (ordem original). */
 function ordenarPorRanking(bills: Bill[], ranking: string[]): Bill[] {
-  const noRanking = ranking
-    .map((id) => bills.find((b) => b.id === id))
-    .filter((b): b is Bill => b != null)
-  const resto = bills.filter((b) => !ranking.includes(b.id))
-  return [...noRanking, ...resto]
+  const vistos = new Set<string>()
+  const ordenadas: Bill[] = []
+  // Ranking primeiro (dedup: um id repetido do matcher não vira linha de lista
+  // duplicada, que a Graph API rejeita); as fora do ranking preservam a ordem.
+  for (const id of ranking) {
+    const b = bills.find((x) => x.id === id)
+    if (b && !vistos.has(b.id)) {
+      vistos.add(b.id)
+      ordenadas.push(b)
+    }
+  }
+  for (const b of bills) {
+    if (!vistos.has(b.id)) {
+      vistos.add(b.id)
+      ordenadas.push(b)
+    }
+  }
+  return ordenadas
 }
 
 export async function responderProposta(
@@ -127,6 +144,15 @@ export async function responderProposta(
     return
   }
 
+  // Proposta em estado terminal (já confirmada/cancelada/expirada): nenhum botão
+  // age — informa e não refaz trabalho. É a idempotência do clique repetido
+  // **antes** de qualquer escrita (o CAS lá dentro cobre só a corrida concorrente).
+  if (proposta.estado !== "proposta") {
+    const msg = proposta.estado === "expirada" ? mensagemPropostaExpirada() : MENSAGEM_JA_RESOLVIDA
+    await deps.messenger.enviarTexto(remetente, msg)
+    return
+  }
+
   switch (acao.acao) {
     case "confirmar":
       return confirmar(deps, log, proposta, remetente)
@@ -147,7 +173,7 @@ async function confirmar(
 ): Promise<void> {
   const { householdId } = proposta
   // Sem Conta não há onde lançar; sem valor/data/competência o Lançamento seria
-  // inválido (ADR-0013 não chuta) — orienta antes de tocar o estado.
+  // inválido (ADR-0013 não chuta) — orienta antes de qualquer escrita.
   if (proposta.billId == null) {
     await deps.messenger.enviarTexto(remetente, MENSAGEM_FALTA_CONTA)
     return
@@ -161,32 +187,38 @@ async function confirmar(
     return
   }
 
-  // CAS `proposta→confirmada`: só um clique ganha — a trava de idempotência (2º
-  // Confirmar devolve null e não cria 2º Lançamento).
-  const confirmada = await deps.proposalRepo.confirmar(householdId, proposta.id)
-  if (!confirmada) {
-    await deps.messenger.enviarTexto(remetente, MENSAGEM_JA_RESOLVIDA)
+  // Revalida a Conta ativa: a Proposta vive dias e a Conta pode ter sido encerrada
+  // no meio-tempo — não se lança em Conta arquivada (paridade com o portal). Já
+  // deixa o `bill` em mãos pro resumo, sem leitura pós-commit que possa falhar
+  // depois do fato criado.
+  const bill = (await deps.billRepo.listarBills(householdId)).find(
+    (b) => b.id === proposta.billId && b.estado === "ativa",
+  )
+  if (!bill) {
+    await deps.messenger.enviarTexto(remetente, MENSAGEM_CONTA_SUMIU)
     return
   }
 
+  // Cria Lançamento + Anexo ANTES de comprometer o estado — o CAS é o **commit
+  // final**. Falha aqui desfaz o parcial e deixa a Proposta intacta em `proposta`:
+  // retry é seguro (nunca duplica, nunca fica confirmada-sem-Lançamento, nem stuck
+  // se um `reabrir` falhasse). Erro PERMANENTE (comprovante inválido) não entra em
+  // loop de retry — mensagem distinta.
+  let payment: Payment | null = null
+  let attachmentId: string | null = null
+  let chaveCanonica: string | null = null
   try {
-    const payment = await recordPayment(
-      deps.paymentRepo,
-      deps.clock,
-      householdId,
-      proposta.billId,
-      {
-        valor: proposta.valorCentavos,
-        dataPagamento: proposta.dataPagamento,
-        competencia: proposta.competencia,
-        paidBy: proposta.paidBy,
-      },
-    )
-    const attachmentId = (deps.novoId ?? randomUUID)()
-    const chave = chaveComprovante(householdId, payment.id, attachmentId)
+    payment = await recordPayment(deps.paymentRepo, deps.clock, householdId, bill.id, {
+      valor: proposta.valorCentavos,
+      dataPagamento: proposta.dataPagamento,
+      competencia: proposta.competencia,
+      paidBy: proposta.paidBy,
+    })
+    attachmentId = (deps.novoId ?? randomUUID)()
+    chaveCanonica = chaveComprovante(householdId, payment.id, attachmentId)
     // Promove os bytes de staging→canônico (já estão no R2, só mudam de chave) e
     // registra o Anexo lendo o metadado real da chave canônica (honesto, #3).
-    await deps.store.copiar(proposta.stagingKey, chave)
+    await deps.store.copiar(proposta.stagingKey, chaveCanonica)
     await registerAttachment(
       deps.attachmentRepo,
       deps.store,
@@ -196,26 +228,66 @@ async function confirmar(
       proposta.paidBy,
       nomeComprovante(proposta),
     )
-    await removerStagingSeguro(deps.store, proposta.stagingKey, log)
   } catch (e) {
-    // Falha após o CAS: compensa reabrindo (confirmada→proposta) pra o Confirmar
-    // poder ser tentado de novo — nada de Proposta confirmada sem Lançamento.
-    await deps.proposalRepo.reabrir(householdId, proposta.id)
+    await compensarParcial(deps, householdId, payment, attachmentId, chaveCanonica, log)
     log(`whatsapp: falha ao criar Lançamento da Proposta ${proposta.id}: ${e}`)
-    await deps.messenger.enviarTexto(remetente, MENSAGEM_TENTE_CONFIRMAR_DE_NOVO)
+    const permanente = e instanceof AttachmentInvalidoError
+    await deps.messenger.enviarTexto(
+      remetente,
+      permanente ? MENSAGEM_COMPROVANTE_INVALIDO : MENSAGEM_TENTE_CONFIRMAR_DE_NOVO,
+    )
     return
   }
 
-  const bill = (await deps.billRepo.listarBills(householdId)).find((b) => b.id === proposta.billId)
+  // Commit: CAS `proposta→confirmada`. Perdeu a corrida (double-tap concorrente
+  // confirmou entre a checagem de estado e aqui) → desfaz o Lançamento recém-criado;
+  // o vencedor já tem o dele.
+  const confirmada = await deps.proposalRepo.confirmar(householdId, proposta.id)
+  if (!confirmada) {
+    await compensarParcial(deps, householdId, payment, attachmentId, chaveCanonica, log)
+    await deps.messenger.enviarTexto(remetente, MENSAGEM_JA_RESOLVIDA)
+    return
+  }
+
+  await removerStagingSeguro(deps.store, proposta.stagingKey, log)
   const resumo: ResumoProposta = {
-    contaNome: bill?.nome ?? null,
+    contaNome: bill.nome,
     valor: formatBRL(proposta.valorCentavos),
     dataPagamento: formatarDataBr(proposta.dataPagamento),
-    competencia: bill
-      ? descreverCompetencia(proposta.competencia, bill.recurrence)
-      : proposta.competencia,
+    competencia: descreverCompetencia(proposta.competencia, bill.recurrence),
   }
   await deps.messenger.enviarTexto(remetente, formatarLancamentoCriado(resumo))
+}
+
+/**
+ * Desfaz um Confirmar parcial (falha antes do commit, ou corrida perdida): remove o
+ * objeto canônico já copiado, o Anexo e o Lançamento já criados — na ordem inversa,
+ * cada passo best-effort (nunca relança). A Proposta segue intacta em `proposta`,
+ * pronta pra um novo Confirmar.
+ */
+async function compensarParcial(
+  deps: ResponderDeps,
+  householdId: string,
+  payment: Payment | null,
+  attachmentId: string | null,
+  chaveCanonica: string | null,
+  log: (m: string) => void,
+): Promise<void> {
+  if (chaveCanonica) await removerStagingSeguro(deps.store, chaveCanonica, log)
+  if (attachmentId) {
+    try {
+      await deps.attachmentRepo.deletarAttachment(householdId, attachmentId)
+    } catch (e) {
+      log(`whatsapp: falha ao compensar Anexo ${attachmentId}: ${e}`)
+    }
+  }
+  if (payment) {
+    try {
+      await deps.paymentRepo.deletarPayment(householdId, payment.id)
+    } catch (e) {
+      log(`whatsapp: falha ao compensar Lançamento ${payment.id}: ${e}`)
+    }
+  }
 }
 
 async function cancelar(
@@ -256,6 +328,15 @@ async function apresentarContas(
     )
   } catch (e) {
     log(`whatsapp: matcher fora no Trocar Conta da Proposta ${proposta.id}: ${e}`)
+  }
+  // A lista interativa da Graph API tem teto rígido de 10 linhas — sem paginação
+  // nativa. Com mais Contas ativas, corta no teto; o ranking do matcher lidera, então
+  // a Conta certa cai no topo na esmagadora maioria. Corte silencioso não: loga o que
+  // ficou de fora (o casal ainda pode dar baixa pelo portal se a Conta rara sobrar).
+  if (ativas.length > MAX_LINHAS_LISTA) {
+    log(
+      `whatsapp: Lar com ${ativas.length} Contas ativas > ${MAX_LINHAS_LISTA} — lista truncada no Trocar Conta da Proposta ${proposta.id}`,
+    )
   }
   const ordenadas = ordenarPorRanking(ativas, ranking).slice(0, MAX_LINHAS_LISTA)
   const linhas = linhasContasProposta(
