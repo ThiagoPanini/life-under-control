@@ -4,6 +4,7 @@ import type { Pessoa } from "../domain/household"
 import type { BillRepo } from "../ports/bill-repo"
 import { fakeAttachmentStore } from "./attachment-store.fake"
 import { fakeCalendar } from "./calendar.fake"
+import { fakeContaMatcher } from "./conta-matcher.fake"
 import { fakePaymentProposalRepo } from "./payment-proposal-repo.fake"
 import { fakePaymentRepo } from "./payment-repo.fake"
 import { processarEventoWhatsapp, TEXTO_INSTRUCAO_USO } from "./processar-evento-whatsapp"
@@ -100,6 +101,7 @@ function comprovanteFake(over: Partial<ComprovanteDeps> = {}): ComprovanteDeps {
       favorecido: "Condomínio",
       vencimentoImpresso: "2026-07-10",
     }),
+    matcher: fakeContaMatcher(["bill-condo"]),
     billRepo,
     paymentRepo: fakePaymentRepo([]),
     proposalRepo: fakePaymentProposalRepo(),

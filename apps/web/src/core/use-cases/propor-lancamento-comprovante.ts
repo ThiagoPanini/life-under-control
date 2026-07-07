@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { type Bill, formatarDataBr } from "../domain/bill"
 import { formatBRL } from "../domain/money"
-import { descreverCompetencia } from "../domain/payment"
+import { descreverCompetencia, type Payment } from "../domain/payment"
 import {
   botoesDaProposta,
   chaveStaging,
@@ -16,12 +16,12 @@ import type { AttachmentStore } from "../ports/attachment-store"
 import type { BillRepo } from "../ports/bill-repo"
 import type { Calendar } from "../ports/calendar"
 import type { Clock } from "../ports/clock"
+import type { ContaMatcher } from "../ports/conta-matcher"
 import { type PaymentProposalRepo, PropostaDuplicadaError } from "../ports/payment-proposal-repo"
 import type { PaymentRepo } from "../ports/payment-repo"
 import { ehMimeComprovanteSuportado, type ReceiptExtractor } from "../ports/receipt-extractor"
 import type { WhatsappMediaFetcher } from "../ports/whatsapp-media-fetcher"
 import type { WhatsappMessenger } from "../ports/whatsapp-messenger"
-import { type CandidatoConta, casarReciboConta } from "./casar-recibo-conta"
 import { inferirCompetenciaRecibo } from "./inferir-competencia-recibo"
 
 /**
@@ -29,8 +29,9 @@ import { inferirCompetenciaRecibo } from "./inferir-competencia-recibo"
  * ADR-0013, issue #158). Roda **pós-resposta** ao webhook (o handler já devolveu
  * 200): baixa a mídia pelo media ID na Graph API (nunca URL do payload —
  * anti-SSRF), detecta reenvio do mesmo arquivo por hash, extrai o recibo (#156),
- * casa a Conta e infere a Competência (funções puras de #162), estaciona os bytes
- * numa chave de staging e persiste a Proposta, respondendo no chat com botões.
+ * casa a Conta por LLM (#177) e infere a Competência (função pura de #162),
+ * estaciona os bytes numa chave de staging e persiste a Proposta, respondendo no
+ * chat com botões.
  *
  * Só orquestra ports — a regra vive no núcleo. A borda (webhook) resolve a Pessoa
  * e o Lar e chama isto por comprovante. **Sempre responde algo** em vez de sumir:
@@ -62,6 +63,7 @@ export type ComprovanteEntrada = {
 export type ComprovanteDeps = {
   mediaFetcher: WhatsappMediaFetcher
   extractor: ReceiptExtractor
+  matcher: ContaMatcher
   billRepo: Pick<BillRepo, "listarBills">
   paymentRepo: Pick<PaymentRepo, "listarTodosPayments">
   proposalRepo: PaymentProposalRepo
@@ -134,16 +136,31 @@ export async function proporLancamentoComprovante(
     return
   }
 
-  // 5. Matching de Conta + inferência de Competência (#162). Só Contas ativas
-  //    casam; score 0 = sem candidata confiável (Conta não identificada).
-  const bills = await deps.billRepo.listarBills(householdId)
-  const todosPayments = await deps.paymentRepo.listarTodosPayments(householdId)
-  const candidatos: CandidatoConta[] = bills
-    .filter((b) => b.estado === "ativa")
-    .map((b) => ({ bill: b, payments: todosPayments.filter((p) => p.billId === b.id) }))
-  const ranqueados = casarReciboConta(recibo, candidatos, deps.calendar)
-  const top = ranqueados[0]
-  const contaCasada: Bill | null = top && top.score > 0 ? top.bill : null
+  // 5. Matching de Conta pelo `ContaMatcher` LLM (#177): só Contas ativas
+  //    concorrem; o topo da ordenação vira a Conta proposta e vazio = abstenção
+  //    (Conta não identificada, sem palpite). É chamada de rede — falha degrada
+  //    como o extrator ("tente de novo"), nunca some. Roda concorrente com a
+  //    leitura dos Lançamentos (que só a Competência, a seguir, usa).
+  let contaCasada: Bill | null
+  let todosPayments: Payment[]
+  try {
+    const ativas = (await deps.billRepo.listarBills(householdId)).filter(
+      (b) => b.estado === "ativa",
+    )
+    const [ranking, payments] = await Promise.all([
+      deps.matcher(
+        recibo.favorecido,
+        ativas.map((b) => ({ billId: b.id, nome: b.nome })),
+      ),
+      deps.paymentRepo.listarTodosPayments(householdId),
+    ])
+    todosPayments = payments
+    contaCasada = ranking.length > 0 ? (ativas.find((b) => b.id === ranking[0]) ?? null) : null
+  } catch (e) {
+    log(`whatsapp: matching de Conta falhou (evento ${waMessageId}): ${e}`)
+    await deps.messenger.enviarTexto(remetente, TEXTO_TENTE_DE_NOVO)
+    return
+  }
 
   const competencia = contaCasada
     ? inferirCompetenciaRecibo(

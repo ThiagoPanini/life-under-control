@@ -1,6 +1,6 @@
 # ADR 0013 — Extração de comprovante por LLM vision atrás de port (Claude no Bedrock)
 
-- **Status:** Accepted
+- **Status:** Accepted (emendado 2026-07-07 — ver [Emenda #177](#emenda-2026-07-07-177--o-llm-também-casa-a-conta): o LLM passou a casar também a Conta)
 - **Data:** 2026-07-06
 - **Decisores:** Thiago Panini (solo)
 - **Relacionado:** [ADR-0012](0012-whatsapp-borda-meta-cloud-api.md) (a borda que consome o extrator), [ADR-0003](0003-nucleo-dominio-multi-borda.md) (ports no núcleo, adapters na borda), [ADR-0008](0008-anexos-object-storage-r2.md) (onde o comprovante vive), backfill #24/#124 (que consagrou o shape do recibo extraído), CONTEXT.md invariante #6 (dinheiro exato)
@@ -16,7 +16,15 @@ A ingestão de comprovante pelo WhatsApp (ADR-0012) precisa extrair, de uma imag
 **Adapter Bedrock com Claude**: `AnthropicBedrockMantle` (`@anthropic-ai/bedrock-sdk`), modelo `anthropic.claude-opus-4-6` (`us.anthropic.claude-opus-4-6-v1`, inference profile us-east-1), **structured output** com schema do shape acima — o JSON sai validado pela API, sem parsing frágil de texto livre. Imagem e PDF entram nativos (blocos `image`/`document`).
   - **Nota (#154, 2026-07-07):** o `anthropic.claude-opus-4-8` cogitado inicialmente ficou de fora — entitlement (`PutUseCaseForModelAccess`/`CreateFoundationModelAgreement`) veio `AVAILABLE`, mas `InvokeModel` seguiu `AccessDeniedException` mesmo assim; Opus 4.7 deu o mesmo. É rollout de capacidade da AWS/Anthropic pros dois modelos mais novos, fora do controle da conta — não bureaucracy de acesso. Opus 4.6 invoca normal e foi o que passou no smoke real (comprovante de gás, JSON estruturado ok). Reavaliar 4.8 quando o rollout destravar.
 
-**O LLM extrai, não decide.** Matching de Conta, inferência de Competência e a criação do fato ficam no núcleo determinístico + confirmação humana (ADR-0012). O modelo lê o documento; quem lança é a Pessoa.
+**O LLM extrai, não decide** — *revisto na [Emenda 2026-07-07](#emenda-2026-07-07-177--o-llm-também-casa-a-conta): o LLM passou a casar também a Conta.* Inferência de Competência e a criação do fato seguem no núcleo determinístico + confirmação humana (ADR-0012). O modelo lê o documento; quem lança é a Pessoa.
+
+## Emenda (2026-07-07, #177) — o LLM também casa a Conta
+
+A decisão original manteve o **matching de Conta** no núcleo determinístico (`casarReciboConta`: similaridade de string do favorecido × proximidade do vencimento). Um teste real derrubou a premissa: o **favorecido legal** do comprovante ("ENEL DISTRIBUICAO SAO PAULO") não se parece com o **apelido** da Conta do Lar ("Luz") — não compartilham token nenhum. Similaridade de string devolve 0 para toda utility (ENEL→Luz, SABESP→Água, VIVO→Internet), porque a ponte exige **conhecimento de mundo** (saber que a Enel distribui energia) — que só um LLM tem.
+
+**Revisão:** o casamento comprovante→Conta vira um **segundo port LLM**, `ContaMatcher` (`(favorecido, Contas ativas) → ids ordenados | vazio`), com adapter Claude no Bedrock — chamada de **texto** (sem imagem), separada do `ReceiptExtractor` (a extração continua agnóstica ao Lar). A `casarReciboConta` de #162 é removida; `inferirCompetenciaRecibo` **permanece determinística**, rodando sobre a Conta que o LLM escolheu.
+
+**O que NÃO muda:** o LLM **ordena candidatas, não cria fato** — o núcleo filtra os ids ao conjunto oferecido (não confia no adapter), a Competência segue derivada por função pura, e **nada vira Lançamento sem o Confirmar humano** (propose-and-confirm, ADR-0012). Sem score nem threshold: a abstenção (lista vazia) deixa a Conta em branco, sem palpite (invariante #3). O CNPJ do beneficiário foi **rejeitado** como chave — chave exata varia tanto quanto o nome; a fuzziness semântica do LLM é justamente a vantagem. Cache de alias aprendido (atalho determinístico sobre o LLM) fica para o futuro.
 
 ## Justificativa
 

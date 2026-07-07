@@ -1,4 +1,5 @@
 import { after } from "next/server"
+import { bedrockContaMatcher } from "@/adapters/bedrock/bedrock-conta-matcher"
 import { bedrockReceiptExtractor } from "@/adapters/bedrock/bedrock-receipt-extractor"
 import { nationalBankCalendar } from "@/adapters/calendar/national-bank-calendar"
 import { systemClock } from "@/adapters/clock/system-clock"
@@ -86,6 +87,7 @@ export async function POST(request: Request): Promise<Response> {
           comprovante: () => ({
             mediaFetcher: httpWhatsappMediaFetcher({ accessToken }),
             extractor: bedrockReceiptExtractor(),
+            matcher: bedrockContaMatcher(),
             billRepo: drizzleBillRepo(),
             paymentRepo: drizzlePaymentRepo(),
             proposalRepo: drizzleWhatsappProposalRepo(),

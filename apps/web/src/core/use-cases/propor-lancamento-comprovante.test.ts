@@ -4,6 +4,7 @@ import type { Payment } from "@/core/domain/payment"
 import type { PaymentProposal } from "@/core/domain/payment-proposal"
 import type { ReciboWhatsapp } from "@/core/domain/recibo-whatsapp"
 import type { BillRepo } from "@/core/ports/bill-repo"
+import type { ContaMatcher } from "@/core/ports/conta-matcher"
 import {
   type PaymentProposalRepo,
   PropostaDuplicadaError,
@@ -12,6 +13,7 @@ import type { ReceiptExtractor } from "@/core/ports/receipt-extractor"
 import type { MidiaBaixada } from "@/core/ports/whatsapp-media-fetcher"
 import { fakeAttachmentStore } from "./attachment-store.fake"
 import { fakeCalendar } from "./calendar.fake"
+import { fakeContaMatcher } from "./conta-matcher.fake"
 import { fakePaymentProposalRepo } from "./payment-proposal-repo.fake"
 import { fakePaymentRepo } from "./payment-repo.fake"
 import {
@@ -27,7 +29,8 @@ import { fakeWhatsappMessenger } from "./whatsapp-messenger.fake"
 /**
  * Seam 1 (issue #158): o pipeline que transforma um comprovante do WhatsApp numa
  * Proposta de Lançamento respondida no chat com botões. Testado só com fakes
- * (mediaFetcher, extractor, repos, store, messenger, Clock) — sem rede nem banco.
+ * (mediaFetcher, extractor, matcher, repos, store, messenger, Clock) — sem rede
+ * nem banco. O casamento de Conta é o `ContaMatcher` (LLM) fakeado (issue #177).
  */
 
 const LAR = "lar-1"
@@ -96,6 +99,10 @@ type Opts = {
   recibo?: Partial<ReciboWhatsapp>
   extractor?: ReceiptExtractor
   midiaPorId?: Record<string, MidiaBaixada>
+  /** Ordenação de billIds que o matcher (fake) devolve; default = ids das Contas na ordem dada. */
+  matcherIds?: string[]
+  /** Sobrescreve o matcher inteiro — pra simular o adapter fora (throw). */
+  matcher?: ContaMatcher
 }
 
 function montar(opts: Opts = {}) {
@@ -111,6 +118,9 @@ function montar(opts: Opts = {}) {
   const deps = {
     mediaFetcher,
     extractor: opts.extractor ?? fakeReceiptExtractor(opts.recibo ?? reciboCompleto()),
+    matcher:
+      opts.matcher ??
+      fakeContaMatcher(opts.matcherIds ?? (opts.bills ?? [bill()]).map((b) => b.id)),
     billRepo,
     paymentRepo: fakePaymentRepo(opts.payments ?? []),
     proposalRepo,
@@ -157,6 +167,53 @@ describe("proporLancamentoComprovante (Seam 1)", () => {
     expect(await store.metadados("finance/proposals/lar-1/prop-1")).not.toBeNull()
   })
 
+  it("test_matcher_casa_por_semantica_mesmo_sem_nome_parecido", async () => {
+    // O caso que quebrou no teste real: o favorecido legal ("ENEL DISTRIBUICAO
+    // SAO PAULO") não parece com o apelido da Conta ("Luz"). O matcher LLM liga
+    // os dois por conhecimento de mundo — similaridade de string devolvia 0.
+    const { deps, proposalRepo } = montar({
+      bills: [bill({ id: "bill-luz", nome: "Luz" })],
+      recibo: reciboCompleto({ favorecido: "ENEL DISTRIBUICAO SAO PAULO" }),
+      matcherIds: ["bill-luz"],
+    })
+
+    await proporLancamentoComprovante(deps, entrada())
+
+    expect(proposalRepo.propostas[0].billId).toBe("bill-luz")
+  })
+
+  it("test_matcher_abstem_deixa_conta_em_branco_com_trocar_conta", async () => {
+    // Nenhuma Conta plausível → o matcher devolve vazio; a Proposta nasce com a
+    // Conta em branco (sem palpite) e o botão pra escolher na mão.
+    const { deps, proposalRepo, messenger } = montar({
+      bills: [bill({ id: "bill-luz", nome: "Luz" })],
+      recibo: reciboCompleto({ favorecido: "LOJA XPTO LTDA" }),
+      matcherIds: [],
+    })
+
+    await proporLancamentoComprovante(deps, entrada())
+
+    expect(proposalRepo.propostas[0].billId).toBeNull()
+    expect(proposalRepo.propostas[0].competencia).toBeNull()
+    expect(messenger.interativos[0].botoes.some((b) => b.titulo === "Trocar Conta")).toBe(true)
+  })
+
+  it("test_matcher_fora_responde_tente_de_novo_sem_criar_proposta", async () => {
+    // O matcher é chamada de rede (Bedrock): throttle/timeout não pode sumir com
+    // o comprovante — degrada como o extrator, pedindo reenvio, sem estacionar.
+    const { deps, proposalRepo, messenger, store } = montar({
+      matcher: async () => {
+        throw new Error("bedrock throttle")
+      },
+    })
+
+    await proporLancamentoComprovante(deps, entrada())
+
+    expect(proposalRepo.propostas).toHaveLength(0)
+    expect(messenger.enviados).toEqual([{ para: "5511987654321", corpo: TEXTO_TENTE_DE_NOVO }])
+    expect(store.chaves()).toHaveLength(0)
+  })
+
   it("test_favorecido_ambiguo_propoe_o_top_e_deixa_trocar_conta", async () => {
     const bills = [bill({ id: "bill-a", nome: "Energia" }), bill({ id: "bill-b", nome: "Energia" })]
     const { deps, proposalRepo, messenger } = montar({
@@ -166,7 +223,7 @@ describe("proporLancamentoComprovante (Seam 1)", () => {
 
     await proporLancamentoComprovante(deps, entrada())
 
-    // Empate preserva ordem de entrada — propõe o primeiro, sem escolha silenciosa.
+    // O matcher devolve a ordenação; propõe o topo, sem escolha silenciosa.
     expect(proposalRepo.propostas[0].billId).toBe("bill-a")
     expect(messenger.interativos[0].botoes.some((b) => b.titulo === "Trocar Conta")).toBe(true)
   })
@@ -306,6 +363,7 @@ describe("proporLancamentoComprovante (Seam 1)", () => {
     const deps = {
       mediaFetcher: fakeWhatsappMediaFetcher({ "media-1": midia() }),
       extractor: fakeReceiptExtractor(reciboCompleto()),
+      matcher: fakeContaMatcher(["bill-condo"]),
       billRepo: {
         async listarBills() {
           return [bill()]
