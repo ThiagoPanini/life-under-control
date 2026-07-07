@@ -206,3 +206,13 @@ export const attachments = pgTable(
     ),
   ],
 )
+
+// Eventos da borda do webhook do WhatsApp (ADR-0012, issue #155) — estado de
+// adapter, não primitivo de domínio (ADR-0005). Idempotência por
+// `wa_message_id`: reentrega da Meta não reprocessa.
+export const whatsappEvents = pgTable("whatsapp_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  waMessageId: text("wa_message_id").notNull().unique(),
+  remetente: text("remetente").notNull(),
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+})

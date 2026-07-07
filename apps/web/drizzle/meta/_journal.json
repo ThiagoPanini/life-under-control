@@ -71,6 +71,13 @@
       "when": 1783360823386,
       "tag": "0009_add_whatsapp_phone",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1783388494789,
+      "tag": "0010_add_whatsapp_events",
+      "breakpoints": true
     }
   ]
 }
