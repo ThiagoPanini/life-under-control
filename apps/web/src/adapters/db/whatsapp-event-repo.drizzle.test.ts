@@ -23,42 +23,37 @@ suite("drizzleWhatsappEventRepo (Seam 2 — Postgres real)", () => {
     await pool?.end()
   })
 
-  it("test_evento_novo_ainda_nao_foi_processado", async () => {
+  it("test_reivindicar_evento_novo_devolve_verdadeiro", async () => {
     const repo = drizzleWhatsappEventRepo(db)
 
-    expect(await repo.jaProcessado(`wamid.novo-${Date.now()}`)).toBe(false)
+    const reivindicado = await repo.reivindicar({
+      waMessageId: `wamid.novo-${Date.now()}`,
+      remetente: "+5511987654321",
+    })
+
+    expect(reivindicado).toBe(true)
   })
 
-  it("test_registrar_e_depois_ja_processado_e_verdadeiro", async () => {
-    const repo = drizzleWhatsappEventRepo(db)
-    const waMessageId = `wamid.registrado-${Date.now()}`
-
-    await repo.registrar({ waMessageId, remetente: "+5511987654321" })
-
-    expect(await repo.jaProcessado(waMessageId)).toBe(true)
-  })
-
-  it("test_registrar_o_mesmo_wa_message_id_duas_vezes_e_idempotente", async () => {
+  it("test_reivindicar_o_mesmo_wa_message_id_duas_vezes_devolve_falso_na_segunda", async () => {
     const repo = drizzleWhatsappEventRepo(db)
     const waMessageId = `wamid.duplicado-${Date.now()}`
 
-    await repo.registrar({ waMessageId, remetente: "+5511987654321" })
+    const primeira = await repo.reivindicar({ waMessageId, remetente: "+5511987654321" })
+    const segunda = await repo.reivindicar({ waMessageId, remetente: "+5511987654321" })
 
-    await expect(
-      repo.registrar({ waMessageId, remetente: "+5511987654321" }),
-    ).resolves.not.toThrow()
+    expect(primeira).toBe(true)
+    expect(segunda).toBe(false)
   })
 
-  it("test_registro_concorrente_do_mesmo_wa_message_id_nao_lanca_erro_cru", async () => {
+  it("test_reivindicacao_concorrente_do_mesmo_wa_message_id_so_uma_vence", async () => {
     const repo = drizzleWhatsappEventRepo(db)
     const waMessageId = `wamid.concorrente-${Date.now()}`
 
-    const resultados = await Promise.allSettled([
-      repo.registrar({ waMessageId, remetente: "+5511987654321" }),
-      repo.registrar({ waMessageId, remetente: "+5511987654321" }),
+    const resultados = await Promise.all([
+      repo.reivindicar({ waMessageId, remetente: "+5511987654321" }),
+      repo.reivindicar({ waMessageId, remetente: "+5511987654321" }),
     ])
 
-    expect(resultados.every((r) => r.status === "fulfilled")).toBe(true)
-    expect(await repo.jaProcessado(waMessageId)).toBe(true)
+    expect(resultados.filter(Boolean)).toHaveLength(1)
   })
 })

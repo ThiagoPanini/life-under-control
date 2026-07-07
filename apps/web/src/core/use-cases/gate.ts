@@ -1,9 +1,11 @@
 /**
- * Prefixos públicos: a porta (login), as rotas do Auth.js e o webhook do
- * WhatsApp (ADR-0012, issue #155) — a Meta chama sem sessão nenhuma; a
- * autenticação daquela borda é a assinatura HMAC, não o Auth.js.
+ * Prefixos públicos: a porta (login) e as rotas do Auth.js. Exceção pontual
+ * pro webhook do WhatsApp (ADR-0012, issue #155) — a Meta chama sem sessão
+ * nenhuma; quem autentica aquela borda é a assinatura HMAC, não o Auth.js.
+ * Caminho exato (não `/api/webhooks` inteiro): um webhook futuro nesse
+ * namespace não herda a isenção sem querer — precisa da própria entrada aqui.
  */
-const PUBLIC_PREFIXES = ["/login", "/api/auth", "/api/webhooks"]
+const PUBLIC_PREFIXES = ["/login", "/api/auth", "/api/webhooks/whatsapp"]
 
 /** Opt-in local para validar a UI sem transportar credenciais/allowlist de produção. */
 export function localAuthBypass(nodeEnv: string | undefined, flag: string | undefined): boolean {

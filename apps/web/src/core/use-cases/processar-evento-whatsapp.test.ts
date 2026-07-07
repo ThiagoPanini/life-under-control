@@ -100,4 +100,53 @@ describe("processarEventoWhatsapp (Seam 1)", () => {
     ).resolves.not.toThrow()
     expect(messenger.enviados).toEqual([])
   })
+
+  it("test_falha_em_um_evento_do_lote_nao_impede_os_demais", async () => {
+    const thiago = pessoa()
+    const jakeline = pessoa({ id: "u-jakeline", whatsappPhone: "+5511900000002" })
+    const userRepo = fakeUserRepo([thiago, jakeline])
+    const eventRepo = fakeWhatsappEventRepo()
+    const messenger = fakeWhatsappMessenger()
+    const enviarOriginal = messenger.enviarTexto
+    messenger.enviarTexto = async (para, corpo) => {
+      if (para === "5511987654321") throw new Error("graph api instável")
+      return enviarOriginal(para, corpo)
+    }
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                messages: [
+                  { id: "wamid.a", from: "5511987654321", type: "text", text: { body: "oi" } },
+                  { id: "wamid.b", from: "5511900000002", type: "text", text: { body: "oi" } },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    await expect(
+      processarEventoWhatsapp({ userRepo, eventRepo, messenger }, payload),
+    ).resolves.not.toThrow()
+
+    expect(messenger.enviados).toEqual([{ para: "5511900000002", corpo: TEXTO_INSTRUCAO_USO }])
+  })
+
+  it("test_log_e_injetavel_em_vez_de_preso_ao_console_global", async () => {
+    const userRepo = fakeUserRepo([])
+    const eventRepo = fakeWhatsappEventRepo()
+    const messenger = fakeWhatsappMessenger()
+    const logs: string[] = []
+
+    await processarEventoWhatsapp(
+      { userRepo, eventRepo, messenger, log: (mensagem) => logs.push(mensagem) },
+      payloadMensagem("wamid.log", "5511900000000", "oi"),
+    )
+
+    expect(logs).toEqual([expect.stringContaining("não vinculado a nenhuma Pessoa")])
+  })
 })

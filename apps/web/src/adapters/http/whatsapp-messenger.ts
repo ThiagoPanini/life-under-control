@@ -1,6 +1,7 @@
 import type { WhatsappMessenger } from "@/core/ports/whatsapp-messenger"
 
 const GRAPH_API_VERSION = "v21.0"
+const TIMEOUT_MS = 10_000
 
 type Config = { phoneNumberId: string; accessToken: string }
 
@@ -27,6 +28,7 @@ export function httpWhatsappMessenger({ phoneNumberId, accessToken }: Config): W
               type: "text",
               text: { body: corpo },
             }),
+            signal: AbortSignal.timeout(TIMEOUT_MS),
           },
         )
         if (!res.ok) console.error(`whatsapp: envio falhou com status ${res.status}`)
