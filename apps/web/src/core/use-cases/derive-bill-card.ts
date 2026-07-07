@@ -113,7 +113,7 @@ function comoTimestamp(iso: string): number {
 }
 
 /** Dias civis entre duas datas (`ate - de`), positivo quando `ate` é depois. */
-function diffEmDias(de: string, ate: string): number {
+export function diffEmDias(de: string, ate: string): number {
   return Math.round((comoTimestamp(ate) - comoTimestamp(de)) / MS_DIA)
 }
 
