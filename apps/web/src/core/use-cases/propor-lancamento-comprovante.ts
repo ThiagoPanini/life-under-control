@@ -16,12 +16,12 @@ import type { AttachmentStore } from "../ports/attachment-store"
 import type { BillRepo } from "../ports/bill-repo"
 import type { Calendar } from "../ports/calendar"
 import type { Clock } from "../ports/clock"
+import type { ContaMatcher } from "../ports/conta-matcher"
 import { type PaymentProposalRepo, PropostaDuplicadaError } from "../ports/payment-proposal-repo"
 import type { PaymentRepo } from "../ports/payment-repo"
 import { ehMimeComprovanteSuportado, type ReceiptExtractor } from "../ports/receipt-extractor"
 import type { WhatsappMediaFetcher } from "../ports/whatsapp-media-fetcher"
 import type { WhatsappMessenger } from "../ports/whatsapp-messenger"
-import { type CandidatoConta, casarReciboConta } from "./casar-recibo-conta"
 import { inferirCompetenciaRecibo } from "./inferir-competencia-recibo"
 
 /**
@@ -30,7 +30,9 @@ import { inferirCompetenciaRecibo } from "./inferir-competencia-recibo"
  * 200): baixa a mídia pelo media ID na Graph API (nunca URL do payload —
  * anti-SSRF), detecta reenvio do mesmo arquivo por hash, extrai o recibo (#156),
  * casa a Conta e infere a Competência (funções puras de #162), estaciona os bytes
- * numa chave de staging e persiste a Proposta, respondendo no chat com botões.
+ * casa a Conta por LLM (#177) e infere a Competência (função pura de #162),
+ * estaciona os bytes numa chave de staging e persiste a Proposta, respondendo no
+ * chat com botões.
  *
  * Só orquestra ports — a regra vive no núcleo. A borda (webhook) resolve a Pessoa
  * e o Lar e chama isto por comprovante. **Sempre responde algo** em vez de sumir:
@@ -62,6 +64,7 @@ export type ComprovanteEntrada = {
 export type ComprovanteDeps = {
   mediaFetcher: WhatsappMediaFetcher
   extractor: ReceiptExtractor
+  matcher: ContaMatcher
   billRepo: Pick<BillRepo, "listarBills">
   paymentRepo: Pick<PaymentRepo, "listarTodosPayments">
   proposalRepo: PaymentProposalRepo
@@ -134,16 +137,19 @@ export async function proporLancamentoComprovante(
     return
   }
 
-  // 5. Matching de Conta + inferência de Competência (#162). Só Contas ativas
-  //    casam; score 0 = sem candidata confiável (Conta não identificada).
+  // 5. Matching de Conta pelo `ContaMatcher` LLM (#177): só Contas ativas
+  //    concorrem; o topo da ordenação vira a Conta proposta e vazio = abstenção
+  //    (Conta não identificada, sem palpite). A Competência é inferida a seguir
+  //    por função pura determinística (#162), sobre a Conta escolhida.
   const bills = await deps.billRepo.listarBills(householdId)
   const todosPayments = await deps.paymentRepo.listarTodosPayments(householdId)
-  const candidatos: CandidatoConta[] = bills
-    .filter((b) => b.estado === "ativa")
-    .map((b) => ({ bill: b, payments: todosPayments.filter((p) => p.billId === b.id) }))
-  const ranqueados = casarReciboConta(recibo, candidatos, deps.calendar)
-  const top = ranqueados[0]
-  const contaCasada: Bill | null = top && top.score > 0 ? top.bill : null
+  const ativas = bills.filter((b) => b.estado === "ativa")
+  const ranking = await deps.matcher(
+    recibo.favorecido,
+    ativas.map((b) => ({ billId: b.id, nome: b.nome })),
+  )
+  const contaCasada: Bill | null =
+    ranking.length > 0 ? (ativas.find((b) => b.id === ranking[0]) ?? null) : null
 
   const competencia = contaCasada
     ? inferirCompetenciaRecibo(
