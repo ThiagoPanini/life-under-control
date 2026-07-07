@@ -49,7 +49,7 @@ export function httpWhatsappMessenger({ phoneNumberId, accessToken }: Config): W
         },
       })
     },
-    async enviarLista(para, corpo, linhas: LinhaInterativa[]) {
+    async enviarLista(para, corpo, linhas: LinhaInterativa[], rotuloBotao: string) {
       await enviar({
         to: para,
         type: "interactive",
@@ -57,9 +57,11 @@ export function httpWhatsappMessenger({ phoneNumberId, accessToken }: Config): W
           type: "list",
           body: { text: corpo },
           action: {
-            button: "Escolher Conta",
+            // O rótulo do botão varia por contexto (#178): antes era fixo "Escolher
+            // Conta", o que mislabelava o menu Alterar e a lista de Mês.
+            button: rotuloBotao,
             sections: [
-              { title: "Contas", rows: linhas.map((l) => ({ id: l.id, title: l.titulo })) },
+              { title: "Opções", rows: linhas.map((l) => ({ id: l.id, title: l.titulo })) },
             ],
           },
         },

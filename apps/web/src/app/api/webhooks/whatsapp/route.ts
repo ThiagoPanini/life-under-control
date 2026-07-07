@@ -110,6 +110,14 @@ export async function POST(request: Request): Promise<Response> {
             clock: systemClock(),
             calendar: nationalBankCalendar(),
           }),
+          // Edição por texto livre do menu Alterar (#178) — LEVE, sem R2/Bedrock: um
+          // texto solto não pode quebrar por env de mídia ausente.
+          edicaoTexto: () => ({
+            proposalRepo: drizzleWhatsappProposalRepo(),
+            billRepo: drizzleBillRepo(),
+            messenger,
+            clock: systemClock(),
+          }),
           // Varredura oportunista de Propostas expiradas (#159) — leve, sem Bedrock.
           varredura: () => ({
             proposalRepo: drizzleWhatsappProposalRepo(),

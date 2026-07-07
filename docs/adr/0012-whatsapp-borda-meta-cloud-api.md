@@ -51,3 +51,15 @@ O clímax de Pagamentos Recorrentes é operar pelo WhatsApp em duas vias: **(1)*
 - Confiança acumulada no matching fizer o toque de confirmação doer — reabre o degrau "auto-lançar em match unívoco com desfazer".
 - O `after()` perder eventos com frequência observável — promove a fila com worker.
 - Sentir falta de urgência para "vencida" — adiciona a escalada por transição sobre o digest (o híbrido já desenhado).
+
+## Emenda — #178: menu Alterar (estado de conversa por remetente + texto livre por campo)
+
+A borda de ingestão deixou de ser **só botões**. O antigo "Trocar Conta" (#159) virou um menu **Alterar** que edita **todo** campo coletado da Proposta pelo próprio WhatsApp — Conta, Competência (mês), Valor, Data de pagamento e Favorecido — antes do Confirmar. Isso revisa a decisão de "propor + confirmar": o Confirmar segue sendo o único ato que vira fato, mas agora o casal corrige a Proposta no chat em vez de abrir o portal.
+
+**Guiado por menu, nunca NLU de intenção.** Alterar abre a lista de campos; Conta/Mês se editam por lista (a shortlist do matcher, #177, e as Competências recentes da recorrência da Conta); Valor/Data/Favorecido por **texto livre lido só como aquele campo**. O bot fica sempre num estado conhecido — "esperando o campo Y da Proposta X desta Pessoa" — e nunca classifica intenção de texto aberto. É o mesmo princípio do ADR-0013 ("a IA ordena/lê, não cria fato"), aqui sem IA nenhuma na edição: os parsers são determinísticos (`parseCentavos`, `parseDataBrParaIso` + `ehDataIsoValida`).
+
+**Estado de conversa na Proposta.** A tabela `whatsapp_proposals` ganha `aguardando_campo` (`valor`/`data`/`favorecido`) e `aguardando_por` (a Pessoa) — migração aditiva. Ao pedir um campo de texto, a Proposta guarda o par; a próxima mensagem de texto **daquela Pessoa** é lida como aquele campo (`editarCampoTexto`, na borda), gravada e a Proposta é re-ofertada. Um slot por Pessoa: pedir um novo campo libera o anterior. Valor/data editados são **fato humano — confiado, mas validado** (centavos > 0, data ISO real); persiste-se o fato, o parser é a validação (CONTEXT.md #3 segue valendo).
+
+**Colisões (todas testadas com fakes):** comprovante novo no meio da edição = Proposta nova, **larga** a edição pendente da Pessoa; texto solto sem Alterar = **eco de instrução** (edição só pelo caminho explícito); parse falho = **larga a pendência** e orienta re-tocar Alterar → campo (com exemplo) — não prende a Pessoa (senão todo texto seguinte cairia na edição, nunca no eco); editar Conta/Mês por **lista é ortogonal** à pendência de texto (não a limpa); Confirmar usa o estado corrente; Cancelar não deixa fato. O slot é setado com o CAS no alvo **primeiro**, e só então libera o anterior — um alvo já fechado não zera a pendência de outra Proposta.
+
+**Consequência de borda:** a fábrica de edição por texto é **leve** (repo/billRepo/messenger/clock, sem R2/Bedrock) — uma mensagem de texto nunca falha por env de mídia ausente, como o eco de fase 0. Nada disso é primitivo de domínio novo: o estado de conversa é da borda (a tabela `whatsapp_*`), não do Lançamento.

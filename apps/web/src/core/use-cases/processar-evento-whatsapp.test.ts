@@ -156,6 +156,8 @@ function proposta159(): PaymentProposal {
     tipoMime: "image/jpeg",
     estado: "proposta",
     criadoEm: "2026-07-07T12:00:00.000Z",
+    aguardandoCampo: null,
+    aguardandoPor: null,
   }
 }
 
@@ -394,6 +396,78 @@ describe("processarEventoWhatsapp (Seam 1)", () => {
 
     // A rede de segurança é da borda: responde pelo messenger externo, não o do bundle.
     expect(messenger.enviados.at(-1)?.corpo).toBe(TEXTO_TENTE_DE_NOVO)
+  })
+
+  it("test_texto_com_edicao_pendente_edita_o_campo_e_nao_ecoa", async () => {
+    // Pessoa tocou Alterar → Valor (aguardando setado); o texto seguinte é o valor.
+    const userRepo = fakeUserRepo([pessoa({ householdId: "lar-1" })])
+    const eventRepo = fakeWhatsappEventRepo()
+    const messenger = fakeWhatsappMessenger() // externo (eco)
+    const proposalRepo = fakePaymentProposalRepo([proposta159()])
+    await proposalRepo.definirAguardando("lar-1", "prop-1", "valor", "u-thiago")
+    const edicaoMessenger = fakeWhatsappMessenger()
+    const edicaoTexto = () => ({
+      proposalRepo,
+      billRepo: {
+        async listarBills() {
+          return [BILL_CONDO]
+        },
+      },
+      messenger: edicaoMessenger,
+      clock: { hoje: () => "2026-07-08" },
+    })
+
+    await processarEventoWhatsapp(
+      { userRepo, eventRepo, messenger, edicaoTexto },
+      payloadMensagem("wamid.edit", "5511987654321", "300,50"),
+    )
+
+    expect(proposalRepo.propostas[0].valorCentavos).toBe(30050)
+    expect(messenger.enviados).toEqual([]) // não ecoou a instrução
+    expect(edicaoMessenger.interativos).toHaveLength(1) // re-ofertou a Proposta
+  })
+
+  it("test_texto_sem_edicao_pendente_ecoa_a_instrucao", async () => {
+    const userRepo = fakeUserRepo([pessoa({ householdId: "lar-1" })])
+    const eventRepo = fakeWhatsappEventRepo()
+    const messenger = fakeWhatsappMessenger()
+    const proposalRepo = fakePaymentProposalRepo([proposta159()]) // sem aguardando
+    const edicaoTexto = () => ({
+      proposalRepo,
+      billRepo: {
+        async listarBills() {
+          return [BILL_CONDO]
+        },
+      },
+      messenger: fakeWhatsappMessenger(),
+      clock: { hoje: () => "2026-07-08" },
+    })
+
+    await processarEventoWhatsapp(
+      { userRepo, eventRepo, messenger, edicaoTexto },
+      payloadMensagem("wamid.echo", "5511987654321", "oi"),
+    )
+
+    expect(messenger.enviados).toEqual([{ para: "5511987654321", corpo: TEXTO_INSTRUCAO_USO }])
+  })
+
+  it("test_comprovante_no_meio_da_edicao_larga_a_edicao_pendente", async () => {
+    const userRepo = fakeUserRepo([pessoa({ householdId: "lar-1" })])
+    const eventRepo = fakeWhatsappEventRepo()
+    const messenger = fakeWhatsappMessenger()
+    const proposalRepo = fakePaymentProposalRepo([proposta159()])
+    await proposalRepo.definirAguardando("lar-1", "prop-1", "valor", "u-thiago")
+    // Compartilha o repo com o pipeline do comprovante; a Proposta nova tem outro id.
+    const comprovante = comprovanteFake({ proposalRepo, novoId: () => "prop-nova" })
+
+    await processarEventoWhatsapp(
+      { userRepo, eventRepo, messenger, comprovante: () => comprovante },
+      payloadComprovante("wamid.img3", "5511987654321", "media-1"),
+    )
+
+    // A Proposta nova assumiu; a edição pendente da anterior foi largada.
+    expect(proposalRepo.propostas).toHaveLength(2)
+    expect(proposalRepo.propostas.find((p) => p.id === "prop-1")?.aguardandoCampo).toBeNull()
   })
 
   it("test_log_e_injetavel_em_vez_de_preso_ao_console_global", async () => {

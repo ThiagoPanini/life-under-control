@@ -2,12 +2,17 @@ import { describe, expect, it } from "vitest"
 import {
   botoesDaProposta,
   chaveStaging,
+  ehCampoLivre,
   estaExpirada,
   formatarLancamentoCriado,
   formatarPropostaMensagem,
+  linhasCamposProposta,
+  linhasCompetenciasProposta,
   linhasContasProposta,
+  mensagemCampoNaoEntendido,
   mensagemPropostaExpirada,
   parsearAcaoBotao,
+  promptEdicaoCampo,
   type ResumoProposta,
 } from "./payment-proposal"
 
@@ -21,10 +26,11 @@ describe("chaveStaging", () => {
 })
 
 describe("botoesDaProposta", () => {
-  it("test_tres_botoes_carregam_o_id_da_proposta_na_acao", () => {
+  it("test_tres_botoes_confirmar_alterar_cancelar_carregam_o_id_da_proposta", () => {
+    // #178: o botão do meio virou "Alterar" (menu de campos), no lugar de "Trocar Conta".
     expect(botoesDaProposta("prop-1")).toEqual([
       { id: "confirmar:prop-1", titulo: "Confirmar" },
-      { id: "trocar:prop-1", titulo: "Trocar Conta" },
+      { id: "alterar:prop-1", titulo: "Alterar" },
       { id: "cancelar:prop-1", titulo: "Cancelar" },
     ])
   })
@@ -56,20 +62,25 @@ describe("formatarPropostaMensagem", () => {
     expect(msg).not.toContain("R$ 0")
   })
 
-  it("test_conta_nao_identificada_orienta_trocar_conta", () => {
+  it("test_conta_nao_identificada_orienta_alterar", () => {
     const msg = formatarPropostaMensagem(resumo({ contaNome: null }))
-    expect(msg).toContain("Trocar Conta")
+    expect(msg).toContain("Alterar")
   })
 })
 
 describe("parsearAcaoBotao", () => {
-  it("test_botao_confirmar_trocar_cancelar_devolve_acao_e_proposta", () => {
+  it("test_botao_confirmar_cancelar_devolve_acao_e_proposta", () => {
     expect(parsearAcaoBotao("confirmar:prop-1")).toEqual({
       acao: "confirmar",
       proposalId: "prop-1",
     })
-    expect(parsearAcaoBotao("trocar:prop-1")).toEqual({ acao: "trocar", proposalId: "prop-1" })
     expect(parsearAcaoBotao("cancelar:prop-1")).toEqual({ acao: "cancelar", proposalId: "prop-1" })
+  })
+
+  it("test_botao_alterar_e_o_trocar_legado_caem_na_mesma_acao", () => {
+    expect(parsearAcaoBotao("alterar:prop-1")).toEqual({ acao: "alterar", proposalId: "prop-1" })
+    // Botão "Trocar Conta" de uma Proposta anterior ao #178 ainda roteia pro menu.
+    expect(parsearAcaoBotao("trocar:prop-1")).toEqual({ acao: "alterar", proposalId: "prop-1" })
   })
 
   it("test_linha_de_lista_devolve_escolher_conta_com_billId", () => {
@@ -80,11 +91,83 @@ describe("parsearAcaoBotao", () => {
     })
   })
 
+  it("test_linha_de_campo_devolve_escolher_campo_validado", () => {
+    expect(parsearAcaoBotao("campo:prop-1:valor")).toEqual({
+      acao: "escolher-campo",
+      proposalId: "prop-1",
+      campo: "valor",
+    })
+    // Campo fora do conjunto conhecido → null (nunca chuta).
+    expect(parsearAcaoBotao("campo:prop-1:apagar")).toBeNull()
+  })
+
+  it("test_linha_de_mes_devolve_escolher_mes_com_competencia_valida", () => {
+    expect(parsearAcaoBotao("mes:prop-1:2026-07")).toEqual({
+      acao: "escolher-mes",
+      proposalId: "prop-1",
+      competencia: "2026-07",
+    })
+    // Competência malformada → null.
+    expect(parsearAcaoBotao("mes:prop-1:2026-13")).toBeNull()
+  })
+
   it("test_id_irreconhecivel_devolve_null_nunca_chuta", () => {
     expect(parsearAcaoBotao("oi")).toBeNull()
     expect(parsearAcaoBotao("apagar:prop-1")).toBeNull()
     expect(parsearAcaoBotao("confirmar:")).toBeNull()
     expect(parsearAcaoBotao("conta:prop-1")).toBeNull()
+  })
+})
+
+describe("menu Alterar (#178)", () => {
+  it("test_linhas_do_menu_cobrem_os_cinco_campos_editaveis", () => {
+    const linhas = linhasCamposProposta("prop-1")
+    expect(linhas.map((l) => l.id)).toEqual([
+      "campo:prop-1:conta",
+      "campo:prop-1:competencia",
+      "campo:prop-1:valor",
+      "campo:prop-1:data",
+      "campo:prop-1:favorecido",
+    ])
+    // Cada linha ré-parseia pro campo certo (round-trip com o parser).
+    expect(parsearAcaoBotao(linhas[2].id)).toEqual({
+      acao: "escolher-campo",
+      proposalId: "prop-1",
+      campo: "valor",
+    })
+  })
+
+  it("test_linhas_de_mes_rotulam_por_extenso_e_carregam_a_competencia", () => {
+    const linhas = linhasCompetenciasProposta("prop-1", ["2026-06", "2026-07"])
+    expect(linhas).toEqual([
+      { id: "mes:prop-1:2026-06", titulo: "Junho de 2026" },
+      { id: "mes:prop-1:2026-07", titulo: "Julho de 2026" },
+    ])
+  })
+
+  it("test_ehCampoLivre_separa_texto_livre_de_lista", () => {
+    expect(ehCampoLivre("valor")).toBe(true)
+    expect(ehCampoLivre("data")).toBe(true)
+    expect(ehCampoLivre("favorecido")).toBe(true)
+    expect(ehCampoLivre("conta")).toBe(false)
+    expect(ehCampoLivre("competencia")).toBe(false)
+  })
+
+  it("test_prompt_de_campo_livre_traz_um_exemplo", () => {
+    expect(promptEdicaoCampo("valor")).toContain("253,43")
+    expect(promptEdicaoCampo("data")).toContain("05/07/2026")
+    expect(promptEdicaoCampo("favorecido").toLowerCase()).toContain("favorecido")
+  })
+
+  it("test_mensagem_de_parse_falho_traz_exemplo_e_aponta_o_re_toque", () => {
+    // Larga a pendência → a mensagem não diz "manda de novo" como se esperasse: manda
+    // re-tocar Alterar → campo, com o exemplo (não fica presa esperando texto).
+    expect(mensagemCampoNaoEntendido("valor")).toContain("253,43")
+    expect(mensagemCampoNaoEntendido("data")).toContain("05/07/2026")
+    for (const campo of ["valor", "data", "favorecido"] as const) {
+      expect(mensagemCampoNaoEntendido(campo)).toContain("Alterar")
+      expect(mensagemCampoNaoEntendido(campo)).toContain("Não entendi")
+    }
   })
 })
 

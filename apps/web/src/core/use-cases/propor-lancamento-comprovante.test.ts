@@ -154,7 +154,7 @@ describe("proporLancamentoComprovante (Seam 1)", () => {
     expect(resposta.corpo).toContain("R$ 1.234,56")
     expect(resposta.corpo).toContain("08/07/2026")
     expect(resposta.corpo).toContain("Julho/2026")
-    expect(resposta.botoes.map((b) => b.titulo)).toEqual(["Confirmar", "Trocar Conta", "Cancelar"])
+    expect(resposta.botoes.map((b) => b.titulo)).toEqual(["Confirmar", "Alterar", "Cancelar"])
     expect(resposta.botoes[0].id).toBe("confirmar:prop-1")
   })
 
@@ -196,7 +196,7 @@ describe("proporLancamentoComprovante (Seam 1)", () => {
 
     expect(proposalRepo.propostas[0].billId).toBeNull()
     expect(proposalRepo.propostas[0].competencia).toBeNull()
-    expect(messenger.interativos[0].botoes.some((b) => b.titulo === "Trocar Conta")).toBe(true)
+    expect(messenger.interativos[0].botoes.some((b) => b.titulo === "Alterar")).toBe(true)
   })
 
   it("test_matcher_fora_responde_tente_de_novo_sem_criar_proposta", async () => {
@@ -226,7 +226,7 @@ describe("proporLancamentoComprovante (Seam 1)", () => {
 
     // O matcher devolve a ordenação; propõe o topo, sem escolha silenciosa.
     expect(proposalRepo.propostas[0].billId).toBe("bill-a")
-    expect(messenger.interativos[0].botoes.some((b) => b.titulo === "Trocar Conta")).toBe(true)
+    expect(messenger.interativos[0].botoes.some((b) => b.titulo === "Alterar")).toBe(true)
   })
 
   it("test_baixa_fracionada_mesma_conta_e_competencia_com_arquivo_distinto_cria_proposta", async () => {
@@ -391,6 +391,19 @@ describe("proporLancamentoComprovante (Seam 1)", () => {
       async atualizarConta() {
         return null
       },
+      async atualizarCompetencia() {
+        return null
+      },
+      async atualizarCampo() {
+        return null
+      },
+      async definirAguardando() {
+        return null
+      },
+      async obterAguardandoPor() {
+        return null
+      },
+      async limparAguardando() {},
       async listarAbertas() {
         return []
       },

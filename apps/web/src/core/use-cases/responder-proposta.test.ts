@@ -9,12 +9,16 @@ import { fakeContaMatcher } from "./conta-matcher.fake"
 import { fakePaymentProposalRepo } from "./payment-proposal-repo.fake"
 import { fakePaymentRepo } from "./payment-repo.fake"
 import {
+  type EdicaoTextoDeps,
+  editarCampoTexto,
   MENSAGEM_CANCELADO,
   MENSAGEM_COMPROVANTE_INVALIDO,
   MENSAGEM_CONTA_SUMIU,
   MENSAGEM_FALTA_CONTA,
   MENSAGEM_JA_RESOLVIDA,
+  MENSAGEM_MES_SEM_CONTA,
   MENSAGEM_PROPOSTA_SUMIU,
+  MENSAGEM_SEM_MESES,
   MENSAGEM_TENTE_CONFIRMAR_DE_NOVO,
   type ResponderDeps,
   responderProposta,
@@ -23,9 +27,10 @@ import {
 import { fakeWhatsappMessenger } from "./whatsapp-messenger.fake"
 
 /**
- * Seam 1 (issue #159): as respostas do casal à Proposta — Confirmar (vira
- * Lançamento com Anexo), Trocar Conta, Cancelar, escolha da Conta e expiração.
- * Só fakes (repos, store, messenger, matcher, Clock) — sem rede nem banco.
+ * Seam 1 (issues #159/#178): as respostas do casal à Proposta — Confirmar (vira
+ * Lançamento com Anexo), Cancelar, o menu Alterar (Conta/Mês por lista, Valor/Data/
+ * Favorecido por texto livre), a edição por texto e a expiração. Só fakes (repos,
+ * store, messenger, matcher, Clock) — sem rede nem banco.
  */
 
 const LAR = "lar-1"
@@ -67,6 +72,8 @@ function propostaSeed(over: Partial<PaymentProposal> = {}): PaymentProposal {
     tipoMime: "image/jpeg",
     estado: "proposta",
     criadoEm: "2026-07-07T12:00:00.000Z",
+    aguardandoCampo: null,
+    aguardandoPor: null,
     ...over,
   }
 }
@@ -113,8 +120,16 @@ function montar(opts: Opts = {}) {
   return { deps, proposalRepo, paymentRepo, attachmentRepo, store, messenger }
 }
 
-function acao(over: Partial<{ acao: string; proposalId: string; billId: string }>) {
-  return { householdId: LAR, remetente: REMET, acao: over as never }
+function acao(
+  over: Partial<{
+    acao: string
+    proposalId: string
+    billId: string
+    campo: string
+    competencia: string
+  }>,
+) {
+  return { householdId: LAR, remetente: REMET, pessoaId: THIAGO, acao: over as never }
 }
 
 describe("responderProposta (Seam 1)", () => {
@@ -177,17 +192,122 @@ describe("responderProposta (Seam 1)", () => {
     expect(messenger.enviados.at(-1)?.corpo).toBe(MENSAGEM_CANCELADO)
   })
 
-  it("test_trocar_conta_apresenta_lista_ranqueada_pelo_matcher", async () => {
+  it("test_alterar_abre_o_menu_com_os_cinco_campos", async () => {
+    const { deps, messenger } = montar()
+
+    await responderProposta(deps, acao({ acao: "alterar", proposalId: "prop-1" }))
+
+    expect(messenger.listas).toHaveLength(1)
+    // O rótulo do botão varia por contexto (#178): aqui é o menu de campos.
+    expect(messenger.listas[0].rotuloBotao).toBe("Escolher campo")
+    expect(messenger.listas[0].linhas.map((l) => l.id)).toEqual([
+      "campo:prop-1:conta",
+      "campo:prop-1:competencia",
+      "campo:prop-1:valor",
+      "campo:prop-1:data",
+      "campo:prop-1:favorecido",
+    ])
+  })
+
+  it("test_alterar_conta_apresenta_lista_ranqueada_pelo_matcher", async () => {
     const bills = [billLuz(), billLuz({ id: "bill-agua", nome: "Água" })]
     const { deps, messenger } = montar({ bills, matcherIds: ["bill-agua", "bill-luz"] })
 
-    await responderProposta(deps, acao({ acao: "trocar", proposalId: "prop-1" }))
+    await responderProposta(
+      deps,
+      acao({ acao: "escolher-campo", proposalId: "prop-1", campo: "conta" }),
+    )
 
     expect(messenger.listas).toHaveLength(1)
+    expect(messenger.listas[0].rotuloBotao).toBe("Escolher Conta")
     expect(messenger.listas[0].linhas.map((l) => l.id)).toEqual([
       "conta:prop-1:bill-agua",
       "conta:prop-1:bill-luz",
     ])
+  })
+
+  it("test_alterar_mes_lista_competencias_recentes_da_conta", async () => {
+    const { deps, messenger } = montar({ hoje: "2026-07-08" })
+
+    await responderProposta(
+      deps,
+      acao({ acao: "escolher-campo", proposalId: "prop-1", campo: "competencia" }),
+    )
+
+    // Conta mensal → últimas Competências, a mais recente (julho) no topo.
+    expect(messenger.listas.at(-1)?.rotuloBotao).toBe("Escolher mês")
+    const linha = messenger.listas.at(-1)?.linhas ?? []
+    expect(linha[0]?.id).toBe("mes:prop-1:2026-07")
+    expect(linha.map((l) => l.id)).toContain("mes:prop-1:2026-06")
+  })
+
+  it("test_alterar_mes_de_conta_encerrada_nao_oferece_meses", async () => {
+    // Conta arquivada não entra na lista ativa: apresentar meses dela levaria a uma
+    // edição que o Confirmar depois rejeita — paridade com Confirmar/Trocar Conta.
+    const { deps, messenger } = montar({
+      bills: [billLuz({ estado: "encerrada", encerradaEm: "2026-07-06" })],
+    })
+
+    await responderProposta(
+      deps,
+      acao({ acao: "escolher-campo", proposalId: "prop-1", campo: "competencia" }),
+    )
+
+    expect(messenger.listas).toHaveLength(0)
+    expect(messenger.enviados.at(-1)?.corpo).toBe(MENSAGEM_MES_SEM_CONTA)
+  })
+
+  it("test_alterar_mes_de_conta_que_so_comeca_no_futuro_avisa_sem_lista_vazia", async () => {
+    // Conta cuja 1ª Competência é toda futura → nenhuma ocorrência válida. Não manda
+    // lista vazia (a Graph API recusa `rows: []`): avisa por texto.
+    const { deps, messenger } = montar({
+      bills: [billLuz({ primeiraCompetencia: "2027-01" })],
+      hoje: "2026-07-08",
+    })
+
+    await responderProposta(
+      deps,
+      acao({ acao: "escolher-campo", proposalId: "prop-1", campo: "competencia" }),
+    )
+
+    expect(messenger.listas).toHaveLength(0)
+    expect(messenger.enviados.at(-1)?.corpo).toBe(MENSAGEM_SEM_MESES)
+  })
+
+  it("test_alterar_mes_sem_conta_orienta_escolher_conta_antes", async () => {
+    const { deps, messenger } = montar({ proposta: { billId: null } })
+
+    await responderProposta(
+      deps,
+      acao({ acao: "escolher-campo", proposalId: "prop-1", campo: "competencia" }),
+    )
+
+    expect(messenger.enviados.at(-1)?.corpo).toBe(MENSAGEM_MES_SEM_CONTA)
+  })
+
+  it("test_escolher_mes_grava_competencia_e_repropoe", async () => {
+    const { deps, proposalRepo, messenger } = montar()
+
+    await responderProposta(
+      deps,
+      acao({ acao: "escolher-mes", proposalId: "prop-1", competencia: "2026-06" }),
+    )
+
+    expect(proposalRepo.propostas[0].competencia).toBe("2026-06")
+    expect(messenger.interativos.at(-1)?.botoes.map((b) => b.titulo)).toContain("Confirmar")
+  })
+
+  it("test_alterar_valor_marca_edicao_pendente_e_pede_o_valor_com_exemplo", async () => {
+    const { deps, proposalRepo, messenger } = montar()
+
+    await responderProposta(
+      deps,
+      acao({ acao: "escolher-campo", proposalId: "prop-1", campo: "valor" }),
+    )
+
+    expect(proposalRepo.propostas[0].aguardandoCampo).toBe("valor")
+    expect(proposalRepo.propostas[0].aguardandoPor).toBe(THIAGO)
+    expect(messenger.enviados.at(-1)?.corpo).toContain("253,43")
   })
 
   it("test_escolher_conta_regrava_conta_reinfere_competencia_e_repropoe", async () => {
@@ -204,6 +324,32 @@ describe("responderProposta (Seam 1)", () => {
     const repropoe = messenger.interativos.at(-1)
     expect(repropoe?.corpo).toContain("Água")
     expect(repropoe?.botoes.map((b) => b.titulo)).toContain("Confirmar")
+  })
+
+  it("test_escolher_conta_por_lista_nao_larga_a_edicao_de_texto_pendente", async () => {
+    // Editar por lista (Conta) é ortogonal a uma edição de texto pendente (#178): a
+    // Pessoa tocou Alterar → Valor e, antes de digitar, mexeu na Conta. A pendência
+    // de texto tem de sobreviver — senão o "50,00" seguinte ecoaria em vez de gravar.
+    const bills = [billLuz(), billLuz({ id: "bill-agua", nome: "Água" })]
+    const { deps, proposalRepo } = montar({ bills })
+    await proposalRepo.definirAguardando(LAR, "prop-1", "valor", THIAGO)
+
+    await responderProposta(
+      deps,
+      acao({ acao: "escolher-conta", proposalId: "prop-1", billId: "bill-agua" }),
+    )
+
+    expect(proposalRepo.propostas[0].billId).toBe("bill-agua")
+    expect(proposalRepo.propostas[0].aguardandoCampo).toBe("valor")
+    // E o texto seguinte ainda grava o valor (não vira eco).
+    const consumido = await editarCampoTexto(deps as EdicaoTextoDeps, {
+      householdId: LAR,
+      remetente: REMET,
+      pessoaId: THIAGO,
+      texto: "50,00",
+    })
+    expect(consumido).toBe(true)
+    expect(proposalRepo.propostas[0].valorCentavos).toBe(5000)
   })
 
   it("test_interacao_com_proposta_expirada_carimba_e_limpa_sem_confirmar", async () => {
@@ -301,6 +447,88 @@ describe("responderProposta (Seam 1)", () => {
   })
 })
 
+describe("editarCampoTexto (menu Alterar por texto livre, #178)", () => {
+  const entrada = (texto: string) => ({
+    householdId: LAR,
+    remetente: REMET,
+    pessoaId: THIAGO,
+    texto,
+  })
+
+  it("test_texto_edita_o_valor_quando_ha_edicao_pendente_e_repropoe", async () => {
+    const { deps, proposalRepo, messenger } = montar()
+    await proposalRepo.definirAguardando(LAR, "prop-1", "valor", THIAGO)
+
+    const consumido = await editarCampoTexto(deps as EdicaoTextoDeps, entrada("300,50"))
+
+    expect(consumido).toBe(true)
+    expect(proposalRepo.propostas[0].valorCentavos).toBe(30050)
+    // Edição pendente limpa e Proposta re-ofertada com botões.
+    expect(proposalRepo.propostas[0].aguardandoCampo).toBeNull()
+    expect(messenger.interativos.at(-1)?.corpo).toContain("R$ 300,50")
+  })
+
+  it("test_texto_edita_a_data_em_formato_br", async () => {
+    const { deps, proposalRepo } = montar()
+    await proposalRepo.definirAguardando(LAR, "prop-1", "data", THIAGO)
+
+    await editarCampoTexto(deps as EdicaoTextoDeps, entrada("10/06/2026"))
+
+    expect(proposalRepo.propostas[0].dataPagamento).toBe("2026-06-10")
+  })
+
+  it("test_texto_edita_o_favorecido_cru_aparado", async () => {
+    const { deps, proposalRepo } = montar()
+    await proposalRepo.definirAguardando(LAR, "prop-1", "favorecido", THIAGO)
+
+    await editarCampoTexto(deps as EdicaoTextoDeps, entrada("  Enel SP  "))
+
+    expect(proposalRepo.propostas[0].favorecido).toBe("Enel SP")
+  })
+
+  it("test_texto_que_nao_casa_o_formato_larga_a_edicao_e_orienta_re_tocar", async () => {
+    const { deps, proposalRepo, messenger } = montar()
+    await proposalRepo.definirAguardando(LAR, "prop-1", "valor", THIAGO)
+
+    const consumido = await editarCampoTexto(deps as EdicaoTextoDeps, entrada("sei lá"))
+
+    expect(consumido).toBe(true)
+    // Não gravou lixo; largou a pendência (senão o próximo texto solto ficaria preso
+    // aqui, nunca no eco) e a mensagem traz o exemplo e aponta o re-toque no menu.
+    expect(proposalRepo.propostas[0].valorCentavos).toBe(25343)
+    expect(proposalRepo.propostas[0].aguardandoCampo).toBeNull()
+    expect(proposalRepo.propostas[0].aguardandoPor).toBeNull()
+    const msg = messenger.enviados.at(-1)?.corpo ?? ""
+    expect(msg).toContain("Não entendi")
+    expect(msg).toContain("Alterar")
+    expect(msg).toContain("253,43")
+  })
+
+  it("test_texto_solto_depois_do_parse_falho_volta_a_ser_eco_nao_consumido", async () => {
+    const { deps, proposalRepo, messenger } = montar()
+    await proposalRepo.definirAguardando(LAR, "prop-1", "valor", THIAGO)
+    await editarCampoTexto(deps as EdicaoTextoDeps, entrada("sei lá"))
+
+    // O texto seguinte não tem mais destino pendente → não consome (a borda ecoa).
+    const consumido = await editarCampoTexto(deps as EdicaoTextoDeps, entrada("oi de novo"))
+
+    expect(consumido).toBe(false)
+    // A única saída daqui foi a orientação do parse falho — nada a mais.
+    expect(messenger.enviados).toHaveLength(1)
+  })
+
+  it("test_texto_sem_edicao_pendente_nao_consome_a_borda_ecoa", async () => {
+    const { deps, messenger } = montar()
+
+    const consumido = await editarCampoTexto(deps as EdicaoTextoDeps, entrada("oi"))
+
+    // Nada pendente → false (a borda manda o eco de instrução); sem resposta daqui.
+    expect(consumido).toBe(false)
+    expect(messenger.enviados).toHaveLength(0)
+    expect(messenger.interativos).toHaveLength(0)
+  })
+})
+
 describe("varrerPropostasExpiradas (Seam 1)", () => {
   it("test_varredura_carimba_expirada_e_limpa_staging_das_velhas_deixa_as_novas", async () => {
     const velha = propostaSeed({
@@ -325,5 +553,35 @@ describe("varrerPropostasExpiradas (Seam 1)", () => {
     expect(proposalRepo.propostas.find((p) => p.id === "prop-nova")?.estado).toBe("proposta")
     expect(store.chaves()).not.toContain(velha.stagingKey)
     expect(store.chaves()).toContain(nova.stagingKey)
+  })
+})
+
+describe("definirAguardando — um slot por Pessoa, na ordem certa (#178)", () => {
+  it("test_setar_numa_aberta_libera_o_slot_anterior_da_mesma_pessoa", async () => {
+    const antiga = propostaSeed({ id: "prop-a", aguardandoCampo: "data", aguardandoPor: THIAGO })
+    const nova = propostaSeed({ id: "prop-b", bytesHash: "hash-2" })
+    const repo = fakePaymentProposalRepo([antiga, nova])
+
+    const alvo = await repo.definirAguardando(LAR, "prop-b", "valor", THIAGO)
+
+    expect(alvo?.aguardandoCampo).toBe("valor")
+    // A pendência antiga da mesma Pessoa foi liberada — um único destino de texto.
+    expect(repo.propostas.find((p) => p.id === "prop-a")?.aguardandoCampo).toBeNull()
+    expect(repo.propostas.find((p) => p.id === "prop-b")?.aguardandoCampo).toBe("valor")
+  })
+
+  it("test_setar_numa_fechada_falha_o_cas_e_preserva_a_pendencia_existente", async () => {
+    // O alvo já saiu de `proposta` (confirmada): o CAS não pega e devolve null. A
+    // ordem certa (setar antes de limpar) garante que a pendência de OUTRA Proposta
+    // não seja zerada à toa por um alvo inválido.
+    const pendente = propostaSeed({ id: "prop-a", aguardandoCampo: "data", aguardandoPor: THIAGO })
+    const fechada = propostaSeed({ id: "prop-b", bytesHash: "hash-2", estado: "confirmada" })
+    const repo = fakePaymentProposalRepo([pendente, fechada])
+
+    const alvo = await repo.definirAguardando(LAR, "prop-b", "valor", THIAGO)
+
+    expect(alvo).toBeNull()
+    expect(repo.propostas.find((p) => p.id === "prop-a")?.aguardandoCampo).toBe("data")
+    expect(repo.propostas.find((p) => p.id === "prop-a")?.aguardandoPor).toBe(THIAGO)
   })
 })

@@ -49,7 +49,13 @@ export function fakePaymentProposalRepo(iniciais: PaymentProposal[] = []): Payme
       if (ativaPorHash(nova.householdId, nova.bytesHash)) {
         throw new PropostaDuplicadaError(nova.bytesHash)
       }
-      const proposta: PaymentProposal = { ...nova, estado: "proposta", criadoEm: CRIADO_EM_FIXO }
+      const proposta: PaymentProposal = {
+        ...nova,
+        estado: "proposta",
+        criadoEm: CRIADO_EM_FIXO,
+        aguardandoCampo: null,
+        aguardandoPor: null,
+      }
       propostas.push(proposta)
       return proposta
     },
@@ -74,6 +80,58 @@ export function fakePaymentProposalRepo(iniciais: PaymentProposal[] = []): Payme
       p.billId = billId
       p.competencia = competencia
       return p
+    },
+    async atualizarCompetencia(householdId, id, competencia) {
+      const p = propostas.find((x) => x.householdId === householdId && x.id === id)
+      if (p?.estado !== "proposta") return null
+      p.competencia = competencia
+      return p
+    },
+    async atualizarCampo(householdId, id, patch) {
+      const p = propostas.find((x) => x.householdId === householdId && x.id === id)
+      if (p?.estado !== "proposta") return null
+      if (patch.valorCentavos !== undefined) p.valorCentavos = patch.valorCentavos
+      if (patch.dataPagamento !== undefined) p.dataPagamento = patch.dataPagamento
+      if (patch.favorecido !== undefined) p.favorecido = patch.favorecido
+      p.aguardandoCampo = null
+      p.aguardandoPor = null
+      return p
+    },
+    async definirAguardando(householdId, id, campo, pessoa) {
+      const p = propostas.find((x) => x.householdId === householdId && x.id === id)
+      if (p?.estado !== "proposta") return null
+      // Um slot por Pessoa, na ordem certa (#178): seta o alvo PRIMEIRO; só então
+      // libera qualquer outra edição pendente dela. Limpar antes arriscaria zerar a
+      // pendência de outra Proposta se o set no alvo não pegasse (aqui não pega se
+      // não estiver `proposta`) — o CAS é o ponto de commit.
+      p.aguardandoCampo = campo
+      p.aguardandoPor = pessoa
+      for (const outra of propostas) {
+        if (outra.householdId === householdId && outra.aguardandoPor === pessoa && outra !== p) {
+          outra.aguardandoCampo = null
+          outra.aguardandoPor = null
+        }
+      }
+      return p
+    },
+    async obterAguardandoPor(householdId, pessoa) {
+      return (
+        propostas.find(
+          (p) =>
+            p.householdId === householdId &&
+            p.estado === "proposta" &&
+            p.aguardandoPor === pessoa &&
+            p.aguardandoCampo !== null,
+        ) ?? null
+      )
+    },
+    async limparAguardando(householdId, pessoa) {
+      for (const p of propostas) {
+        if (p.householdId === householdId && p.aguardandoPor === pessoa) {
+          p.aguardandoCampo = null
+          p.aguardandoPor = null
+        }
+      }
     },
     async listarAbertas() {
       return propostas.filter((p) => p.estado === "proposta")

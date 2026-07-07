@@ -1,4 +1,4 @@
-import type { NovaPaymentProposal, PaymentProposal } from "../domain/payment-proposal"
+import type { CampoLivre, NovaPaymentProposal, PaymentProposal } from "../domain/payment-proposal"
 
 /**
  * `criar` colidiu com uma Proposta **ativa** de mesmo hash (o índice único
@@ -47,13 +47,62 @@ export type PaymentProposalRepo = {
   cancelar(householdId: string, id: string): Promise<PaymentProposal | null>
   /** Transição CAS `proposta → expirada` (limpeza lazy ou varredura). `null` se já não estava em `proposta`. */
   marcarExpirada(householdId: string, id: string): Promise<PaymentProposal | null>
-  /** Regrava Conta e Competência de uma Proposta ainda aberta (Trocar Conta). `null` se não está em `proposta`. */
+  /**
+   * Regrava Conta e Competência de uma Proposta ainda aberta (Alterar → Conta).
+   * **Não toca** a edição de texto pendente (`aguardando*`): editar por lista é
+   * ortogonal a uma pendência de texto livre — só `atualizarCampo`/`limparAguardando`/
+   * `definirAguardando` mexem nela. `null` se não está em `proposta`.
+   */
   atualizarConta(
     householdId: string,
     id: string,
     billId: string,
     competencia: string | null,
   ): Promise<PaymentProposal | null>
+  /**
+   * Regrava só a Competência (Alterar → Mês). Como `atualizarConta`, **não toca** a
+   * edição de texto pendente. `null` se não está em `proposta`.
+   */
+  atualizarCompetencia(
+    householdId: string,
+    id: string,
+    competencia: string,
+  ): Promise<PaymentProposal | null>
+  /**
+   * Grava o valor de um campo de texto livre editado (Alterar → Valor/Data/
+   * Favorecido) e **limpa** a edição pendente (`aguardando*` → null). O `patch`
+   * traz só o campo mexido. `null` se não está em `proposta`.
+   */
+  atualizarCampo(
+    householdId: string,
+    id: string,
+    patch: Partial<Pick<PaymentProposal, "valorCentavos" | "dataPagamento" | "favorecido">>,
+  ): Promise<PaymentProposal | null>
+  /**
+   * Marca que o bot espera um campo de texto livre desta Pessoa (Alterar →
+   * Valor/Data/Favorecido): CAS `proposta` setando `aguardandoCampo`/`aguardandoPor`
+   * nesta Proposta **primeiro** e, só se o CAS pegou, **libera qualquer outra edição
+   * pendente da mesma Pessoa** (um slot por Pessoa). A ordem importa: um alvo que já
+   * saiu de `proposta` não pode zerar a pendência de outra Proposta. `null` se já não
+   * está aberta.
+   */
+  definirAguardando(
+    householdId: string,
+    id: string,
+    campo: CampoLivre,
+    pessoa: string,
+  ): Promise<PaymentProposal | null>
+  /**
+   * A Proposta aberta em que esta Pessoa tem uma edição de texto pendente
+   * (`aguardandoPor` = pessoa, `aguardandoCampo` não-nulo) — a próxima mensagem de
+   * texto do remetente é lida como esse campo. `null` se não há edição pendente.
+   */
+  obterAguardandoPor(householdId: string, pessoa: string): Promise<PaymentProposal | null>
+  /**
+   * Libera toda edição pendente desta Pessoa no Lar (colisão: um comprovante novo
+   * no meio da edição larga a edição pendente — a Proposta nova assume).
+   */
+  limparAguardando(householdId: string, pessoa: string): Promise<void>
   /** Todas as Propostas ainda abertas (`proposta`) — a varredura oportunista filtra as expiradas pelo relógio. */
   listarAbertas(): Promise<PaymentProposal[]>
 }

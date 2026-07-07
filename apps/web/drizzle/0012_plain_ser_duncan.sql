@@ -1,0 +1,4 @@
+ALTER TABLE "whatsapp_proposals" ADD COLUMN "aguardando_campo" text;--> statement-breakpoint
+ALTER TABLE "whatsapp_proposals" ADD COLUMN "aguardando_por" uuid;--> statement-breakpoint
+ALTER TABLE "whatsapp_proposals" ADD CONSTRAINT "whatsapp_proposals_aguardando_por_users_id_fk" FOREIGN KEY ("aguardando_por") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "whatsapp_proposals" ADD CONSTRAINT "whatsapp_proposals_aguardando_check" CHECK ("whatsapp_proposals"."aguardando_campo" is null or "whatsapp_proposals"."aguardando_campo" in ('valor', 'data', 'favorecido'));

@@ -10,12 +10,19 @@ export type WhatsappMessenger = {
   enviarTexto(para: string, corpo: string): Promise<void>
   /**
    * Envia uma mensagem com botões de resposta rápida (a Proposta: Confirmar /
-   * Trocar Conta / Cancelar). A Graph API aceita no máximo 3 botões.
+   * Alterar / Cancelar). A Graph API aceita no máximo 3 botões.
    */
   enviarBotoes(para: string, corpo: string, botoes: BotaoInterativo[]): Promise<void>
   /**
-   * Envia uma lista interativa (Trocar Conta): um botão abre a lista de Contas
-   * selecionáveis. A Graph API aceita no máximo 10 linhas no total.
+   * Envia uma lista interativa (o menu Alterar e as listas de Conta/Mês, #159/#178):
+   * uma linha selecionável por opção. `rotuloBotao` é o texto do botão que abre a
+   * lista (≤20 chars) — varia por contexto (Escolher campo/Conta/mês), nunca fixo.
+   * A Graph API aceita no máximo 10 linhas.
    */
-  enviarLista(para: string, corpo: string, linhas: LinhaInterativa[]): Promise<void>
+  enviarLista(
+    para: string,
+    corpo: string,
+    linhas: LinhaInterativa[],
+    rotuloBotao: string,
+  ): Promise<void>
 }

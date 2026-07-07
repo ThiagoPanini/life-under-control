@@ -181,4 +181,85 @@ suite("drizzleWhatsappProposalRepo (Seam 2 — Postgres real)", () => {
     expect(ids).toContain(aberta.id)
     expect(ids).not.toContain(confirmada.id)
   })
+
+  it("test_definir_aguardando_marca_o_campo_e_a_pessoa_e_obter_acha", async () => {
+    const repo = drizzleWhatsappProposalRepo(db)
+    const criada = await repo.criar(nova())
+
+    const marcada = await repo.definirAguardando(larId, criada.id, "valor", pessoa)
+    expect(marcada?.aguardandoCampo).toBe("valor")
+    expect(marcada?.aguardandoPor).toBe(pessoa)
+
+    const achada = await repo.obterAguardandoPor(larId, pessoa)
+    expect(achada?.id).toBe(criada.id)
+  })
+
+  it("test_definir_aguardando_e_um_slot_por_pessoa", async () => {
+    const repo = drizzleWhatsappProposalRepo(db)
+    const p1 = await repo.criar(nova())
+    const p2 = await repo.criar(nova())
+
+    await repo.definirAguardando(larId, p1.id, "valor", pessoa)
+    await repo.definirAguardando(larId, p2.id, "data", pessoa)
+
+    // O 2º setou p2 e liberou p1 — a Pessoa espera texto numa única Proposta.
+    expect((await repo.obterPorId(larId, p1.id))?.aguardandoCampo).toBeNull()
+    expect((await repo.obterAguardandoPor(larId, pessoa))?.id).toBe(p2.id)
+  })
+
+  it("test_definir_aguardando_com_cas_falho_preserva_a_pendencia_existente", async () => {
+    const repo = drizzleWhatsappProposalRepo(db)
+    const p1 = await repo.criar(nova())
+    const p2 = await repo.criar(nova())
+    await repo.definirAguardando(larId, p1.id, "valor", pessoa)
+    await repo.confirmar(larId, p2.id) // p2 sai de `proposta` → o CAS do alvo vai falhar
+
+    const alvo = await repo.definirAguardando(larId, p2.id, "data", pessoa)
+
+    // Ordem certa (#178): seta o alvo primeiro; CAS falho → null e NÃO zera a
+    // pendência de p1 à toa (limpar-antes faria isso).
+    expect(alvo).toBeNull()
+    const achada = await repo.obterAguardandoPor(larId, pessoa)
+    expect(achada?.id).toBe(p1.id)
+    expect(achada?.aguardandoCampo).toBe("valor")
+  })
+
+  it("test_atualizar_campo_grava_o_valor_e_limpa_a_edicao_pendente", async () => {
+    const repo = drizzleWhatsappProposalRepo(db)
+    const criada = await repo.criar(nova({ valorCentavos: null }))
+    await repo.definirAguardando(larId, criada.id, "valor", pessoa)
+
+    const atualizada = await repo.atualizarCampo(larId, criada.id, { valorCentavos: 25343 })
+    expect(atualizada?.valorCentavos).toBe(25343)
+    expect(atualizada?.aguardandoCampo).toBeNull()
+    expect(await repo.obterAguardandoPor(larId, pessoa)).toBeNull()
+  })
+
+  it("test_atualizar_competencia_grava_o_mes_no_estado_proposta", async () => {
+    const repo = drizzleWhatsappProposalRepo(db)
+    const criada = await repo.criar(nova({ competencia: "2026-07" }))
+
+    const atualizada = await repo.atualizarCompetencia(larId, criada.id, "2026-06")
+    expect(atualizada?.competencia).toBe("2026-06")
+  })
+
+  it("test_atualizar_competencia_nao_larga_a_edicao_de_texto_pendente", async () => {
+    const repo = drizzleWhatsappProposalRepo(db)
+    const criada = await repo.criar(nova())
+    await repo.definirAguardando(larId, criada.id, "valor", pessoa)
+
+    await repo.atualizarCompetencia(larId, criada.id, "2026-06")
+
+    // Editar por lista (Mês) é ortogonal à pendência de texto: ela sobrevive (#178).
+    expect((await repo.obterAguardandoPor(larId, pessoa))?.id).toBe(criada.id)
+  })
+
+  it("test_limpar_aguardando_libera_a_pessoa", async () => {
+    const repo = drizzleWhatsappProposalRepo(db)
+    const criada = await repo.criar(nova())
+    await repo.definirAguardando(larId, criada.id, "favorecido", pessoa)
+
+    await repo.limparAguardando(larId, pessoa)
+    expect(await repo.obterAguardandoPor(larId, pessoa)).toBeNull()
+  })
 })
