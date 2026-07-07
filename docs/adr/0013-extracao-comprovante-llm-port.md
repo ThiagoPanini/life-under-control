@@ -13,7 +13,8 @@ A ingestão de comprovante pelo WhatsApp (ADR-0012) precisa extrair, de uma imag
 
 **Port `ReceiptExtractor` no núcleo**: `(conteudo: Uint8Array, tipoMime) → ReciboExtraido` com o shape consagrado no backfill — `valorCentavos`, `dataPagamento`, `favorecido`, `vencimentoImpresso`, `mesReferenciaImpresso` (todos nuláveis quando ilegíveis; "ilegível" nunca vira palpite). O núcleo **valida** o retorno (centavos inteiros > 0, datas ISO) — não confia no adapter.
 
-**Adapter Bedrock com Claude**: `AnthropicBedrockMantle` (`@anthropic-ai/bedrock-sdk`), modelo `anthropic.claude-opus-4-8`, região us-east-1, **structured output** com schema do shape acima — o JSON sai validado pela API, sem parsing frágil de texto livre. Imagem e PDF entram nativos (blocos `image`/`document`).
+**Adapter Bedrock com Claude**: `AnthropicBedrockMantle` (`@anthropic-ai/bedrock-sdk`), modelo `anthropic.claude-opus-4-6` (`us.anthropic.claude-opus-4-6-v1`, inference profile us-east-1), **structured output** com schema do shape acima — o JSON sai validado pela API, sem parsing frágil de texto livre. Imagem e PDF entram nativos (blocos `image`/`document`).
+  - **Nota (#154, 2026-07-07):** o `anthropic.claude-opus-4-8` cogitado inicialmente ficou de fora — entitlement (`PutUseCaseForModelAccess`/`CreateFoundationModelAgreement`) veio `AVAILABLE`, mas `InvokeModel` seguiu `AccessDeniedException` mesmo assim; Opus 4.7 deu o mesmo. É rollout de capacidade da AWS/Anthropic pros dois modelos mais novos, fora do controle da conta — não bureaucracy de acesso. Opus 4.6 invoca normal e foi o que passou no smoke real (comprovante de gás, JSON estruturado ok). Reavaliar 4.8 quando o rollout destravar.
 
 **O LLM extrai, não decide.** Matching de Conta, inferência de Competência e a criação do fato ficam no núcleo determinístico + confirmação humana (ADR-0012). O modelo lê o documento; quem lança é a Pessoa.
 
