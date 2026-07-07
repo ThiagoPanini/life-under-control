@@ -4,13 +4,14 @@ import type { WhatsappMessenger } from "@/core/ports/whatsapp-messenger"
 export type WhatsappMessengerFake = WhatsappMessenger & {
   enviados: { para: string; corpo: string }[]
   interativos: { para: string; corpo: string; botoes: BotaoInterativo[] }[]
-  listas: { para: string; corpo: string; linhas: LinhaInterativa[] }[]
+  listas: { para: string; corpo: string; linhas: LinhaInterativa[]; rotuloBotao: string }[]
 }
 
 export function fakeWhatsappMessenger(): WhatsappMessengerFake {
   const enviados: { para: string; corpo: string }[] = []
   const interativos: { para: string; corpo: string; botoes: BotaoInterativo[] }[] = []
-  const listas: { para: string; corpo: string; linhas: LinhaInterativa[] }[] = []
+  const listas: { para: string; corpo: string; linhas: LinhaInterativa[]; rotuloBotao: string }[] =
+    []
 
   return {
     enviados,
@@ -22,8 +23,8 @@ export function fakeWhatsappMessenger(): WhatsappMessengerFake {
     async enviarBotoes(para, corpo, botoes) {
       interativos.push({ para, corpo, botoes })
     },
-    async enviarLista(para, corpo, linhas) {
-      listas.push({ para, corpo, linhas })
+    async enviarLista(para, corpo, linhas, rotuloBotao) {
+      listas.push({ para, corpo, linhas, rotuloBotao })
     },
   }
 }

@@ -257,7 +257,7 @@ export function linhasCompetenciasProposta(
   })
 }
 
-/** O texto que pede um campo de texto livre, com um exemplo — serve também de reprompt no parse falho (#178). */
+/** O texto que pede um campo de texto livre, com um exemplo (#178). */
 export function promptEdicaoCampo(campo: CampoLivre): string {
   switch (campo) {
     case "valor":
@@ -266,6 +266,22 @@ export function promptEdicaoCampo(campo: CampoLivre): string {
       return "Qual a data de pagamento? Manda *dd/mm* ou *dd/mm/aaaa* — ex.: *05/07/2026*."
     case "favorecido":
       return "Qual o favorecido? Manda o nome como aparece no comprovante."
+  }
+}
+
+/**
+ * Mensagem do parse falho (#178): o texto não casou o formato do campo. Larga a
+ * edição pendente (por isso NÃO diz "manda de novo" como se ainda esperasse), traz o
+ * exemplo e aponta o re-toque no menu — o texto seguinte volta a ser eco, sem trap.
+ */
+export function mensagemCampoNaoEntendido(campo: CampoLivre): string {
+  switch (campo) {
+    case "valor":
+      return "Não entendi o valor. Toque *Alterar* → *Valor* e manda de novo — ex.: *253,43*."
+    case "data":
+      return "Não entendi a data. Toque *Alterar* → *Data* e manda de novo — ex.: *05/07/2026*."
+    case "favorecido":
+      return "Não entendi. Toque *Alterar* → *Favorecido* e manda o nome de novo."
   }
 }
 

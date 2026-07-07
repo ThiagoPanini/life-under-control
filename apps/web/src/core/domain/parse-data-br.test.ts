@@ -3,9 +3,9 @@ import { parseDataBrParaIso } from "./parse-data-br"
 
 /**
  * Parser da data de pagamento digitada pelo casal no chat (#178): dd/mm[/aaaa] em
- * pt-BR → ISO (YYYY-MM-DD), ou `null` quando não é data real. Data de comprovante
- * é sempre passada — sem ano, infere o ano de hoje (recuando um ano se cairia no
- * futuro, o caso da virada). Puro, sem relógio: `hoje` é injetado.
+ * pt-BR → ISO (YYYY-MM-DD), ou `null` quando não é data real. Data de comprovante é
+ * sempre passada — sem ano, pega a ocorrência passada mais recente (recua ano a ano
+ * do de hoje, cobrindo a virada e o 29/02). Puro, sem relógio: `hoje` é injetado.
  */
 const HOJE = "2026-07-08"
 
@@ -43,6 +43,17 @@ describe("parseDataBrParaIso", () => {
 
   it("test_29_de_fevereiro_em_ano_bissexto_vale", () => {
     expect(parseDataBrParaIso("29/02/2024", HOJE)).toBe("2024-02-29")
+  })
+
+  it("test_29_de_fevereiro_sem_ano_recua_ate_o_bissexto_anterior", () => {
+    // Hoje em 2026 (não-bissexto): "29/02" não existe em 2026 nem 2025 — a ocorrência
+    // passada mais recente é 2024. O parser recua ano a ano até casar uma data real.
+    expect(parseDataBrParaIso("29/02", HOJE)).toBe("2024-02-29")
+  })
+
+  it("test_sem_ano_no_mesmo_dia_de_hoje_vale_hoje", () => {
+    // Limite: hoje não é futuro — a ocorrência do próprio dia é aceita.
+    expect(parseDataBrParaIso("08/07", HOJE)).toBe("2026-07-08")
   })
 
   it("test_lixo_e_formato_errado_devolvem_null", () => {

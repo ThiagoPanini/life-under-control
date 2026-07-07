@@ -48,8 +48,10 @@ export type PaymentProposalRepo = {
   /** Transição CAS `proposta → expirada` (limpeza lazy ou varredura). `null` se já não estava em `proposta`. */
   marcarExpirada(householdId: string, id: string): Promise<PaymentProposal | null>
   /**
-   * Regrava Conta e Competência de uma Proposta ainda aberta (Alterar → Conta) e
-   * **limpa** a edição pendente. `null` se não está em `proposta`.
+   * Regrava Conta e Competência de uma Proposta ainda aberta (Alterar → Conta).
+   * **Não toca** a edição de texto pendente (`aguardando*`): editar por lista é
+   * ortogonal a uma pendência de texto livre — só `atualizarCampo`/`limparAguardando`/
+   * `definirAguardando` mexem nela. `null` se não está em `proposta`.
    */
   atualizarConta(
     householdId: string,
@@ -58,8 +60,8 @@ export type PaymentProposalRepo = {
     competencia: string | null,
   ): Promise<PaymentProposal | null>
   /**
-   * Regrava só a Competência (Alterar → Mês) e limpa a edição pendente. `null` se
-   * não está em `proposta`.
+   * Regrava só a Competência (Alterar → Mês). Como `atualizarConta`, **não toca** a
+   * edição de texto pendente. `null` se não está em `proposta`.
    */
   atualizarCompetencia(
     householdId: string,
@@ -78,9 +80,11 @@ export type PaymentProposalRepo = {
   ): Promise<PaymentProposal | null>
   /**
    * Marca que o bot espera um campo de texto livre desta Pessoa (Alterar →
-   * Valor/Data/Favorecido): seta `aguardandoCampo`/`aguardandoPor` na Proposta e
-   * **libera qualquer outra edição pendente da mesma Pessoa** (um slot por Pessoa).
-   * CAS `proposta`; `null` se já não está aberta.
+   * Valor/Data/Favorecido): CAS `proposta` setando `aguardandoCampo`/`aguardandoPor`
+   * nesta Proposta **primeiro** e, só se o CAS pegou, **libera qualquer outra edição
+   * pendente da mesma Pessoa** (um slot por Pessoa). A ordem importa: um alvo que já
+   * saiu de `proposta` não pode zerar a pendência de outra Proposta. `null` se já não
+   * está aberta.
    */
   definirAguardando(
     householdId: string,

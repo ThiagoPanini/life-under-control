@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { chaveComprovante } from "../domain/attachment"
-import { type Bill, formatarDataBr } from "../domain/bill"
+import { type Bill, descreverMesPorExtenso, formatarDataBr } from "../domain/bill"
 import { formatBRL, parseCentavos } from "../domain/money"
 import { parseDataBrParaIso } from "../domain/parse-data-br"
 import { descreverCompetencia, type Payment } from "../domain/payment"
@@ -14,6 +14,7 @@ import {
   linhasCamposProposta,
   linhasCompetenciasProposta,
   linhasContasProposta,
+  mensagemCampoNaoEntendido,
   mensagemPropostaExpirada,
   type PaymentProposal,
   promptEdicaoCampo,
@@ -81,10 +82,16 @@ export const MENSAGEM_CONTA_SUMIU = "Não achei essa Conta. Toque *Alterar* → 
 /** Alterar → Mês sem Conta escolhida: a Competência depende da recorrência da Conta. */
 export const MENSAGEM_MES_SEM_CONTA =
   "Escolhe a Conta primeiro (*Alterar* → *Conta*) — a Competência depende dela. 🙏"
-/** Prefixo do reprompt quando o texto livre não casa o formato do campo (parse falho). */
-export const PREFIXO_NAO_ENTENDI = "Não entendi. "
 /** Cabeçalho da lista de Conta (Alterar → Conta). */
 export const TITULO_LISTA_CONTAS = "Qual é a Conta certa?"
+/** Nenhum mês pra oferecer (Conta que só começa no futuro) — não manda lista vazia (a Graph API recusa). */
+export const MENSAGEM_SEM_MESES =
+  "Não achei Competências pra escolher nessa Conta. Confere a Conta em *Alterar* → *Conta*. 🙏"
+
+/** Rótulo do botão que abre cada lista interativa (#178) — varia por contexto, nunca fixo. */
+export const BOTAO_ESCOLHER_CAMPO = "Escolher campo"
+export const BOTAO_ESCOLHER_CONTA = "Escolher Conta"
+export const BOTAO_ESCOLHER_MES = "Escolher mês"
 
 /** Teto de linhas de uma lista interativa da Graph API. */
 const MAX_LINHAS_LISTA = 10
@@ -203,6 +210,7 @@ async function apresentarCampos(
     remetente,
     TITULO_MENU_ALTERAR,
     linhasCamposProposta(proposta.id),
+    BOTAO_ESCOLHER_CAMPO,
   )
 }
 
@@ -242,8 +250,12 @@ async function apresentarMeses(
   proposta: PaymentProposal,
   remetente: string,
 ): Promise<void> {
+  // Só Conta **ativa** (paridade com o Confirmar/Trocar Conta): oferecer meses de
+  // Conta arquivada levaria a uma edição que o Confirmar depois rejeita.
   const bill = proposta.billId
-    ? (await deps.billRepo.listarBills(proposta.householdId)).find((b) => b.id === proposta.billId)
+    ? (await deps.billRepo.listarBills(proposta.householdId)).find(
+        (b) => b.id === proposta.billId && b.estado === "ativa",
+      )
     : undefined
   if (!bill) {
     await deps.messenger.enviarTexto(remetente, MENSAGEM_MES_SEM_CONTA)
@@ -256,8 +268,14 @@ async function apresentarMeses(
   )
     .filter((c) => c >= bill.primeiraCompetencia)
     .reverse() // a mais recente (a mais provável) no topo da lista
+  // Conta que só começa no futuro → nenhuma ocorrência válida; não manda lista
+  // vazia (a Graph API recusa `rows: []` e a interação estouraria).
+  if (competencias.length === 0) {
+    await deps.messenger.enviarTexto(remetente, MENSAGEM_SEM_MESES)
+    return
+  }
   const linhas = linhasCompetenciasProposta(proposta.id, competencias)
-  await deps.messenger.enviarLista(remetente, TITULO_LISTA_MESES, linhas)
+  await deps.messenger.enviarLista(remetente, TITULO_LISTA_MESES, linhas, BOTAO_ESCOLHER_MES)
 }
 
 /** Alterar → Mês → escolha: grava a Competência e re-oferece a Proposta. */
@@ -457,7 +475,7 @@ async function apresentarContas(
     proposta.id,
     ordenadas.map((b) => ({ billId: b.id, nome: b.nome })),
   )
-  await deps.messenger.enviarLista(remetente, TITULO_LISTA_CONTAS, linhas)
+  await deps.messenger.enviarLista(remetente, TITULO_LISTA_CONTAS, linhas, BOTAO_ESCOLHER_CONTA)
 }
 
 async function trocarConta(
@@ -499,31 +517,41 @@ async function trocarConta(
     await deps.messenger.enviarTexto(remetente, MENSAGEM_JA_RESOLVIDA)
     return
   }
-  await reofertarProposta(deps, atualizada, remetente)
+  // Passa o `bill` já carregado — evita reofertar re-consultar a lista de Contas.
+  await reofertarProposta(deps, atualizada, remetente, bill)
 }
 
 /**
  * Re-renderiza a Proposta (resumo + botões Confirmar/Alterar/Cancelar) depois de
  * qualquer edição — o casal vê o efeito na hora e segue editando ou confirma. Deriva
- * o resumo dos campos **atuais** da Proposta; a Competência usa a recorrência da
- * Conta (busca o `bill`), caindo no texto cru se ainda não há Conta.
+ * o resumo dos campos **atuais** da Proposta. O `billConhecido` evita uma re-consulta
+ * quando o chamador já tem a Conta em mãos (Trocar Conta); sem ela, busca. A
+ * Competência usa a recorrência da Conta; sem Conta, cai no mês por extenso (nunca o
+ * ISO cru).
  */
 async function reofertarProposta(
   deps: Pick<ResponderDeps, "billRepo" | "messenger">,
   proposta: PaymentProposal,
   remetente: string,
+  billConhecido?: Bill,
 ): Promise<void> {
-  const bill = proposta.billId
-    ? (await deps.billRepo.listarBills(proposta.householdId)).find((b) => b.id === proposta.billId)
-    : undefined
+  const bill =
+    billConhecido ??
+    (proposta.billId
+      ? (await deps.billRepo.listarBills(proposta.householdId)).find(
+          (b) => b.id === proposta.billId,
+        )
+      : undefined)
+  const competenciaFmt = proposta.competencia
+    ? bill
+      ? descreverCompetencia(proposta.competencia, bill.recurrence)
+      : descreverMesPorExtenso(proposta.competencia)
+    : null
   const resumo: ResumoProposta = {
     contaNome: bill?.nome ?? null,
     valor: proposta.valorCentavos !== null ? formatBRL(proposta.valorCentavos) : null,
     dataPagamento: proposta.dataPagamento ? formatarDataBr(proposta.dataPagamento) : null,
-    competencia:
-      proposta.competencia && bill
-        ? descreverCompetencia(proposta.competencia, bill.recurrence)
-        : proposta.competencia,
+    competencia: competenciaFmt,
   }
   await deps.messenger.enviarBotoes(
     remetente,
@@ -534,7 +562,10 @@ async function reofertarProposta(
 
 /** O que a edição por texto livre precisa — subconjunto leve, sem R2/Bedrock (um texto nunca falha por env de mídia). */
 export type EdicaoTextoDeps = {
-  proposalRepo: Pick<PaymentProposalRepo, "obterAguardandoPor" | "atualizarCampo">
+  proposalRepo: Pick<
+    PaymentProposalRepo,
+    "obterAguardandoPor" | "atualizarCampo" | "limparAguardando"
+  >
   billRepo: Pick<BillRepo, "listarBills">
   messenger: WhatsappMessenger
   clock: Clock
@@ -551,8 +582,9 @@ export type TextoEntrada = {
 /**
  * Interpreta uma mensagem de texto livre (#178): se a Pessoa tem uma edição pendente
  * (tocou Alterar → Valor/Data/Favorecido), lê o texto **só** como aquele campo (parser
- * determinístico), grava e re-oferece a Proposta. Parse falho → reprompt 1× com o
- * exemplo, mantendo a edição pendente. Devolve `true` se **consumiu** o texto como
+ * determinístico), grava e re-oferece a Proposta. Parse falho → **larga** a edição
+ * pendente e orienta o re-toque no menu (senão o próximo texto solto cairia de novo aqui,
+ * nunca no eco — a Pessoa ficaria presa). Devolve `true` se **consumiu** o texto como
  * edição; `false` = não havia edição pendente (a borda ecoa a instrução de uso).
  */
 export async function editarCampoTexto(
@@ -566,9 +598,11 @@ export async function editarCampoTexto(
   const campo = proposta.aguardandoCampo
   const patch = parseCampoLivre(campo, texto, deps.clock.hoje())
   if (patch === null) {
-    // Fato humano é confiado, mas validado (#178): o parser é a validação. Não
-    // casou o formato → reprompt com o exemplo, sem largar a edição pendente.
-    await deps.messenger.enviarTexto(remetente, `${PREFIXO_NAO_ENTENDI}${promptEdicaoCampo(campo)}`)
+    // Fato humano é confiado, mas validado (#178): o parser é a validação. Não casou
+    // o formato → larga a edição pendente e orienta o re-toque no menu. Manter a
+    // pendência prenderia a Pessoa: todo texto seguinte cairia aqui, nunca no eco.
+    await deps.proposalRepo.limparAguardando(householdId, pessoaId)
+    await deps.messenger.enviarTexto(remetente, mensagemCampoNaoEntendido(campo))
     return true
   }
 

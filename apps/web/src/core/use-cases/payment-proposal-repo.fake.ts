@@ -79,16 +79,12 @@ export function fakePaymentProposalRepo(iniciais: PaymentProposal[] = []): Payme
       if (p?.estado !== "proposta") return null
       p.billId = billId
       p.competencia = competencia
-      p.aguardandoCampo = null
-      p.aguardandoPor = null
       return p
     },
     async atualizarCompetencia(householdId, id, competencia) {
       const p = propostas.find((x) => x.householdId === householdId && x.id === id)
       if (p?.estado !== "proposta") return null
       p.competencia = competencia
-      p.aguardandoCampo = null
-      p.aguardandoPor = null
       return p
     },
     async atualizarCampo(householdId, id, patch) {
@@ -104,15 +100,18 @@ export function fakePaymentProposalRepo(iniciais: PaymentProposal[] = []): Payme
     async definirAguardando(householdId, id, campo, pessoa) {
       const p = propostas.find((x) => x.householdId === householdId && x.id === id)
       if (p?.estado !== "proposta") return null
-      // Um slot por Pessoa: libera qualquer outra edição pendente dela antes de setar.
+      // Um slot por Pessoa, na ordem certa (#178): seta o alvo PRIMEIRO; só então
+      // libera qualquer outra edição pendente dela. Limpar antes arriscaria zerar a
+      // pendência de outra Proposta se o set no alvo não pegasse (aqui não pega se
+      // não estiver `proposta`) — o CAS é o ponto de commit.
+      p.aguardandoCampo = campo
+      p.aguardandoPor = pessoa
       for (const outra of propostas) {
         if (outra.householdId === householdId && outra.aguardandoPor === pessoa && outra !== p) {
           outra.aguardandoCampo = null
           outra.aguardandoPor = null
         }
       }
-      p.aguardandoCampo = campo
-      p.aguardandoPor = pessoa
       return p
     },
     async obterAguardandoPor(householdId, pessoa) {

@@ -130,7 +130,7 @@ export function drizzleWhatsappProposalRepo(db: Db = getDb()): PaymentProposalRe
     async atualizarConta(householdId, id, billId, competencia) {
       const [row] = await db
         .update(whatsappProposals)
-        .set({ billId, competencia, aguardandoCampo: null, aguardandoPor: null })
+        .set({ billId, competencia })
         .where(
           and(
             eq(whatsappProposals.householdId, householdId),
@@ -145,7 +145,7 @@ export function drizzleWhatsappProposalRepo(db: Db = getDb()): PaymentProposalRe
     async atualizarCompetencia(householdId, id, competencia) {
       const [row] = await db
         .update(whatsappProposals)
-        .set({ competencia, aguardandoCampo: null, aguardandoPor: null })
+        .set({ competencia })
         .where(
           and(
             eq(whatsappProposals.householdId, householdId),
@@ -173,18 +173,10 @@ export function drizzleWhatsappProposalRepo(db: Db = getDb()): PaymentProposalRe
     },
 
     async definirAguardando(householdId, id, campo, pessoa) {
-      // Um slot por Pessoa: libera qualquer edição pendente dela em OUTRA Proposta
-      // antes de setar esta — o texto seguinte tem um único destino inequívoco.
-      await db
-        .update(whatsappProposals)
-        .set({ aguardandoCampo: null, aguardandoPor: null })
-        .where(
-          and(
-            eq(whatsappProposals.householdId, householdId),
-            eq(whatsappProposals.aguardandoPor, pessoa),
-            ne(whatsappProposals.id, id),
-          ),
-        )
+      // Um slot por Pessoa, na ordem certa (#178): seta o alvo PRIMEIRO (CAS no estado
+      // `proposta`). Só se o CAS pegou é que libera a edição pendente dela em OUTRA
+      // Proposta — senão um alvo que já saiu do estado aberto zeraria a pendência de
+      // outra Proposta à toa. O texto seguinte tem um único destino inequívoco.
       const [row] = await db
         .update(whatsappProposals)
         .set({ aguardandoCampo: campo, aguardandoPor: pessoa })
@@ -196,7 +188,18 @@ export function drizzleWhatsappProposalRepo(db: Db = getDb()): PaymentProposalRe
           ),
         )
         .returning()
-      return row ? paraDominio(row) : null
+      if (!row) return null
+      await db
+        .update(whatsappProposals)
+        .set({ aguardandoCampo: null, aguardandoPor: null })
+        .where(
+          and(
+            eq(whatsappProposals.householdId, householdId),
+            eq(whatsappProposals.aguardandoPor, pessoa),
+            ne(whatsappProposals.id, id),
+          ),
+        )
+      return paraDominio(row)
     },
 
     async obterAguardandoPor(householdId, pessoa) {

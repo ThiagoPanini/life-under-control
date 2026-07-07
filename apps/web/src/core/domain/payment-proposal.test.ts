@@ -9,6 +9,7 @@ import {
   linhasCamposProposta,
   linhasCompetenciasProposta,
   linhasContasProposta,
+  mensagemCampoNaoEntendido,
   mensagemPropostaExpirada,
   parsearAcaoBotao,
   promptEdicaoCampo,
@@ -156,6 +157,17 @@ describe("menu Alterar (#178)", () => {
     expect(promptEdicaoCampo("valor")).toContain("253,43")
     expect(promptEdicaoCampo("data")).toContain("05/07/2026")
     expect(promptEdicaoCampo("favorecido").toLowerCase()).toContain("favorecido")
+  })
+
+  it("test_mensagem_de_parse_falho_traz_exemplo_e_aponta_o_re_toque", () => {
+    // Larga a pendência → a mensagem não diz "manda de novo" como se esperasse: manda
+    // re-tocar Alterar → campo, com o exemplo (não fica presa esperando texto).
+    expect(mensagemCampoNaoEntendido("valor")).toContain("253,43")
+    expect(mensagemCampoNaoEntendido("data")).toContain("05/07/2026")
+    for (const campo of ["valor", "data", "favorecido"] as const) {
+      expect(mensagemCampoNaoEntendido(campo)).toContain("Alterar")
+      expect(mensagemCampoNaoEntendido(campo)).toContain("Não entendi")
+    }
   })
 })
 
