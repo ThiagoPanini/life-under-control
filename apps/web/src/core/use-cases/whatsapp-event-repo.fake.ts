@@ -9,5 +9,8 @@ export function fakeWhatsappEventRepo(): WhatsappEventRepo {
       reivindicados.add(evento.waMessageId)
       return true
     },
+    async liberar(evento) {
+      reivindicados.delete(evento.waMessageId)
+    },
   }
 }

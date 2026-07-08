@@ -10,4 +10,11 @@ export type WhatsappEventRepo = {
    * banco decide, não uma leitura seguida de escrita).
    */
   reivindicar(evento: { waMessageId: string; remetente: string }): Promise<boolean>
+  /**
+   * Libera uma reivindicação (apaga a linha) — compensação do digest (#160):
+   * reivindica-se antes de enviar o template; se o envio falha, libera para o
+   * próximo disparo tentar de novo, em vez de poisonar o dia. No-op se a chave
+   * não existe. O webhook (#155) não usa — lá a reentrega da Meta é o retry.
+   */
+  liberar(evento: { waMessageId: string }): Promise<void>
 }

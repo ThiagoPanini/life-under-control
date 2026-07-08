@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm"
 import type { WhatsappEventRepo } from "@/core/ports/whatsapp-event-repo"
 import { type Db, getDb } from "./client"
 import { ehViolacaoDeUnicidade } from "./postgres-error"
@@ -17,6 +18,9 @@ export function drizzleWhatsappEventRepo(db: Db = getDb()): WhatsappEventRepo {
         if (ehViolacaoDeUnicidade(e, "whatsapp_events_wa_message_id_unique")) return false
         throw e
       }
+    },
+    async liberar(evento: { waMessageId: string }): Promise<void> {
+      await db.delete(whatsappEvents).where(eq(whatsappEvents.waMessageId, evento.waMessageId))
     },
   }
 }

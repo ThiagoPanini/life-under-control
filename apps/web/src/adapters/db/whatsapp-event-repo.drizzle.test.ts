@@ -45,6 +45,23 @@ suite("drizzleWhatsappEventRepo (Seam 2 — Postgres real)", () => {
     expect(segunda).toBe(false)
   })
 
+  it("test_liberar_apaga_a_reivindicacao_e_permite_reivindicar_de_novo", async () => {
+    const repo = drizzleWhatsappEventRepo(db)
+    const waMessageId = `digest.liberar-${Date.now()}`
+
+    expect(await repo.reivindicar({ waMessageId, remetente: "+5511987654321" })).toBe(true)
+    await repo.liberar({ waMessageId })
+    // após liberar, a mesma chave reivindica de novo (compensação do digest #160)
+    expect(await repo.reivindicar({ waMessageId, remetente: "+5511987654321" })).toBe(true)
+  })
+
+  it("test_liberar_chave_inexistente_e_no_op", async () => {
+    const repo = drizzleWhatsappEventRepo(db)
+    await expect(
+      repo.liberar({ waMessageId: `digest.ausente-${Date.now()}` }),
+    ).resolves.toBeUndefined()
+  })
+
   it("test_reivindicacao_concorrente_do_mesmo_wa_message_id_so_uma_vence", async () => {
     const repo = drizzleWhatsappEventRepo(db)
     const waMessageId = `wamid.concorrente-${Date.now()}`

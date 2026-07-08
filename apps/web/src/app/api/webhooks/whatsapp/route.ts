@@ -10,7 +10,7 @@ import { drizzlePaymentRepo } from "@/adapters/db/payment-repo.drizzle"
 import { drizzleUserRepo } from "@/adapters/db/user-repo.drizzle"
 import { drizzleWhatsappEventRepo } from "@/adapters/db/whatsapp-event-repo.drizzle"
 import { httpWhatsappMediaFetcher } from "@/adapters/http/whatsapp-media-fetcher"
-import { httpWhatsappMessenger } from "@/adapters/http/whatsapp-messenger"
+import { whatsappMessengerFromEnv } from "@/adapters/http/whatsapp-messenger"
 import { r2AttachmentStore } from "@/adapters/r2/r2-attachment-store"
 import { assinaturaValida } from "@/core/domain/whatsapp-assinatura"
 import { verificarChallengeWebhook } from "@/core/domain/whatsapp-verificacao-webhook"
@@ -66,10 +66,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN ?? ""
-  const messenger = httpWhatsappMessenger({
-    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID ?? "",
-    accessToken,
-  })
+  const messenger = whatsappMessengerFromEnv()
 
   // Trabalho pesado (download da mídia + extração + matching + persistência) roda
   // PÓS-resposta: o webhook devolve 200 na hora — a Meta reentrega agressivo se

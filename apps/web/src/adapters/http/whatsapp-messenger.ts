@@ -1,5 +1,5 @@
 import type { BotaoInterativo, LinhaInterativa } from "@/core/domain/payment-proposal"
-import type { WhatsappMessenger } from "@/core/ports/whatsapp-messenger"
+import type { TemplateWhatsapp, WhatsappMessenger } from "@/core/ports/whatsapp-messenger"
 
 const GRAPH_API_VERSION = "v21.0"
 const TIMEOUT_MS = 10_000
@@ -12,7 +12,8 @@ type Config = { phoneNumberId: string; accessToken: string }
  * que chama isso precisa responder 200 rápido pra Meta, não travar num retry.
  */
 export function httpWhatsappMessenger({ phoneNumberId, accessToken }: Config): WhatsappMessenger {
-  async function enviar(payload: Record<string, unknown>): Promise<void> {
+  /** `true` só quando a Meta aceitou (2xx); falha de rede/não-OK loga e devolve `false`. */
+  async function enviar(payload: Record<string, unknown>): Promise<boolean> {
     try {
       const res = await fetch(
         `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
@@ -26,9 +27,14 @@ export function httpWhatsappMessenger({ phoneNumberId, accessToken }: Config): W
           signal: AbortSignal.timeout(TIMEOUT_MS),
         },
       )
-      if (!res.ok) console.error(`whatsapp: envio falhou com status ${res.status}`)
+      if (!res.ok) {
+        console.error(`whatsapp: envio falhou com status ${res.status}`)
+        return false
+      }
+      return true
     } catch (e) {
       console.error("whatsapp: envio falhou", e)
+      return false
     }
   }
 
@@ -67,5 +73,33 @@ export function httpWhatsappMessenger({ phoneNumberId, accessToken }: Config): W
         },
       })
     },
+    async enviarTemplate(para, template: TemplateWhatsapp) {
+      return enviar({
+        to: para,
+        type: "template",
+        template: {
+          name: template.nome,
+          language: { code: template.idioma },
+          components: [
+            {
+              type: "body",
+              parameters: template.params.map((text) => ({ type: "text", text })),
+            },
+          ],
+        },
+      })
+    },
   }
+}
+
+/**
+ * Monta o messenger a partir do env de produção (WHATSAPP_PHONE_NUMBER_ID /
+ * WHATSAPP_ACCESS_TOKEN). Fonte única do fio env→messenger, compartilhada pelo
+ * webhook (#155) e pelo disparo do digest (#160) — muda num lugar só.
+ */
+export function whatsappMessengerFromEnv(): WhatsappMessenger {
+  return httpWhatsappMessenger({
+    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID ?? "",
+    accessToken: process.env.WHATSAPP_ACCESS_TOKEN ?? "",
+  })
 }
