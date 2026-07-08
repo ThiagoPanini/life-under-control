@@ -26,6 +26,10 @@ describe("gateRedirect", () => {
     expect(gateRedirect({ isLoggedIn: false, pathname: "/api/webhooks/whatsapp" })).toBeNull()
   })
 
+  it("test_sem_sessao_disparo_do_digest_segue_o_cron_autentica_por_segredo", () => {
+    expect(gateRedirect({ isLoggedIn: false, pathname: "/api/cron/digest-vencimentos" })).toBeNull()
+  })
+
   it("test_logado_na_porta_ou_landing_vai_pro_painel", () => {
     expect(gateRedirect({ isLoggedIn: true, pathname: "/login" })).toBe("/painel")
     expect(gateRedirect({ isLoggedIn: true, pathname: "/" })).toBe("/painel")
