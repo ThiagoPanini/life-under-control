@@ -35,7 +35,7 @@ O sistema visual oficial do LUC está em [`docs/design/`](docs/design/README.md)
 
 ## Arquitetura
 
-App único **Next.js 15** (App Router) full-stack, TypeScript, **Postgres via Drizzle**, **Vitest** + **Biome**. Sem backend Python — a API FastAPI do scaffold foi aposentada ([ADR-0001](docs/adr/0001-app-unico-next-fullstack.md)). Todo dado nasce de um ato no portal e vive no banco; nada de uso é versionado em git.
+Hoje: app único **Next.js 15** (App Router) full-stack, TypeScript, **Postgres via Drizzle**, **Vitest** + **Biome**. **Em migração para split** ([ADR-0014](docs/adr/0014-backend-python-fastapi.md), que supersede o [ADR-0001](docs/adr/0001-app-unico-next-fullstack.md)): nasce o `apps/api` — **Python/FastAPI/uv** — dono do domínio, adapters e bordas de servidor; o Next vira borda de UI/BFF. Durante a migração vale o **hard-freeze do backend TS** (bugfix sim, feature nova não; UI livre). Todo dado nasce de um ato no portal e vive no banco; nada de uso é versionado em git.
 
 - `apps/web/` — o app (Server Components / Server Actions / Route Handlers). O layout de pastas do núcleo firma no primeiro código ([ADR-0003](docs/adr/0003-nucleo-dominio-multi-borda.md)).
 
