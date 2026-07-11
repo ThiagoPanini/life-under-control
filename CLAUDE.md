@@ -61,6 +61,14 @@ pnpm --filter @luc/web typecheck
 pnpm --filter @luc/web test                # vitest
 node_modules/.bin/biome check apps/web     # NÃO use `pnpm exec biome` (falso-verde)
 
+# API (de apps/api) — backend Python 3.14 / FastAPI / uv (ADR-0014).
+uv sync                                    # instala deps (inclui dev)
+uv run uvicorn luc_api.main:app --reload   # :8000
+uv run pytest                              # pytest-asyncio
+uv run ruff format --check . && uv run ruff check .
+uv run pyright                             # tipos (strict)
+uv run lint-imports                        # fronteiras (import-linter)
+
 # Execução local (Docker) — dependências em container, app nativo. Ver docs/agents/local-dev.md.
 pnpm dev:up                                # Postgres :5432 + MinIO :9000
 pnpm --filter @luc/web db:migrate          # migra + semeia o Postgres local
@@ -69,7 +77,7 @@ pnpm dev:smoke                             # smoke fiel à prod (imagem do Docke
 
 ## Gate
 
-Workflow `pr-checks` (web: biome + typecheck + vitest · gitleaks). `main` é protegida → o `pr-checks` abre o PR no verde e o agente mergeia sozinho (merge autônomo — [ADR-0007](docs/adr/0007-autonomia-total-do-agente.md)). Os jobs pulam em verde enquanto `apps/web` ainda não existe.
+Workflow `pr-checks` (web: biome + typecheck + vitest · api: ruff + pyright strict + import-linter + pytest · gitleaks no repo inteiro). `main` é protegida → o `pr-checks` abre o PR no verde e o agente mergeia sozinho (merge autônomo — [ADR-0007](docs/adr/0007-autonomia-total-do-agente.md)). Cada job pula em verde enquanto seu app (`apps/web`, `apps/api`) ainda não existe.
 
 ## Agent skills
 

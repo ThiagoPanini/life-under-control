@@ -76,6 +76,65 @@ jobs:
           DATABASE_URL: postgres://luc:luc@localhost:5432/luc
         run: pnpm --filter @luc/web test
 
+  api:
+    name: api
+    runs-on: ubuntu-latest
+    # Postgres real, provisionado desde já para o Seam-2 das fatias F2
+    # (vazio por ora — só o passo de teste recebe DATABASE_URL).
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: luc
+          POSTGRES_PASSWORD: luc
+          POSTGRES_DB: luc
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U luc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - id: appcheck
+        run: |
+          if [ -f apps/api/pyproject.toml ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::apps/api ainda nao existe — gate api pulado."
+          fi
+      - uses: astral-sh/setup-uv@v6
+        if: steps.appcheck.outputs.exists == 'true'
+        with:
+          enable-cache: true
+      - if: steps.appcheck.outputs.exists == 'true'
+        working-directory: apps/api
+        run: uv sync --frozen
+      - name: format (ruff)
+        if: steps.appcheck.outputs.exists == 'true'
+        working-directory: apps/api
+        run: uv run --frozen ruff format --check .
+      - name: lint (ruff)
+        if: steps.appcheck.outputs.exists == 'true'
+        working-directory: apps/api
+        run: uv run --frozen ruff check .
+      - name: types (pyright)
+        if: steps.appcheck.outputs.exists == 'true'
+        working-directory: apps/api
+        run: uv run --frozen pyright
+      - name: imports (import-linter)
+        if: steps.appcheck.outputs.exists == 'true'
+        working-directory: apps/api
+        run: uv run --frozen lint-imports
+      - name: test (pytest)
+        if: steps.appcheck.outputs.exists == 'true'
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgres://luc:luc@localhost:5432/luc
+        run: uv run --frozen pytest
+
   security:
     name: security
     runs-on: ubuntu-latest
@@ -89,7 +148,7 @@ jobs:
 
   open-pr:
     name: open-pr
-    needs: [web, security]
+    needs: [web, api, security]
     runs-on: ubuntu-latest
     permissions:
       contents: read
