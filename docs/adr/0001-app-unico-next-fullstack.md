@@ -1,6 +1,6 @@
 # ADR 0001 — App único Next.js full-stack; o LUC é operado de dentro, com o banco como sistema de registro
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0014](0014-backend-python-fastapi.md)
 - **Data:** 2026-06-26
 - **Decisores:** Thiago Panini (solo)
 - **Relacionado:** [ADR-0003](0003-nucleo-dominio-multi-borda.md) (o núcleo de domínio vive dentro deste app), [ADR-0006](0006-faseamento-por-areas.md) (faseamento), [CONTEXT.md](../../CONTEXT.md) (intro + Fronteira de escopo)
