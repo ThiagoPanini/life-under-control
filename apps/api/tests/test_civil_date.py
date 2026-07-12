@@ -97,3 +97,25 @@ def test_competencia_com_mes_fora_da_faixa_e_invalida():
 def test_dia_da_semana_abreviado_de_data_iso():
     # 2026-07-06 é segunda-feira.
     assert dia_da_semana_abreviado("2026-07-06") == "seg"
+
+
+def test_dia_da_semana_cobre_domingo_e_sabado():
+    # Boundary do shift domingo=0 ((weekday()+1)%7): 05/07 é domingo, 11/07 é sábado.
+    assert dia_da_semana_abreviado("2026-07-05") == "dom"
+    assert dia_da_semana_abreviado("2026-07-11") == "sáb"
+
+
+# --- paridade com o TS (achados de review) ------------------------------------
+def test_rejeita_data_iso_com_newline_final():
+    # O `$` do Python casaria antes do `\n`; `\Z` fecha a brecha (paridade JS).
+    assert eh_data_iso_valida("2026-07-06\n") is False
+    assert eh_competencia_valida("2026-07\n") is False
+
+
+def test_rejeita_digito_unicode_em_data_iso():
+    assert eh_data_iso_valida("۲۰۲۶-۰۷-۰۶") is False  # noqa: RUF001  (dígitos não-ASCII de propósito)
+
+
+def test_sem_ano_recua_ate_o_pior_caso_de_8_anos():
+    # 29/02 na virada de século não-bissexta: hoje em 2104 (antes de 29/02) → 2096.
+    assert parse_data_br_para_iso("29/02", "2104-01-15") == "2096-02-29"

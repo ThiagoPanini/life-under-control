@@ -8,9 +8,11 @@ import re
 _TAM_GRUPO_MILHAR = 3  # dinheiro tem 2 casas → grupo final de 3 dígitos é milhar
 _MIN_CASAS_DECIMAIS = 1
 _MAX_CASAS_DECIMAIS = 2
+_MAX_CENTAVOS_SEGURO = 2**53 - 1  # espelha Number.isSafeInteger do TS (não estoura o bigint)
 
-_SO_DIGITOS_PONTO_VIRGULA = re.compile(r"[\d.,]+")
-_VALOR_NORMALIZADO = re.compile(r"\d+(\.\d{1,2})?")
+# re.ASCII: o \d do Python casa dígitos Unicode; o do JS é ASCII-only (paridade TS).
+_SO_DIGITOS_PONTO_VIRGULA = re.compile(r"[\d.,]+", re.ASCII)
+_VALOR_NORMALIZADO = re.compile(r"\d+(\.\d{1,2})?", re.ASCII)
 
 
 def _garantir_inteiro(cents: object) -> None:
@@ -70,7 +72,7 @@ def parse_centavos(texto: str) -> int | None:
 
     reais, _, frac = normal.partition(".")
     centavos = int(reais) * 100 + int(frac.ljust(2, "0"))
-    if centavos <= 0:
+    if centavos <= 0 or centavos > _MAX_CENTAVOS_SEGURO:
         return None
     return centavos
 
@@ -101,4 +103,8 @@ def centavos_para_campo(cents: int) -> str:
     _garantir_inteiro(cents)
     reais = abs(cents) // 100
     centavos = abs(cents) % 100
-    return f"{'-' if cents < 0 else ''}{reais},{centavos:02d}"
+    # int não tem -0: quando |cents| < 1 real, o sinal some (espelha String(-0) -> "0"
+    # do TS); só há sinal quando existe real inteiro negativo.
+    if cents < 0:
+        reais = -reais
+    return f"{reais},{centavos:02d}"

@@ -96,3 +96,20 @@ def test_milhar_com_ponto_e_sem_casa_decimal():
 def test_recusa_nao_inteiro_como_format_brl():
     with pytest.raises(ValueError):
         format_brl_sem_centavos(10.5)  # type: ignore[arg-type]
+
+
+# --- paridade com o TS (achados de review) ------------------------------------
+def test_recusa_digito_unicode_nao_ascii():
+    # `\d` do Python casaria dígitos Unicode; o do JS é ASCII-only.
+    assert parse_centavos("١٩,٩٩") is None
+
+
+def test_recusa_valor_acima_do_inteiro_seguro():
+    # Espelha o Number.isSafeInteger do TS — não deixa estourar o bigint na borda.
+    assert parse_centavos("99999999999999999999") is None
+
+
+def test_negativo_sub_real_perde_o_sinal_como_no_ts():
+    # |cents| < 1 real: String(-0) → "0" no TS; real inteiro negativo mantém sinal.
+    assert centavos_para_campo(-5) == "0,05"
+    assert centavos_para_campo(-150) == "-1,50"

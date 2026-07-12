@@ -12,9 +12,11 @@ DIAS_SEMANA_CURTOS = ("dom", "seg", "ter", "qua", "qui", "sex", "sáb")
 _DIGITOS_ANO_CURTO = 2  # "26" → 2026
 _MAX_RECUO_ANOS = 8  # pior caso: intervalo entre dois 29/02 (virada de século)
 
-_DATA_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_COMPETENCIA = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
-_DATA_BR = re.compile(r"^(\d{1,2})/(\d{1,2})(?:/(\d{2}|\d{4}))?$")
+# re.ASCII: \d do Python casa dígitos Unicode (o do JS é ASCII-only). \Z, não $: o $
+# do Python casa antes de um \n final e aceitaria lixo com newline.
+_DATA_ISO = re.compile(r"\A\d{4}-\d{2}-\d{2}\Z", re.ASCII)
+_COMPETENCIA = re.compile(r"\A\d{4}-(0[1-9]|1[0-2])\Z", re.ASCII)
+_DATA_BR = re.compile(r"\A(\d{1,2})/(\d{1,2})(?:/(\d{2}|\d{4}))?\Z", re.ASCII)
 
 
 def dia_da_semana_abreviado(iso: str) -> str:
@@ -74,7 +76,9 @@ def parse_data_br_para_iso(texto: str, hoje_iso: str) -> str | None:
 
     # Sem ano: desce do ano de hoje até a 1ª ocorrência real e não-futura.
     ano_hoje = int(hoje_iso[:4])
-    for ano_n in range(ano_hoje, ano_hoje - _MAX_RECUO_ANOS, -1):
+    # range exclui o fim; o -1 inclui o recuo cheio de _MAX_RECUO_ANOS anos (pior caso
+    # 29/02 na virada de século não-bissexta: 2096, 8 anos atrás de 2104).
+    for ano_n in range(ano_hoje, ano_hoje - _MAX_RECUO_ANOS - 1, -1):
         iso = f"{ano_n}-{mes}-{dia}"
         if eh_data_iso_valida(iso) and iso <= hoje_iso:
             return iso
