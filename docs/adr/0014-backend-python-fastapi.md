@@ -40,6 +40,10 @@ Decisões técnicas do split, fixadas em grilling:
 - O repo é **poliglota pra sempre**: a UI (~8,8k LOC React/Mirante) permanece TS por decisão, não por inércia.
 - CLAUDE.md, docs de agente e comandos precisam refletir o split conforme ele materializa.
 
+### Revisão — língua do código e nomes de pacote (2026-07-13)
+
+O grilling de padrões do `apps/api` revisou duas cláusulas: **docstrings "Google pt-BR" → todo artefato de código em inglês** ([ADR-0016](0016-ingles-codigo-apps-api.md)), e os pacotes de contexto do layout passam a **`identity/`, `finance/`, `whatsapp/`** (eram `identidade/`, `financas/`) — ajustado antes de os pacotes existirem. A forma do domínio ganhou detalhe no [ADR-0015](0015-forma-dominio-python-tipos-nativos.md) (funções sobre `int` centavos; datas civis em `datetime.date`). O resto — split, async-first, SQLAlchemy Core, auth, gates — segue intacto.
+
 ## Opções rejeitadas
 
 - **Manter TS (status quo).** Correto em moeda de produto; deixa as três metas de portfólio sem veículo.

@@ -41,3 +41,5 @@ Para um **refinamento** (a decisão segue válida, muda um detalhe), edite o ADR
 - [0012 — WhatsApp como borda de ingestão e notificação via Meta Cloud API](0012-whatsapp-borda-meta-cloud-api.md)
 - [0013 — Extração de comprovante por LLM vision atrás de port (Claude no Bedrock)](0013-extracao-comprovante-llm-port.md)
 - [0014 — Backend em Python (FastAPI); Next vira borda de UI — supersede 0001](0014-backend-python-fastapi.md)
+- [0015 — Forma do domínio Python: funções puras sobre tipos nativos (apps/api)](0015-forma-dominio-python-tipos-nativos.md)
+- [0016 — Inglês integral no código do apps/api](0016-ingles-codigo-apps-api.md)
