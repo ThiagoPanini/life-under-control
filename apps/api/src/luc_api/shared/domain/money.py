@@ -1,110 +1,112 @@
-"""Dinheiro no LUC é exato e em centavos (invariante #6): inteiro, BRL, nunca float.
+"""Money in LUC is exact and in cents (invariant #6): integer, BRL, never float.
 
-É a única forma de virar valor monetário em texto para a UI.
+The only place where a monetary amount becomes text for the UI.
 """
 
 import re
 
-_TAM_GRUPO_MILHAR = 3  # dinheiro tem 2 casas → grupo final de 3 dígitos é milhar
-_MIN_CASAS_DECIMAIS = 1
-_MAX_CASAS_DECIMAIS = 2
-_MAX_CENTAVOS_SEGURO = 2**53 - 1  # espelha Number.isSafeInteger do TS (não estoura o bigint)
+__all__ = ["cents_to_input_text", "format_brl", "format_brl_no_cents", "parse_brl"]
 
-# re.ASCII: o \d do Python casa dígitos Unicode; o do JS é ASCII-only (paridade TS).
-_SO_DIGITOS_PONTO_VIRGULA = re.compile(r"[\d.,]+", re.ASCII)
-_VALOR_NORMALIZADO = re.compile(r"\d+(\.\d{1,2})?", re.ASCII)
+_THOUSANDS_GROUP_LEN = 3  # money has 2 decimal places -> a final group of 3 digits is thousands
+_MIN_DECIMAL_PLACES = 1
+_MAX_DECIMAL_PLACES = 2
+_MAX_SAFE_CENTS = 2**53 - 1  # mirrors TS Number.isSafeInteger (no bigint overflow at the edge)
+
+# re.ASCII: Python's \d matches Unicode digits; JS's is ASCII-only (TS parity).
+_DIGITS_DOTS_COMMAS_ONLY = re.compile(r"[\d.,]+", re.ASCII)
+_NORMALIZED_AMOUNT = re.compile(r"\d+(\.\d{1,2})?", re.ASCII)
 
 
-def _garantir_inteiro(cents: object) -> None:
-    """Rejeita valor monetário que não seja inteiro em centavos (invariante #6)."""
+def _ensure_int(cents: object) -> None:
+    """Rejects a monetary amount that is not an integer in cents (invariant #6)."""
     if not isinstance(cents, int) or isinstance(cents, bool):
-        raise ValueError(f"valor monetário deve ser inteiro em centavos, recebido: {cents}")
+        raise ValueError(f"monetary amount must be an integer in cents, got: {cents}")
 
 
-def _com_milhar(reais: int) -> str:
-    """Insere o ponto de milhar num inteiro de reais (1000000 → "1.000.000")."""
+def _with_thousands_dot(reais: int) -> str:
+    """Inserts the thousands dot into a whole amount of reais (1000000 -> "1.000.000")."""
     return f"{reais:,}".replace(",", ".")
 
 
 def format_brl(cents: int) -> str:
-    """Formata centavos (inteiro) como BRL — "R$ 1.234,56" (milhar com ponto)."""
-    _garantir_inteiro(cents)
-    negativo = cents < 0
+    """Formats cents (integer) as BRL — "R$ 1.234,56" (dot as thousands separator)."""
+    _ensure_int(cents)
+    negative = cents < 0
     abs_cents = abs(cents)
     reais = abs_cents // 100
-    centavos = abs_cents % 100
-    return f"{'-' if negativo else ''}R$ {_com_milhar(reais)},{centavos:02d}"
+    remainder = abs_cents % 100
+    return f"{'-' if negative else ''}R$ {_with_thousands_dot(reais)},{remainder:02d}"
 
 
-def format_brl_sem_centavos(cents: int) -> str:
-    """Formata centavos como BRL sem casa decimal — "R$ 1.240" (estimativa, ≈).
+def format_brl_no_cents(cents: int) -> str:
+    """Formats cents as BRL with no decimal places — "R$ 1.240" (an estimate, ≈).
 
-    Arredonda ao real mais próximo por aritmética inteira (sem float): uma média
-    não finge a precisão de um fato. Fatos exatos continuam em `format_brl`.
+    Rounds to the nearest real using integer arithmetic (no float): an average must
+    not fake the precision of a fact. Exact facts stay in `format_brl`.
     """
-    _garantir_inteiro(cents)
-    negativo = cents < 0
+    _ensure_int(cents)
+    negative = cents < 0
     reais = (abs(cents) + 50) // 100
-    return f"{'-' if negativo else ''}R$ {_com_milhar(reais)}"
+    return f"{'-' if negative else ''}R$ {_with_thousands_dot(reais)}"
 
 
-def parse_centavos(texto: str) -> int | None:
-    """Lê um valor BRL digitado em centavos inteiros — `None` se inválido/não-positivo.
+def parse_brl(text: str) -> int | None:
+    """Reads a typed BRL amount into integer cents — `None` if invalid or non-positive.
 
-    Aceita o formato brasileiro com milhar ("1.234,56" · "1.500"), a vírgula
-    decimal sem milhar ("19,99") e o ponto decimal do teclado numérico
-    ("1234.56"), além do inteiro de reais ("1500" → R$ 1.500,00). Recusa mais de
-    2 casas decimais, sinal negativo e caractere fora do esperado. Sem float:
-    monta os centavos a partir das partes inteiras.
+    Accepts the Brazilian format with thousands ("1.234,56" · "1.500"), the decimal
+    comma without thousands ("19,99") and the numeric-keypad decimal dot ("1234.56"),
+    plus whole reais ("1500" -> R$ 1.500,00). Rejects more than 2 decimal places, a
+    negative sign and unexpected characters. No float: cents are assembled from the
+    integer parts.
     """
-    limpo = re.sub(r"^R\$", "", texto.strip(), flags=re.IGNORECASE)
-    limpo = re.sub(r"\s", "", limpo)
-    if limpo == "" or not _SO_DIGITOS_PONTO_VIRGULA.fullmatch(limpo):
+    cleaned = re.sub(r"^R\$", "", text.strip(), flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s", "", cleaned)
+    if cleaned == "" or not _DIGITS_DOTS_COMMAS_ONLY.fullmatch(cleaned):
         return None
 
-    if "," in limpo:
-        # Vírgula é o decimal; pontos são de milhar.
-        normal = limpo.replace(".", "").replace(",", ".")
+    if "," in cleaned:
+        # The comma is the decimal separator; dots are thousands.
+        normalized = cleaned.replace(".", "").replace(",", ".")
     else:
-        normal = _normalizar_so_com_pontos(limpo)
-    if normal is None or not _VALOR_NORMALIZADO.fullmatch(normal):
+        normalized = _normalize_dots_only(cleaned)
+    if normalized is None or not _NORMALIZED_AMOUNT.fullmatch(normalized):
         return None
 
-    reais, _, frac = normal.partition(".")
-    centavos = int(reais) * 100 + int(frac.ljust(2, "0"))
-    if centavos <= 0 or centavos > _MAX_CENTAVOS_SEGURO:
+    reais, _, frac = normalized.partition(".")
+    cents = int(reais) * 100 + int(frac.ljust(2, "0"))
+    if cents <= 0 or cents > _MAX_SAFE_CENTS:
         return None
-    return centavos
+    return cents
 
 
-def _normalizar_so_com_pontos(limpo: str) -> str | None:
-    """Resolve a ambiguidade do ponto sem vírgula: milhar (grupo final de 3) vs decimal.
+def _normalize_dots_only(cleaned: str) -> str | None:
+    """Resolves the comma-less dot ambiguity: thousands (final group of 3) vs decimal.
 
-    "1.500" → "1500" (milhar); "129.90" → "129.90" (decimal, com pontos
-    anteriores como milhar). `None` se a forma não couber em nenhum dos dois.
+    "1.500" -> "1500" (thousands); "129.90" -> "129.90" (decimal, with earlier dots
+    as thousands). `None` when the shape fits neither.
     """
-    if "." not in limpo:
-        return limpo
-    partes = limpo.split(".")
-    tam_ultima = len(partes[-1])
-    if tam_ultima == _TAM_GRUPO_MILHAR:
-        return "".join(partes)
-    if _MIN_CASAS_DECIMAIS <= tam_ultima <= _MAX_CASAS_DECIMAIS:
-        dec = partes.pop()
-        return f"{''.join(partes)}.{dec}"
+    if "." not in cleaned:
+        return cleaned
+    parts = cleaned.split(".")
+    last_len = len(parts[-1])
+    if last_len == _THOUSANDS_GROUP_LEN:
+        return "".join(parts)
+    if _MIN_DECIMAL_PLACES <= last_len <= _MAX_DECIMAL_PLACES:
+        decimals = parts.pop()
+        return f"{''.join(parts)}.{decimals}"
     return None
 
 
-def centavos_para_campo(cents: int) -> str:
-    """Projeta centavos no texto que o campo de valor edita ("1234,56", sem milhar).
+def cents_to_input_text(cents: int) -> str:
+    """Projects cents into the text the amount input edits ("1234,56", no thousands).
 
-    Round-trip com `parse_centavos`. Distinto de `format_brl`, que é para exibir.
+    Round-trips with `parse_brl`. Distinct from `format_brl`, which is for display.
     """
-    _garantir_inteiro(cents)
+    _ensure_int(cents)
     reais = abs(cents) // 100
-    centavos = abs(cents) % 100
-    # int não tem -0: quando |cents| < 1 real, o sinal some (espelha String(-0) -> "0"
-    # do TS); só há sinal quando existe real inteiro negativo.
+    remainder = abs(cents) % 100
+    # int has no -0: below 1 whole real the sign vanishes (mirrors TS String(-0) ->
+    # "0"); there is only a sign when a negative whole real exists.
     if cents < 0:
         reais = -reais
-    return f"{reais},{centavos:02d}"
+    return f"{reais},{remainder:02d}"

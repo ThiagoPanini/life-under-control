@@ -1,7 +1,7 @@
 [project]
 name = "luc-api"
 version = "0.0.0"
-description = "Backend do Life Under Control — domínio, ports/adapters e bordas de servidor (ADR-0014)."
+description = "Life Under Control backend — domain, ports/adapters and server edges (ADR-0014)."
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -26,16 +26,16 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/luc_api"]
 
-# --- Régua panlabs: ruff (format + lint) ---------------------------------
+# --- panlabs bar: ruff (format + lint) ------------------------------------
 [tool.ruff]
 line-length = 100
 target-version = "py314"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-# Set curado: erros de estilo, pyflakes, imports, bugbear, comprehensions,
+# Curated set: style errors, pyflakes, imports, bugbear, comprehensions,
 # pyupgrade, simplify, naming, docstrings (Google), pathlib, async, pylint,
-# imports proibidos e regras próprias do ruff.
+# banned imports and ruff's own rules.
 select = [
     "E",
     "W",
@@ -54,7 +54,7 @@ select = [
     "RUF",
 ]
 ignore = [
-    "E501", # comprimento de linha é do formatter
+    "E501", # line length belongs to the formatter
 ]
 
 [tool.ruff.lint.pydocstyle]
@@ -64,7 +64,7 @@ convention = "google"
 ban-relative-imports = "all"
 
 [tool.ruff.lint.per-file-ignores]
-# Testes não exigem docstring nem proíbem valores mágicos.
+# Tests require no docstrings and may use magic values.
 "tests/**" = ["D", "PLR2004"]
 
 [tool.ruff.format]
@@ -84,12 +84,12 @@ venv = ".venv"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 
-# --- import-linter: fronteiras executáveis (ADR-0014) --------------------
+# --- import-linter: executable boundaries (ADR-0014) ---------------------
 [tool.importlinter]
 root_package = "luc_api"
 
 [[tool.importlinter.contracts]]
-name = "shared segue camadas hexagonais (domain < application < adapters)"
+name = "shared follows hexagonal layers (domain < application < adapters)"
 type = "layers"
 layers = [
     "adapters",
