@@ -1,25 +1,34 @@
-"""Erros semânticos do domínio: categorias por significado, nunca por status HTTP.
+"""Semantic domain errors: categories by meaning, never by HTTP status.
 
-O número HTTP nasce só na borda (router), traduzindo estas categorias; o núcleo
-não conhece protocolo (ADR-0003). Cada Área deriva erros nomeados destas raízes.
+The HTTP number is born only at the edge (router), translating these categories;
+the core knows no protocol (ADR-0003). Each Area (Área) derives its named errors
+from these roots.
 """
+
+__all__ = [
+    "ConflictError",
+    "DomainError",
+    "InvalidInputError",
+    "NotFoundError",
+    "ValidationError",
+]
 
 
 class DomainError(Exception):
-    """Raiz dos erros de domínio do LUC — semântica, sem acoplamento a HTTP."""
+    """Root of the LUC domain errors — semantic, with no HTTP coupling."""
 
 
 class NotFoundError(DomainError):
-    """Um recurso esperado não existe no Lar (id inexistente ou de outro Lar)."""
+    """An expected resource does not exist in the Household (missing or another Household's id)."""
 
 
 class ConflictError(DomainError):
-    """A operação conflita com o estado/invariante atual (duplicidade, unicidade)."""
+    """The operation conflicts with the current state/invariant (duplicity, uniqueness)."""
 
 
 class ValidationError(DomainError):
-    """A entrada não passou na validação de domínio."""
+    """The input failed domain validation."""
 
 
 class InvalidInputError(DomainError):
-    """A entrada é malformada ou inaceitável (formato, faixa, tipo)."""
+    """The input is malformed or unacceptable (shape, range, type)."""

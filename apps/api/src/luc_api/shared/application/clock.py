@@ -1,27 +1,30 @@
-"""Port do relógio (ADR-0003): o domínio trabalha em datas civis, não timestamps (#3).
+"""Clock port (ADR-0003): the domain works with civil dates, never timestamps (#3).
 
-Injetar o relógio torna "hoje" determinístico no teste (FixedClock) e fixa o fuso
-do Lar (America/Sao_Paulo) num só lugar, no adapter real.
+Injecting the clock makes "today" deterministic in tests (FixedClock) and pins the
+Household timezone (America/Sao_Paulo) in a single place, the real adapter.
 """
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Protocol
+
+__all__ = ["Clock", "FixedClock"]
 
 
 class Clock(Protocol):
-    """Relógio do domínio — devolve a data civil de hoje no fuso do Lar."""
+    """Domain clock — yields today's civil date in the Household timezone."""
 
-    def hoje(self) -> str:
-        """A data civil de hoje (YYYY-MM-DD) no fuso do domínio."""
+    def today(self) -> date:
+        """Today's civil date in the domain timezone."""
         ...
 
 
 @dataclass(frozen=True)
 class FixedClock:
-    """Duplo determinístico do `Clock` para teste: devolve sempre a data injetada."""
+    """Deterministic `Clock` double for tests: always yields the injected date."""
 
-    hoje_iso: str
+    fixed_today: date
 
-    def hoje(self) -> str:
-        """A data civil fixa deste relógio (YYYY-MM-DD)."""
-        return self.hoje_iso
+    def today(self) -> date:
+        """The fixed civil date of this clock."""
+        return self.fixed_today

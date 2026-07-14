@@ -1,4 +1,4 @@
-"""Borda de servidor: o healthcheck responde 200 com corpo estável."""
+"""Server edge: the healthcheck responds 200 with a stable body."""
 
 from httpx import ASGITransport, AsyncClient
 

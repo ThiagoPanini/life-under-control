@@ -1,85 +1,97 @@
-"""Datas civis do domínio (YYYY-MM-DD), no fuso do Lar — nunca timestamps (#3).
+"""Civil dates of the domain (`datetime.date`) — never timestamps (#3).
 
-Validação, formatação pt-BR e parse do que o casal digita no chat. Puro: o "hoje"
-é sempre injetado, sem relógio.
+Parsing, pt-BR formatting and reading what the couple types in the chat. Pure:
+"today" is always injected, never read from a clock here. The reference period
+(Competência) stays a `str` "YYYY-MM" — there is no stdlib year-month type.
 """
 
 import re
 from datetime import date
 
-DIAS_SEMANA_CURTOS = ("dom", "seg", "ter", "qua", "qui", "sex", "sáb")
+__all__ = [
+    "WEEKDAYS_ABBREV_PT",
+    "format_br_date",
+    "is_valid_reference_period",
+    "parse_br_date",
+    "parse_iso_date",
+    "weekday_abbrev",
+]
 
-_DIGITOS_ANO_CURTO = 2  # "26" → 2026
-_MAX_RECUO_ANOS = 8  # pior caso: intervalo entre dois 29/02 (virada de século)
+WEEKDAYS_ABBREV_PT = ("dom", "seg", "ter", "qua", "qui", "sex", "sáb")  # product copy
 
-# re.ASCII: \d do Python casa dígitos Unicode (o do JS é ASCII-only). \Z, não $: o $
-# do Python casa antes de um \n final e aceitaria lixo com newline.
-_DATA_ISO = re.compile(r"\A\d{4}-\d{2}-\d{2}\Z", re.ASCII)
-_COMPETENCIA = re.compile(r"\A\d{4}-(0[1-9]|1[0-2])\Z", re.ASCII)
-_DATA_BR = re.compile(r"\A(\d{1,2})/(\d{1,2})(?:/(\d{2}|\d{4}))?\Z", re.ASCII)
+_SHORT_YEAR_DIGITS = 2  # "26" -> 2026
+_MAX_YEARS_BACK = 8  # worst case: the gap between two Feb 29 (non-leap century turn)
 
-
-def dia_da_semana_abreviado(iso: str) -> str:
-    """Dia da semana abreviado de uma data civil ISO ("2026-07-06" → "seg")."""
-    ano, mes, dia = (int(p) for p in iso.split("-"))
-    # `weekday()` tem segunda=0; deslocamos para domingo=0 (como o TS getUTCDay).
-    return DIAS_SEMANA_CURTOS[(date(ano, mes, dia).weekday() + 1) % 7]
-
-
-def eh_competencia_valida(s: str) -> bool:
-    """É uma Competência `ano-mês` (YYYY-MM) com mês entre 01 e 12?"""
-    return _COMPETENCIA.match(s) is not None
+# re.ASCII: Python's \d matches Unicode digits (JS's is ASCII-only). \Z, not $: Python's
+# $ matches before a trailing \n and would accept garbage with a newline.
+_ISO_DATE = re.compile(r"\A\d{4}-\d{2}-\d{2}\Z", re.ASCII)
+_REFERENCE_PERIOD = re.compile(r"\A\d{4}-(0[1-9]|1[0-2])\Z", re.ASCII)
+_BR_DATE = re.compile(r"\A(\d{1,2})/(\d{1,2})(?:/(\d{2}|\d{4}))?\Z", re.ASCII)
 
 
-def eh_data_iso_valida(s: str) -> bool:
-    """É uma data civil ISO (YYYY-MM-DD) real?
+def weekday_abbrev(day: date) -> str:
+    """Abbreviated pt-BR weekday of a civil date (2026-07-06 -> "seg"), as product copy."""
+    # `weekday()` has monday=0; shift to sunday=0 (like the TS getUTCDay).
+    return WEEKDAYS_ABBREV_PT[(day.weekday() + 1) % 7]
 
-    Rejeita formato torto, mês fora de 1-12 e dia inexistente (29/02 em ano comum,
-    31 de mês curto). O domínio trabalha em datas civis, não timestamps (#3).
+
+def is_valid_reference_period(text: str) -> bool:
+    """Is this a reference period (Competência) — `year-month` (YYYY-MM), month 01 to 12?"""
+    return _REFERENCE_PERIOD.match(text) is not None
+
+
+def parse_iso_date(text: str) -> date | None:
+    """Parses an ISO civil date (YYYY-MM-DD) — `None` if malformed or not a real day.
+
+    Rejects crooked shapes, months outside 1-12 and nonexistent days (Feb 29 in a
+    common year, day 31 in a short month). Edges turn text into `date` here, and the
+    domain only ever sees real dates ("parse, don't validate" — ADR-0015).
     """
-    if not _DATA_ISO.match(s):
-        return False
-    ano, mes, dia = (int(p) for p in s.split("-"))
-    try:
-        date(ano, mes, dia)
-    except ValueError:
-        return False
-    return True
+    if not _ISO_DATE.match(text):
+        return None
+    year, month, day = (int(part) for part in text.split("-"))
+    return _real_date_or_none(year, month, day)
 
 
-def formatar_data_br(iso: str) -> str:
-    """Formata uma data civil ISO em pt-BR ("2026-06-29" → "29/06/2026")."""
-    ano, mes, dia = iso.split("-")
-    return f"{dia}/{mes}/{ano}"
+def format_br_date(day: date) -> str:
+    """Formats a civil date in pt-BR (2026-06-29 -> "29/06/2026")."""
+    return f"{day.day:02d}/{day.month:02d}/{day.year:04d}"
 
 
-def parse_data_br_para_iso(texto: str, hoje_iso: str) -> str | None:
-    """Lê `dd/mm` ou `dd/mm/aaaa` (ano de 2 ou 4 dígitos) → ISO, ou `None` se irreal.
+def parse_br_date(text: str, today: date) -> date | None:
+    """Reads `dd/mm` or `dd/mm/yyyy` (2- or 4-digit year) into a `date` — `None` if unreal.
 
-    Sem ano, pega a ocorrência passada mais recente — um comprovante é sempre
-    pagamento já feito (nunca futuro): recua ano a ano de `hoje_iso` até casar uma
-    data real que não seja futura. Puro: `hoje_iso` é injetado, sem relógio.
+    Without a year, picks the most recent past occurrence — a receipt is always a
+    payment already made (never in the future): steps back year by year from `today`
+    until a real, non-future date matches. Pure: `today` is injected, no clock here.
     """
-    m = _DATA_BR.match(texto.strip())
-    if not m:
+    matched = _BR_DATE.match(text.strip())
+    if not matched:
         return None
 
-    dia = m.group(1).rjust(2, "0")
-    mes = m.group(2).rjust(2, "0")
+    day = int(matched.group(1))
+    month = int(matched.group(2))
 
-    if m.group(3) is not None:
-        # Ano explícito: intenção do casal — valida a realidade, sem forçar passado.
-        ano_bruto = m.group(3)
-        ano = f"20{ano_bruto}" if len(ano_bruto) == _DIGITOS_ANO_CURTO else ano_bruto
-        iso = f"{ano}-{mes}-{dia}"
-        return iso if eh_data_iso_valida(iso) else None
+    if matched.group(3) is not None:
+        # An explicit year states the couple's intent — check it is real, without
+        # forcing it into the past.
+        raw_year = matched.group(3)
+        year = int(f"20{raw_year}") if len(raw_year) == _SHORT_YEAR_DIGITS else int(raw_year)
+        return _real_date_or_none(year, month, day)
 
-    # Sem ano: desce do ano de hoje até a 1ª ocorrência real e não-futura.
-    ano_hoje = int(hoje_iso[:4])
-    # range exclui o fim; o -1 inclui o recuo cheio de _MAX_RECUO_ANOS anos (pior caso
-    # 29/02 na virada de século não-bissexta: 2096, 8 anos atrás de 2104).
-    for ano_n in range(ano_hoje, ano_hoje - _MAX_RECUO_ANOS - 1, -1):
-        iso = f"{ano_n}-{mes}-{dia}"
-        if eh_data_iso_valida(iso) and iso <= hoje_iso:
-            return iso
+    # No year: walk down from today's year to the first real, non-future occurrence.
+    # range excludes the end; the -1 keeps the full _MAX_YEARS_BACK stretch (worst
+    # case Feb 29 at a non-leap century turn: 2096, 8 years behind 2104).
+    for year in range(today.year, today.year - _MAX_YEARS_BACK - 1, -1):
+        candidate = _real_date_or_none(year, month, day)
+        if candidate is not None and candidate <= today:
+            return candidate
     return None
+
+
+def _real_date_or_none(year: int, month: int, day: int) -> date | None:
+    """The `date` when the calendar day exists, else `None` (Feb 29, day 31 in a short month)."""
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None

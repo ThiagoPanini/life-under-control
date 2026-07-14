@@ -1,27 +1,27 @@
 # syntax=docker/dockerfile:1
-# Build context = raiz do monorepo (deploy.yml: context: ., file: apps/api/Dockerfile).
-# As imagens uv:pythonX são construídas SOBRE python:X-slim, então o interpretador
-# em /usr/local/bin bate com o runner — a .venv é copiável entre os estágios.
+# Build context = monorepo root (deploy.yml: context: ., file: apps/api/Dockerfile).
+# The uv:pythonX images are built ON TOP OF python:X-slim, so the interpreter at
+# /usr/local/bin matches the runner — the .venv is copyable across stages.
 
-# --- build: resolve deps congeladas e instala o pacote (sem dev, sem editable) ---
+# --- build: resolves frozen deps and installs the package (no dev, no editable) ---
 FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim AS build
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never
 WORKDIR /app
 
-# Camada de deps primeiro: muda pouco → cache estável entre builds.
+# Deps layer first: changes rarely -> stable cache across builds.
 COPY apps/api/pyproject.toml apps/api/uv.lock apps/api/.python-version ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev
 
-# Camada do projeto: instala o pacote não-editável → .venv autossuficiente.
+# Project layer: installs the package non-editable -> self-sufficient .venv.
 COPY apps/api/README.md ./
 COPY apps/api/src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-editable
 
-# --- runner: imagem mínima de produção, non-root, sem uv ---
+# --- runner: minimal production image, non-root, no uv ---
 FROM python:3.14-slim-bookworm AS runner
 WORKDIR /app
 ENV PATH="/app/.venv/bin:$PATH" \
@@ -31,10 +31,10 @@ RUN groupadd -r luc -g 1001 && useradd -r -u 1001 -g luc luc
 COPY --from=build --chown=luc:luc /app/.venv /app/.venv
 USER luc
 EXPOSE 8000
-# Healthcheck nativo do container: usa o python (já presente) contra /health —
-# evita depender de curl/wget (ausentes na imagem slim) e deixa o Coolify/Docker
-# lerem a saúde direto. Lê $PORT em runtime pra bater com o CMD.
+# Container-native healthcheck: uses python (already present) against /health —
+# avoids depending on curl/wget (absent in the slim image) and lets Coolify/Docker
+# read the health directly. Reads $PORT at runtime to match the CMD.
 HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
     CMD python -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('PORT','8000')+'/health').read()"
-# Sobe o servidor ASGI. (Alembic upgrade no boot entra quando a persistência chegar — ADR-0014.)
+# Starts the ASGI server. (Alembic upgrade at boot arrives with persistence — ADR-0014.)
 CMD ["sh", "-c", "uvicorn luc_api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

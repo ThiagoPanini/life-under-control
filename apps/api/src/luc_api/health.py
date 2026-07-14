@@ -1,15 +1,17 @@
-"""Borda de servidor: healthcheck (liveness probe público)."""
+"""Server edge: healthcheck (public liveness probe)."""
 
 from fastapi import APIRouter
+
+__all__ = ["router"]
 
 router = APIRouter()
 
 
 @router.get("/health")
 async def health() -> dict[str, str]:
-    """Responde enquanto o processo está de pé.
+    """Responds while the process is up.
 
     Returns:
-        Estado do processo.
+        Process status.
     """
     return {"status": "ok"}

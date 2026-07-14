@@ -1,24 +1,27 @@
-"""Adapter do `Clock` sobre o relógio do sistema, no fuso do Lar (America/Sao_Paulo).
+"""`Clock` adapter over the system clock, in the Household (Lar) timezone.
 
-Formata como data civil (YYYY-MM-DD), sem hora nem timezone vazando para o domínio.
+Yields a civil date (`datetime.date`), with no time or timezone leaking into
+the domain.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from luc_api.shared.application.clock import Clock
 
-_FUSO_LAR = ZoneInfo("America/Sao_Paulo")
+__all__ = ["SystemClock", "system_clock"]
+
+_HOUSEHOLD_TZ = ZoneInfo("America/Sao_Paulo")
 
 
 class SystemClock:
-    """`Clock` sobre o relógio do sistema, no fuso do Lar."""
+    """`Clock` over the system clock, in the Household timezone."""
 
-    def hoje(self) -> str:
-        """A data civil de hoje (YYYY-MM-DD) no fuso do Lar."""
-        return datetime.now(_FUSO_LAR).date().isoformat()
+    def today(self) -> date:
+        """Today's civil date in the Household timezone."""
+        return datetime.now(_HOUSEHOLD_TZ).date()
 
 
 def system_clock() -> Clock:
-    """Monta o `Clock` do sistema no fuso do Lar."""
+    """Builds the system `Clock` in the Household timezone."""
     return SystemClock()
