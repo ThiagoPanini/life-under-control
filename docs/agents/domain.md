@@ -11,7 +11,7 @@ Se algum desses não existir, **siga em silêncio** — não sinalize ausência 
 
 ## Use o vocabulário do glossário
 
-Ao nomear um conceito de domínio (título de issue, proposta de refactor, hipótese, nome de teste), use o termo como definido no `CONTEXT.md`. **Respeite os termos proibidos** lá listados — não derive para sinônimos que o glossário evita. Convenção do repo: termo de domínio em pt-BR; identificador de código em inglês.
+Ao nomear um conceito de domínio (título de issue, proposta de refactor, hipótese, nome de teste), use o termo como definido no `CONTEXT.md`. **Respeite os termos proibidos** lá listados — não derive para sinônimos que o glossário evita. Convenção do repo: termo de domínio em pt-BR; identificador de código em inglês. No `apps/api`, nome de teste e todo artefato de código são em inglês, usando a coluna inglesa do glossário para termos de domínio ([ADR-0016](../adr/0016-ingles-codigo-apps-api.md)); a regra do nome de teste pt-BR segue valendo no `apps/web`.
 
 Se o conceito ainda não está no glossário, isso é um sinal: ou você está inventando linguagem que o projeto não usa (reconsidere), ou há uma lacuna real (anote para o `/domain-modeling`).
 

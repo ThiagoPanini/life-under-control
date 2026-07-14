@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> Repositório em **pt-BR** (prosa, comentários, copy de UI, commits).
+> Repositório em **pt-BR** (prosa, comentários, copy de UI, commits). Exceção: todo artefato de código do `apps/api` é em inglês ([ADR-0016](docs/adr/0016-ingles-codigo-apps-api.md)).
 
 **Life Under Control (LUC)** — organizador da vida adulta de um **Lar** (um casal com acesso idêntico aos mesmos dados). Um cockpit com as Áreas da vida (Finanças, Saúde, Carro…), operado inteiramente de dentro do portal. App único Next.js full-stack + Postgres. Estado: **pré-protótipo** — `CONTEXT.md` e ADRs estabelecidos; a implementação começa após o protótipo no Claude Design. Faseamento por Áreas ([ADR-0006](docs/adr/0006-faseamento-por-areas.md)).
 
@@ -27,7 +27,7 @@ O sistema visual oficial do LUC está em [`docs/design/`](docs/design/README.md)
 
 ## Convenções (não negociáveis)
 
-- Termo de domínio em pt-BR; **identificador de código em inglês** (mapa no glossário do `CONTEXT.md`). Respeite os termos proibidos lá listados.
+- Termo de domínio em pt-BR; **identificador de código em inglês** (mapa no glossário do `CONTEXT.md`). Respeite os termos proibidos lá listados. No `apps/api`, o inglês cobre **todo** o código — docstrings, comentários, nomes de teste, mensagens de exceção ([ADR-0016](docs/adr/0016-ingles-codigo-apps-api.md)); copy de produto emitida pela borda (ex.: mensagens do bot WhatsApp) permanece pt-BR.
 - **Markdown sem hard-wrap:** uma linha por parágrafo (quebra só *entre* parágrafos) — não corte frases em ~80 colunas; o soft-wrap é do editor. Quebra de linha só onde tem semântica: item de lista, linha de tabela, bloco de código. Vale pra todo `.md`, inclusive o escrito por agente.
 - **Conventional Commits**, subject minúsculo (validado por commitlint).
 - **Prompts:** quando o dono pedir "um prompt", salve em `prompts/` (nunca no scratchpad), nome `YYYYMMDDHHMMSS_slug-kebab-ptBR.md` — timestamp via `date +%Y%m%d%H%M%S`, slug curto em pt-BR; corpo em pt-BR começando por `# Título`, sem frontmatter. Diretório é local (gitignored).
@@ -47,8 +47,10 @@ Ao tocar a lógica do LUC, considere:
 - **Borda fina.** UI (Server Actions/Components) hoje; amanhã webhook de WhatsApp, OCR, importação — toda borda chama os **mesmos** use-cases. Borda nunca fala com o store direto; fala com use-case.
 - **Primitivos descritivos, não schema fechado** ([ADR-0005](docs/adr/0005-primitivos-descritivos-spine-especializacao.md)). Tarefa/Registro/Métrica/Indicação/Gerador são spines genéricos; cada Área os especializa (Lançamento é-um Registro; Conta é o Gerador de Finanças). O catálogo cresce por Área — não crave ontologia universal a partir de uma Área só.
 - **Persistir fatos, derivar interpretações** (CONTEXT.md). "Atrasado", juros, vencimento esperado são calculados, nunca colunas.
-- **Dinheiro** = inteiro em centavos, BRL; nunca ponto flutuante (CONTEXT.md #6).
-- **Testes:** use-case com fakes dos ports (sem DB); `Clock` port no lugar do relógio real. GWT (`given`/`when`/`then`), nome `test_<cenário>_<esperado>`.
+- **Dinheiro** = inteiro em centavos, BRL; nunca ponto flutuante (CONTEXT.md #6). No `apps/api`: funções puras sobre `int`, sem VO `Money` ([ADR-0015](docs/adr/0015-forma-dominio-python-tipos-nativos.md)).
+- **Datas civis** no `apps/api` = `datetime.date` no domínio (validação vira parse na borda); Competência = `str` `"YYYY-MM"` ([ADR-0015](docs/adr/0015-forma-dominio-python-tipos-nativos.md)). Regra geral de forma: tipo nativo semântico quando existe; primitivo quando a representação é contrato de ponta a ponta; VO próprio (`dataclass frozen`) só para conceito composto com comportamento, no contexto.
+- **Estrutura Python por conceito de domínio, nunca por tipo DDD** (sem `entities/`/`value_objects/`): módulo por conceito; subpacote só quando um Assunto/agregado coeso emergir; módulos por papel (`errors.py`, `events.py`) ok; ports em `application/`; `shared/` é kernel mínimo (entra só o que 2+ contextos usam); `__all__` + façade + docstring-mapa nos `__init__.py`; sem base classes de DDD.
+- **Testes:** use-case com fakes dos ports (sem DB); `Clock`/`FixedClock` no lugar do relógio real (nunca freezegun). Nome `test_<scenario>_<expected>` carrega o cenário (inglês no `apps/api`; no web segue `test_<cenário>_<esperado>` pt-BR); corpo AAA separado por linha em branco; comentários `# given`/`# when`/`# then` só onde há montagem real (use-case/adapter). No porte do oráculo TS: um teste por caso, ordem preservada (`parametrize` só em teste novo). `tests/` espelha `src/` com `__init__.py` por nível.
 
 Porquê: [ADR-0003](docs/adr/0003-nucleo-dominio-multi-borda.md) e [ADR-0005](docs/adr/0005-primitivos-descritivos-spine-especializacao.md).
 
