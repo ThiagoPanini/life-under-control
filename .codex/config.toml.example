@@ -1,5 +1,6 @@
 # Template local do Codex. Copie para .codex/config.toml, que e gitignored.
 # O Hostinger le o token do .env; cole o token Coolify somente na copia gitignored.
+# O Meta DevTools autentica por OAuth (codex mcp login meta-devtools) — nao ha token no arquivo.
 
 [mcp_servers.hostinger-vps]
 command = "npx"
@@ -19,4 +20,8 @@ COOLIFY_ACCESS_TOKEN = "<COLE_O_TOKEN_DO_COOLIFY>"
 
 [mcp_servers.cloudflare]
 url = "https://mcp.cloudflare.com/mcp"
+default_tools_approval_mode = "prompt"
+
+[mcp_servers.meta-devtools]
+url = "https://mcp.facebook.com/devtools"
 default_tools_approval_mode = "prompt"
