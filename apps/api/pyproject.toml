@@ -97,3 +97,13 @@ layers = [
     "domain",
 ]
 containers = ["luc_api.shared"]
+
+[[tool.importlinter.contracts]]
+name = "identity follows hexagonal layers (domain < application < adapters)"
+type = "layers"
+layers = [
+    "(adapters)",
+    "application",
+    "domain",
+]
+containers = ["luc_api.identity"]
