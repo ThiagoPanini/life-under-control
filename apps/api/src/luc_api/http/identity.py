@@ -47,7 +47,7 @@ def current_identity(request: Request) -> Identity:
             translates it to 401 problem+json.
     """
     scheme, _, token = request.headers.get("Authorization", "").partition(" ")
-    if scheme != "Bearer" or not token:
+    if scheme.lower() != "bearer" or not token:  # auth scheme is case-insensitive (RFC 7235)
         raise AuthenticationError("Missing bearer token")
 
     settings: Settings = request.app.state.settings
@@ -64,11 +64,17 @@ def current_identity(request: Request) -> Identity:
     except jwt.InvalidTokenError as error:
         raise AuthenticationError("Invalid internal token") from error
 
-    user_id = claims.get("sub")
-    household_id = claims.get("household")
-    if not isinstance(user_id, str) or not isinstance(household_id, str):
-        raise AuthenticationError("Token identity claims are malformed")
-    return Identity(user_id=user_id, household_id=household_id)
+    return Identity(
+        user_id=_text_claim(claims, "sub"),
+        household_id=_text_claim(claims, "household"),
+    )
+
+
+def _text_claim(claims: dict[str, object], name: str) -> str:
+    value = claims.get(name)
+    if not isinstance(value, str) or not value:
+        raise AuthenticationError(f"Token claim '{name}' is malformed")
+    return value
 
 
 CurrentIdentity = Annotated[Identity, Depends(current_identity)]

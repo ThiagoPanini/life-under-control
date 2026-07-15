@@ -91,6 +91,34 @@ async def test_invalid_signature_returns_401() -> None:
     assert response.status_code == 401
 
 
+async def test_lowercase_bearer_scheme_is_accepted() -> None:
+    # The auth scheme token is case-insensitive (RFC 7235).
+    token = mint_token()
+
+    async with client() as http:
+        response = await http.get("/me", headers={"Authorization": f"bearer {token}"})
+
+    assert response.status_code == 200
+
+
+async def test_empty_sub_claim_returns_401() -> None:
+    token = mint_token(sub="")
+
+    async with client() as http:
+        response = await http.get("/me", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 401
+
+
+async def test_empty_household_claim_returns_401() -> None:
+    token = mint_token(household="")
+
+    async with client() as http:
+        response = await http.get("/me", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 401
+
+
 async def test_missing_household_claim_returns_401() -> None:
     token = mint_token(household=None)
 
