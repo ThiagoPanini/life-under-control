@@ -90,11 +90,14 @@ testpaths = ["tests"]
 root_package = "luc_api"
 
 [[tool.importlinter.contracts]]
-name = "shared follows hexagonal layers (domain < application < adapters)"
+name = "contexts follow hexagonal layers (domain < application < adapters)"
 type = "layers"
 layers = [
-    "adapters",
+    "(adapters)",
     "application",
     "domain",
 ]
-containers = ["luc_api.shared"]
+containers = [
+    "luc_api.shared",
+    "luc_api.finance",
+]
