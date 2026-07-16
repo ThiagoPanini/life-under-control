@@ -8,9 +8,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
 
-from luc_api.finance.domain.attachment import Attachment, AttachmentData
+from luc_api.finance.domain.attachment import Attachment, AttachmentData, receipt_key
 
-__all__ = ["AttachmentRepo", "FakeAttachmentRepo", "NewAttachment"]
+__all__ = ["AttachmentRepo", "FakeAttachmentRepo", "NewAttachment", "receipt_key"]
 
 
 @dataclass(frozen=True)

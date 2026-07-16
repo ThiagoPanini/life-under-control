@@ -106,4 +106,12 @@ containers = [
     "luc_api.shared",
     "luc_api.finance",
     "luc_api.identity",
+    "luc_api.whatsapp",
 ]
+
+[[tool.importlinter.contracts]]
+name = "whatsapp consumes financas only via the public application layer"
+type = "forbidden"
+source_modules = ["luc_api.whatsapp"]
+forbidden_modules = ["luc_api.finance.domain"]
+allow_indirect_imports = true

@@ -7,9 +7,9 @@ precedent) so every suite drives the same double.
 from dataclasses import dataclass, fields
 from typing import Protocol
 
-from luc_api.finance.domain.payment import Payment, PaymentData
+from luc_api.finance.domain.payment import Payment, PaymentData, PaymentRaw
 
-__all__ = ["FakePaymentRepo", "NewPayment", "PaymentRepo"]
+__all__ = ["FakePaymentRepo", "NewPayment", "Payment", "PaymentRaw", "PaymentRepo"]
 
 
 @dataclass(frozen=True)

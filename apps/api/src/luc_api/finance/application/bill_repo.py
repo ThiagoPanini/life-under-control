@@ -4,9 +4,27 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Protocol
 
-from luc_api.finance.domain.bill import Bill, BillData
+from luc_api.finance.domain.bill import (
+    Bill,
+    BillData,
+    DueRule,
+    FixedDayRule,
+    LastBusinessDayRule,
+    NthBusinessDayRule,
+    Recurrence,
+)
 
-__all__ = ["BillDependents", "BillRepo", "NewBill"]
+__all__ = [
+    "Bill",
+    "BillDependents",
+    "BillRepo",
+    "DueRule",
+    "FixedDayRule",
+    "LastBusinessDayRule",
+    "NewBill",
+    "NthBusinessDayRule",
+    "Recurrence",
+]
 
 
 @dataclass(frozen=True)
