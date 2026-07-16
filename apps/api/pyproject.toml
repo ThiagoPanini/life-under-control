@@ -100,4 +100,5 @@ layers = [
 containers = [
     "luc_api.shared",
     "luc_api.finance",
+    "luc_api.identity",
 ]
