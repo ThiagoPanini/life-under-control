@@ -9,8 +9,35 @@ from dataclasses import replace
 from typing import Protocol
 
 from luc_api.identity.domain.household import User
+from luc_api.shared.domain.errors import ConflictError
 
-__all__ = ["InMemoryUserRepo", "UserRepo"]
+__all__ = [
+    "GoogleEmailAlreadyLinkedError",
+    "InMemoryUserRepo",
+    "UserRepo",
+    "WhatsappPhoneAlreadyLinkedError",
+]
+
+
+class GoogleEmailAlreadyLinkedError(ConflictError):
+    """Another User already has this Google email linked (unique-index race).
+
+    The use-case's own pre-write check (`get_by_google_email`) already covers
+    the common case; this is the port's guarantee for the race it can't see —
+    two concurrent links losing to the same database constraint.
+    """
+
+    def __init__(self, google_email: str) -> None:
+        """Record which email lost the race."""
+        super().__init__(f"Google email {google_email} is already linked to another User")
+
+
+class WhatsappPhoneAlreadyLinkedError(ConflictError):
+    """Another User already has this WhatsApp phone linked (unique-index race)."""
+
+    def __init__(self, whatsapp_phone: str) -> None:
+        """Record which phone lost the race."""
+        super().__init__(f"WhatsApp phone {whatsapp_phone} is already linked to another User")
 
 
 class UserRepo(Protocol):
@@ -29,7 +56,11 @@ class UserRepo(Protocol):
         ...
 
     async def link_google_email(self, user_id: str, google_email: str) -> None:
-        """Persist the Google email link of a User (already normalized to lowercase)."""
+        """Persist the Google email link of a User (already normalized to lowercase).
+
+        Raises:
+            GoogleEmailAlreadyLinkedError: Another User won the race for this email.
+        """
         ...
 
     async def get_by_whatsapp_phone(self, whatsapp_phone: str) -> User | None:
@@ -37,7 +68,11 @@ class UserRepo(Protocol):
         ...
 
     async def link_whatsapp_phone(self, user_id: str, whatsapp_phone: str) -> None:
-        """Persist the WhatsApp phone (E.164) link of a User."""
+        """Persist the WhatsApp phone (E.164) link of a User.
+
+        Raises:
+            WhatsappPhoneAlreadyLinkedError: Another User won the race for this phone.
+        """
         ...
 
     async def unlink_whatsapp_phone(self, user_id: str) -> None:

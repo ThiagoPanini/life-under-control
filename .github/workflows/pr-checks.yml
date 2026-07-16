@@ -79,8 +79,9 @@ jobs:
   api:
     name: api
     runs-on: ubuntu-latest
-    # Postgres real, provisionado desde já para o Seam-2 das fatias F2
-    # (vazio por ora — só o passo de teste recebe DATABASE_URL).
+    # Postgres real para o Seam-2 das fatias F2 (repos + fidelidade do MetaData
+    # + boot do Alembic). Os demais passos ignoram o serviço; só o passo de
+    # teste recebe DATABASE_URL.
     services:
       postgres:
         image: postgres:16-alpine

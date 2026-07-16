@@ -3,3 +3,5 @@
 import os
 
 os.environ.setdefault("LUC_INTERNAL_JWT_SECRET", "test-only-secret-0123456789abcdef")
+
+pytest_plugins = ["tests.support.postgres"]
