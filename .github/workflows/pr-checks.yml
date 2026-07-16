@@ -80,10 +80,7 @@ jobs:
     name: api
     runs-on: ubuntu-latest
     # Postgres real, provisionado desde já para o Seam-2 das fatias F2
-    # (vazio por ora — só o passo de teste recebe DATABASE_URL). MinIO real
-    # para o R2AttachmentStore (#194) — mesma imagem do docker-compose local,
-    # exceto pela distro (bitnami roda o server sem args; GH Actions services:
-    # não tem como passar `server /data` pro minio/minio oficial).
+    # (vazio por ora — só o passo de teste recebe DATABASE_URL).
     services:
       postgres:
         image: postgres:16-alpine
@@ -98,18 +95,6 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-      minio:
-        image: bitnami/minio:latest
-        env:
-          MINIO_ROOT_USER: lucminio
-          MINIO_ROOT_PASSWORD: lucminio123
-        ports:
-          - 9000:9000
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v7
       - id: appcheck
@@ -120,6 +105,21 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
             echo "::notice::apps/api ainda nao existe — gate api pulado."
           fi
+      # MinIO real pro R2AttachmentStore (#194) — mesma imagem do
+      # docker-compose local (minio/minio). O schema `services:` do GitHub
+      # Actions não passa `command:` pro container, e essa imagem exige
+      # `server /data` como args pra subir o servidor; roda via `docker run`
+      # manual em vez de `services:`.
+      - name: start minio
+        if: steps.appcheck.outputs.exists == 'true'
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=lucminio \
+            -e MINIO_ROOT_PASSWORD=lucminio123 \
+            minio/minio server /data
+          until curl -sf http://localhost:9000/minio/health/live; do
+            echo "aguardando o MinIO..."; sleep 1
+          done
       - uses: astral-sh/setup-uv@v6
         if: steps.appcheck.outputs.exists == 'true'
         with:
