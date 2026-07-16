@@ -80,7 +80,10 @@ jobs:
     name: api
     runs-on: ubuntu-latest
     # Postgres real, provisionado desde já para o Seam-2 das fatias F2
-    # (vazio por ora — só o passo de teste recebe DATABASE_URL).
+    # (vazio por ora — só o passo de teste recebe DATABASE_URL). MinIO real
+    # para o R2AttachmentStore (#194) — mesma imagem do docker-compose local,
+    # exceto pela distro (bitnami roda o server sem args; GH Actions services:
+    # não tem como passar `server /data` pro minio/minio oficial).
     services:
       postgres:
         image: postgres:16-alpine
@@ -92,6 +95,18 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U luc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      minio:
+        image: bitnami/minio:latest
+        env:
+          MINIO_ROOT_USER: lucminio
+          MINIO_ROOT_PASSWORD: lucminio123
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -133,6 +148,10 @@ jobs:
         working-directory: apps/api
         env:
           DATABASE_URL: postgres://luc:luc@localhost:5432/luc
+          R2_ENDPOINT: http://localhost:9000
+          R2_ACCESS_KEY_ID: lucminio
+          R2_SECRET_ACCESS_KEY: lucminio123
+          R2_BUCKET: luc-attachments-test
         run: uv run --frozen pytest
 
   security:
