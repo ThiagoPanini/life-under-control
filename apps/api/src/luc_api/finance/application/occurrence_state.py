@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from luc_api.finance.application.bill_card import PROXIMITY_THRESHOLD_DAYS, BeaconState
-from luc_api.finance.domain.bill import Recurrence, describe_month_full_pt
+from luc_api.finance.domain.bill import MONTHS_PT, Recurrence
 from luc_api.finance.domain.payment import describe_reference_period_pt
 from luc_api.shared.domain import format_br_date
 
@@ -83,7 +83,7 @@ def long_reading_of_occurrence(occurrence: Occurrence, today: date) -> str:
     Settled never repeats the due date — the pill/short phrase already covers
     "when it was paid".
     """
-    month = describe_month_full_pt(occurrence.reference_period).split(" de ")[0]
+    month = MONTHS_PT[int(occurrence.reference_period[5:7]) - 1].lower()
     if occurrence.settled:
         return f"competência de {month} quitada"
 

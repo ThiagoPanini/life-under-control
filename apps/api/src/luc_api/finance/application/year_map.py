@@ -24,6 +24,7 @@ from luc_api.finance.application.bill_card import (
     recent_occurrences,
     reference_period_of,
     resolve_due_date,
+    round_half_up,
 )
 from luc_api.finance.application.calendar import Calendar
 from luc_api.finance.application.historical_analysis import HISTORICAL_WINDOW_MONTHS, MONTHLY
@@ -112,16 +113,6 @@ class YearMap:
     """The window's reference periods."""
     rows: list[MapRow] = field(default_factory=list[MapRow])
     """One row per Bill whose effective period intersects the window."""
-
-
-def _round_half_up(total: int, count: int) -> int:
-    """Rounds `total / count` to the nearest integer, ties rounding up (mirrors JS `Math.round`).
-
-    Both operands are non-negative money sums here, so this integer formula
-    avoids Python's `round()` (banker's rounding) without ever going through a
-    float.
-    """
-    return (2 * total + count) // (2 * count)
 
 
 def _index_by_bill(payments: list[Payment]) -> dict[str, list[Payment]]:
@@ -239,7 +230,7 @@ def derive_year_map(
             )
 
         values = list(totals.values())
-        average = _round_half_up(sum(values), len(values)) if values else None
+        average = round_half_up(sum(values), len(values)) if values else None
 
         cells = [
             _classify_cell(

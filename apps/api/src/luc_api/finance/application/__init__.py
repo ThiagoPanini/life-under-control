@@ -123,8 +123,8 @@ from luc_api.finance.application.monthly_panorama import (
     MonthCardState,
     PanoramaCard,
     derive_monthly_panorama,
-    estado_da_ocorrencia,
     phrase_of_month_card,
+    state_of_occurrence,
 )
 from luc_api.finance.application.notifier import FakeNotifier, Notifier, Template
 from luc_api.finance.application.occurrence_state import (
@@ -319,7 +319,6 @@ __all__ = [
     "detail_bill_punctuality",
     "edit_bill",
     "edit_payment",
-    "estado_da_ocorrencia",
     "estimate_remaining_for_month",
     "estimate_remaining_to_pay",
     "grid_occurrences",
@@ -346,6 +345,7 @@ __all__ = [
     "resolve_due_date",
     "send_due_digest",
     "sort_by_urgency",
+    "state_of_occurrence",
     "sum_paid_in_month",
     "total_paid_in_month",
 ]

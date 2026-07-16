@@ -40,6 +40,7 @@ __all__ = [
     "recent_occurrences",
     "reference_period_of",
     "resolve_due_date",
+    "round_half_up",
 ]
 
 OCCURRENCES_IN_WINDOW = 12
@@ -297,7 +298,7 @@ def grid_occurrences(
     return cells
 
 
-def _round_half_up(total: int, count: int) -> int:
+def round_half_up(total: int, count: int) -> int:
     """Rounds `total / count` to the nearest integer, ties rounding up (mirrors JS `Math.round`).
 
     Both operands are non-negative money sums here, so this integer formula avoids
@@ -315,7 +316,7 @@ def payments_summary(grid: list[GridCell]) -> PaymentsSummary:
     """
     sparkline = [cell.amount_cents for cell in grid]
     paid = [v for v in sparkline if v is not None]
-    average = _round_half_up(sum(paid), len(paid)) if paid else None
+    average = round_half_up(sum(paid), len(paid)) if paid else None
     return PaymentsSummary(average_cents=average, sparkline=sparkline)
 
 

@@ -82,8 +82,10 @@ def _expected_reference_periods(
     A closed Bill still expected an occurrence **before** it closed — excluding
     it would erase a real "expected it and didn't pay" fact (e.g. a missed month
     before canceling the subscription), disguising it as a gap. But it can't
-    expect anything **after** its own closing — hence the cap at the closing
-    reference period's month.
+    expect anything **after** its own closing, nor **before** it started
+    projecting — hence the cap at the closing reference period's month on one
+    end and `first_reference_period` on the other (a brand-new Bill must not
+    turn the months before it existed into false "expected it" facts).
     """
     expected: set[str] = set()
     for bill in bills:
@@ -93,5 +95,7 @@ def _expected_reference_periods(
             else current_reference_period
         )
         for reference_period in recent_occurrences(bill.recurrence, ref_reference_period, size):
+            if reference_period < bill.first_reference_period:
+                continue
             expected.add(reference_period)
     return expected

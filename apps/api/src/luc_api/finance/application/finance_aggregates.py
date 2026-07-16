@@ -19,9 +19,11 @@ from luc_api.finance.application.bill_card import (
     beacon_of_month,
     recent_occurrences,
     reference_period_of,
+    round_half_up,
 )
 from luc_api.finance.application.calendar import Calendar
-from luc_api.finance.domain.bill import Bill, Recurrence
+from luc_api.finance.application.historical_analysis import MONTHLY
+from luc_api.finance.domain.bill import Bill
 from luc_api.finance.domain.payment import Payment
 from luc_api.shared.application.clock import Clock
 
@@ -43,9 +45,6 @@ __all__ = [
 
 SPEND_WINDOW_MONTHS = 12
 """Window of the average monthly spend: the last 12 **complete** months (excludes the current one)."""
-
-_MONTHLY = Recurrence(interval_months=1, anchor_month=None)
-"""Pure monthly recurrence — used only to enumerate the average-spend window's months."""
 
 _OPEN_BEACONS = ("amarelo", "vermelho")
 """The two beacon states counted as "open" for `count_open_bills`/`estimate_remaining_to_pay`."""
@@ -77,7 +76,7 @@ def derive_total_paid_series(
 
     active_ids = {bill.id for bill in active}
     current_reference_period = reference_period_of(today)
-    reference_periods = recent_occurrences(_MONTHLY, current_reference_period, size)
+    reference_periods = recent_occurrences(MONTHLY, current_reference_period, size)
 
     return [
         MonthlySeriesPoint(
@@ -210,7 +209,7 @@ def average_monthly_spend(bills: list[Bill], payments: list[Payment], today: dat
     active_ids = {bill.id for bill in _active_bills(bills)}
     # 13 months up to the current one, minus the current one: the window's 12 complete months.
     window = set(
-        recent_occurrences(_MONTHLY, reference_period_of(today), SPEND_WINDOW_MONTHS + 1)[
+        recent_occurrences(MONTHLY, reference_period_of(today), SPEND_WINDOW_MONTHS + 1)[
             :SPEND_WINDOW_MONTHS
         ]
     )
@@ -224,7 +223,7 @@ def average_monthly_spend(bills: list[Bill], payments: list[Payment], today: dat
 
     if not had_spend:
         return None
-    return _round_half_up(total, SPEND_WINDOW_MONTHS)
+    return round_half_up(total, SPEND_WINDOW_MONTHS)
 
 
 def _average_paid(bill: Bill, bill_payments: list[Payment], today: date) -> int | None:
@@ -248,7 +247,7 @@ def _average_paid(bill: Bill, bill_payments: list[Payment], today: date) -> int 
 
     if not amounts:
         return None
-    return _round_half_up(sum(amounts), len(amounts))
+    return round_half_up(sum(amounts), len(amounts))
 
 
 def estimate_remaining_to_pay(
@@ -273,16 +272,6 @@ def estimate_remaining_to_pay(
             continue  # no history: not estimated
         total = (total or 0) + average
     return total
-
-
-def _round_half_up(total: int, count: int) -> int:
-    """Rounds `total / count` to the nearest integer, ties rounding up (mirrors JS `Math.round`).
-
-    Both operands are non-negative money sums here, so this integer formula
-    avoids Python's `round()` (banker's rounding) without ever going through a
-    float.
-    """
-    return (2 * total + count) // (2 * count)
 
 
 def derive_finance_aggregates(

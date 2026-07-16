@@ -32,8 +32,8 @@ __all__ = [
     "MonthCardState",
     "PanoramaCard",
     "derive_monthly_panorama",
-    "estado_da_ocorrencia",
     "phrase_of_month_card",
+    "state_of_occurrence",
 ]
 
 MonthCardState = Literal["pago", "a-vencer", "vence-em-breve", "vencida"]
@@ -94,7 +94,7 @@ def _days_until(today: date, target: date) -> int:
     return (target - today).days
 
 
-def estado_da_ocorrencia(settled: bool, days: int) -> MonthCardState:
+def state_of_occurrence(settled: bool, days: int) -> MonthCardState:
     """The occurrence's state: `pago` first, else derived from the distance to the due date."""
     if settled:
         return "pago"
@@ -169,7 +169,7 @@ def derive_monthly_panorama(
         total = sum(p.amount_cents for p in settlements) if settlements else None
         settled = total is not None
         days = _days_until(today, due_date)
-        state = estado_da_ocorrencia(settled, days)
+        state = state_of_occurrence(settled, days)
 
         average = historical_average_up_to(bill, own, reference_period) if not settled else None
         if total is not None:

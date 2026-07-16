@@ -19,6 +19,7 @@ from luc_api.finance.application.bill_card import (
     add_months,
     recent_occurrences,
     resolve_due_date,
+    round_half_up,
 )
 from luc_api.finance.application.calendar import Calendar
 from luc_api.finance.domain.bill import Bill
@@ -73,16 +74,6 @@ def _sum_in_reference_period(payments: list[Payment], reference_period: str) -> 
     return sum(p.amount_cents for p in relevant)
 
 
-def _round_half_up(total: int, count: int) -> int:
-    """Rounds `total / count` to the nearest integer, ties rounding up (mirrors JS `Math.round`).
-
-    Both operands are non-negative money sums here, so this integer formula
-    avoids Python's `round()` (banker's rounding) without ever going through
-    a float.
-    """
-    return (2 * total + count) // (2 * count)
-
-
 def historical_average_up_to(
     bill: Bill, payments: list[Payment], reference_period: str
 ) -> int | None:
@@ -99,7 +90,7 @@ def historical_average_up_to(
     values = [v for rp in window if (v := _sum_in_reference_period(own, rp)) is not None]
     if not values:
         return None
-    return _round_half_up(sum(values), len(values))
+    return round_half_up(sum(values), len(values))
 
 
 def project_month_spend(
@@ -257,7 +248,9 @@ def list_prior_pending(
     """Pendings from prior reference periods: open occurrences (without a Payment) in the 12 reference periods preceding the target one, per active Bill.
 
     Always a collection — never absorbed into the current reference period's
-    total.
+    total. A reference period before the Bill's `first_reference_period` is
+    outside its effective period (ADR-0011) — never a fabricated pending for a
+    Bill that did not exist yet.
     """
     month_before = add_months(reference_period, -1)
     pending: list[PriorPending] = []
@@ -265,6 +258,8 @@ def list_prior_pending(
         window = recent_occurrences(bill.recurrence, month_before, OCCURRENCES_IN_WINDOW)
         own = [p for p in payments if p.bill_id == bill.id]
         for rp in window:
+            if rp < bill.first_reference_period:
+                continue
             if any(p.reference_period == rp for p in own):
                 continue
             due_date = resolve_due_date(bill.due_rule, bill.due_month_offset, rp, calendar)

@@ -256,6 +256,16 @@ def test_prior_pendings_are_a_collection():
     assert all(p.bill_id == "luz" for p in pending)
 
 
+def test_prior_pendings_never_predate_the_bills_first_reference_period():
+    # a brand-new Bill (first_reference_period is the target month itself) must
+    # not fabricate 12 pending months for a Bill that did not exist yet
+    bill = bill_base(id="luz", first_reference_period="2026-06")
+
+    pending = list_prior_pending(FakeCalendar(), [bill], [], "2026-06")
+
+    assert pending == []
+
+
 # --- derive_reference_period_shape (Seam 1) ---
 
 

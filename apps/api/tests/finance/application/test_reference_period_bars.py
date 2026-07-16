@@ -142,6 +142,22 @@ def test_closed_bill_does_not_generate_expectation_after_its_own_closing():
     assert may == BarPoint(reference_period="2026-05", amount_cents=0, state="lacuna")
 
 
+def test_bill_does_not_generate_expectation_before_its_own_first_reference_period():
+    # A brand-new Bill (first_reference_period is the current month) cannot have expected
+    # anything in the months before it existed — those must be "lacuna", never a fabricated
+    # "fechado" (which would say the household missed a payment it never owed).
+    new_bill = bill_base(first_reference_period="2026-06")
+    series = derive_total_paid_series([new_bill], [], date(2026, 6, 15), 3)
+
+    points = reference_period_bar_points(series, [new_bill], date(2026, 6, 15))
+
+    assert points == [
+        BarPoint(reference_period="2026-04", amount_cents=0, state="lacuna"),
+        BarPoint(reference_period="2026-05", amount_cents=0, state="lacuna"),
+        BarPoint(reference_period="2026-06", amount_cents=0, state="em-curso"),
+    ]
+
+
 # --- closed_values (Seam 1) ---
 
 

@@ -22,8 +22,8 @@ from luc_api.finance.application.calendar import Calendar
 from luc_api.finance.application.monthly_panorama import (
     CardAmount,
     MonthCardState,
-    estado_da_ocorrencia,
     phrase_of_month_card,
+    state_of_occurrence,
 )
 from luc_api.finance.application.punctuality import PunctualityDetail, detail_bill_punctuality
 from luc_api.finance.application.year_map import ValueClassification, classify_value
@@ -125,7 +125,7 @@ def _build_row(
     total = sum(p.amount_cents for p in settlements) if settlements else None
     settled = total is not None
     days = _days_until(today, due_date)
-    state = estado_da_ocorrencia(settled, days)
+    state = state_of_occurrence(settled, days)
     last = _last_settlement(settlements)
 
     grid = grid_occurrences(bill, bill_payments, today, calendar)
