@@ -2,7 +2,8 @@
 
 Map: `domain` (Bill/Conta, Payment/Lançamento, Attachment/Anexo — pure rules),
 `application` (write use-cases and their ports), `adapters` (the Postgres/Core
-repos — Seam-2, F2/ADR-0014).
+repos — Seam-2 — and `R2AttachmentStore` over an S3-compatible bucket;
+F2/ADR-0014).
 """
 
 __all__: list[str] = []
