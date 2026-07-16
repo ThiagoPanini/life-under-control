@@ -3,8 +3,9 @@
 Oracle: apps/web/src/core/domain/bill.test.ts. Describe blocks for
 `ehCompetenciaValida`/`ehDataIsoValida`/`formatarDataBr`/`mesCurto`/
 `diaDaSemanaAbreviado` are kernel-owned (`shared.domain.civil_date`, already
-covered there); pt-BR display helpers (`descreverRecorrencia` etc.) are
-read-side copy and stay out of the facts slice (#188).
+covered there); `descreverMesPorExtenso` is ported below (#189, the derive-*
+slice); `descreverRecorrencia`/`descreverVencimento` stay out — no derive-*
+use-case consumes them yet.
 """
 
 from dataclasses import fields, replace
@@ -16,6 +17,7 @@ from luc_api.finance.domain.bill import (
     LastBusinessDayRule,
     NthBusinessDayRule,
     Recurrence,
+    describe_month_full_pt,
     validate_bill_data,
 )
 
@@ -196,3 +198,14 @@ def test_registration_never_accepts_amount():
 
     assert res.ok is True
     assert "amount_cents" not in {f.name for f in fields(res.value)}
+
+
+# --- describe_month_full_pt (Seam 1) ---
+
+
+def test_month_in_full_lowercase():
+    assert describe_month_full_pt("2026-07") == "julho de 2026"
+
+
+def test_january_in_full():
+    assert describe_month_full_pt("2026-01") == "janeiro de 2026"

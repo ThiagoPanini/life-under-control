@@ -2,7 +2,7 @@
 
 Oracle: apps/web/src/core/domain/payment.test.ts. The `ehCompetenciaValida`
 describe is kernel-owned (`shared.domain.is_valid_reference_period`, covered
-there); `descreverCompetencia` is read-side pt-BR copy, out of the facts slice.
+there); `descreverCompetencia` is ported below (#189, the derive-* slice).
 The oracle's `test_data_invalida_falha` dropped: an invalid date string can no
 longer reach the domain — dates arrive parsed as `datetime.date` (ADR-0015).
 The oracle's NaN/1.5 amount sentinels arrive as `None` (unparseable money).
@@ -11,7 +11,12 @@ The oracle's NaN/1.5 amount sentinels arrive as `None` (unparseable money).
 from dataclasses import replace
 from datetime import date
 
-from luc_api.finance.domain.payment import PaymentRaw, validate_payment_data
+from luc_api.finance.domain.bill import Recurrence
+from luc_api.finance.domain.payment import (
+    PaymentRaw,
+    describe_reference_period_pt,
+    validate_payment_data,
+)
 from luc_api.finance.domain.validation import Valid
 
 _VALID_RAW = PaymentRaw(
@@ -66,3 +71,26 @@ def test_invalid_reference_period_fails():
 
 def test_paid_by_required():
     assert "paidBy" in error_fields(valid_raw(paid_by=""))
+
+
+# --- describe_reference_period_pt (Seam 1) ---
+
+
+def test_monthly_shows_month_and_year():
+    result = describe_reference_period_pt(
+        "2026-07", Recurrence(interval_months=1, anchor_month=None)
+    )
+
+    assert result == "Julho/2026"
+
+
+def test_yearly_shows_only_the_year():
+    result = describe_reference_period_pt("2026-03", Recurrence(interval_months=12, anchor_month=3))
+
+    assert result == "2026"
+
+
+def test_other_cadences_show_month_and_year():
+    result = describe_reference_period_pt("2026-07", Recurrence(interval_months=2, anchor_month=7))
+
+    assert result == "Julho/2026"

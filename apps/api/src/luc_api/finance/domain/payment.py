@@ -7,10 +7,18 @@ shape lives at the edge; unparseable money arrives as `None`.
 from dataclasses import dataclass
 from datetime import date
 
+from luc_api.finance.domain.bill import MONTHS_PT, Recurrence
 from luc_api.finance.domain.validation import FieldError, Invalid, Valid
 from luc_api.shared.domain import is_valid_reference_period
 
-__all__ = ["Payment", "PaymentData", "PaymentRaw", "PaymentValidation", "validate_payment_data"]
+__all__ = [
+    "Payment",
+    "PaymentData",
+    "PaymentRaw",
+    "PaymentValidation",
+    "describe_reference_period_pt",
+    "validate_payment_data",
+]
 
 
 @dataclass(frozen=True)
@@ -82,3 +90,19 @@ def validate_payment_data(raw: PaymentRaw) -> PaymentValidation:
             paid_by=paid_by,
         )
     )
+
+
+_MONTHS_PER_YEAR = 12
+
+
+def describe_reference_period_pt(reference_period: str, recurrence: Recurrence) -> str:
+    """Describes a reference period at the Recurrence's display granularity; product copy.
+
+    Monthly (and other cadences) shows "Julho/2026"; yearly shows only the year
+    ("2026"). The reference period is always `YYYY-MM` in storage — only the
+    *display* changes.
+    """
+    year, month = reference_period.split("-")
+    if recurrence.interval_months == _MONTHS_PER_YEAR:
+        return year
+    return f"{MONTHS_PT[int(month) - 1]}/{year}"

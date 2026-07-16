@@ -13,6 +13,7 @@ from luc_api.shared.domain import is_valid_reference_period
 
 __all__ = [
     "BILL_ICONS",
+    "MONTHS_PT",
     "Bill",
     "BillData",
     "BillRaw",
@@ -23,6 +24,7 @@ __all__ = [
     "LastBusinessDayRule",
     "NthBusinessDayRule",
     "Recurrence",
+    "describe_month_full_pt",
     "validate_bill_data",
 ]
 
@@ -233,3 +235,25 @@ def validate_bill_data(raw: BillRaw) -> BillValidation:  # noqa: PLR0912 — mir
             first_reference_period=first_reference_period,
         )
     )
+
+
+MONTHS_PT = (
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
+)  # product copy
+
+
+def describe_month_full_pt(reference_period: str) -> str:
+    """Full pt-BR lowercase month of a reference period ("2026-07" -> "julho de 2026"); product copy."""
+    year, month = reference_period.split("-")
+    return f"{MONTHS_PT[int(month) - 1].lower()} de {year}"
