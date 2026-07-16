@@ -105,6 +105,21 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
             echo "::notice::apps/api ainda nao existe — gate api pulado."
           fi
+      # MinIO real pro R2AttachmentStore (#194) — mesma imagem do
+      # docker-compose local (minio/minio). O schema `services:` do GitHub
+      # Actions não passa `command:` pro container, e essa imagem exige
+      # `server /data` como args pra subir o servidor; roda via `docker run`
+      # manual em vez de `services:`.
+      - name: start minio
+        if: steps.appcheck.outputs.exists == 'true'
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=lucminio \
+            -e MINIO_ROOT_PASSWORD=lucminio123 \
+            minio/minio server /data
+          until curl -sf http://localhost:9000/minio/health/live; do
+            echo "aguardando o MinIO..."; sleep 1
+          done
       - uses: astral-sh/setup-uv@v6
         if: steps.appcheck.outputs.exists == 'true'
         with:
@@ -133,6 +148,10 @@ jobs:
         working-directory: apps/api
         env:
           DATABASE_URL: postgres://luc:luc@localhost:5432/luc
+          R2_ENDPOINT: http://localhost:9000
+          R2_ACCESS_KEY_ID: lucminio
+          R2_SECRET_ACCESS_KEY: lucminio123
+          R2_BUCKET: luc-attachments-test
         run: uv run --frozen pytest
 
   security:
