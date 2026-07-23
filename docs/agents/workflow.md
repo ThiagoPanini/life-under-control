@@ -68,14 +68,14 @@ Medições de `/implement` reais mostraram a janela chegando a 92-160k de tokens
 - **Issue enxuta.** Só a issue-alvo (`gh issue view N`, title/body/labels); sem irmãs, sem `--comments` salvo necessidade.
 - **Não releia output cru.** `.output` de subagente e dumps de `tool-results/` de MCP já viraram digest — re-consulte a fonte com pergunta dirigida, não releia o dump.
 
-**Enforcement (dois hooks do projeto, em `.claude/hooks/`):**
+**Enforcement (dois hooks globais, em `~/.claude/hooks/` — promovidos por [#54](https://github.com/panlabs-tech/panlabs/issues/54)):**
 
 - **Injetor** (`UserPromptSubmit`): ao ver `/implement` ou "implementa as issues", injeta o protocolo no contexto do turno.
 - **Trava** (`PreToolUse`/Read): bloqueia leitura inteira de paths que nunca valem a pena no implement — `.output`, `tool-results/`, lockfiles, `drizzle/meta/`, artefatos (`node_modules`/`dist`/`.next`/`*.min.*`). Leitura de código-fonte fica livre.
 
-Ambos são **marker-gated** pelo arquivo `.claude/context-economy-protocol.md`: sem ele, são inertes. Isso permite **promover os scripts pro `~/.claude` global** (fonte única, sem drift) e cada repo opta-in só dropando o protocolo — sem duplicar o wiring (hooks de user e project mergeiam e disparariam 2×).
+Ambos são **marker-gated** pelo arquivo `.claude/context-economy-protocol.md`: sem ele, são inertes. A fonte única vive em `~/.claude/hooks/` — este repo não carrega mais cópia dos scripts nem wiring em `.claude/settings.json` (removido na promoção, porque hooks de user e project **mesclam** em vez de o mais específico sobrepor, e duplicar dispararia 2×). O único artefato que o LUC ainda versiona é o próprio `context-economy-protocol.md`, que segue sendo o marker de opt-in.
 
-**Promoção pro global (quando validado no LUC):** (1) `cp .claude/hooks/*.py ~/.claude/hooks/`; (2) mova o bloco `hooks` de `.claude/settings.json` → `~/.claude/settings.json`; (3) **apague** o bloco `hooks` do `.claude/settings.json` do projeto (senão dispara 2×); (4) o LUC mantém o `context-economy-protocol.md` como override/marker; (5) cada outro repo opta-in dropando seu próprio `context-economy-protocol.md`. Scripts não mudam (já `${CLAUDE_PROJECT_DIR}`-relativos e marker-gated).
+Rollout: cada outro repo da org opta-in criando seu próprio `.claude/context-economy-protocol.md` (conteúdo idêntico — a metodologia é portável, não amarrada ao domínio do LUC).
 
 ## Onde as coisas vivem
 
